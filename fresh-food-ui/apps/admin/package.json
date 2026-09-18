@@ -1,0 +1,15 @@
+{
+  "name": "@fresh-food/admin",
+  "private": true,
+  "scripts": { "dev": "next dev -p 3002", "build": "next build", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@fresh-food/design-tokens": "*",
+    "@fresh-food/ui": "*",
+    "lucide-react": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": { "@types/node": "latest", "@types/react": "latest", "@types/react-dom": "latest", "typescript": "latest" }
+}

@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fresh Food — Product Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#1F4D46;
+    --primary-dark:#0F2E29;
+    --primary-tint:#E4ECE9;
+    --accent:#E5623E;
+    --accent-tint:#FBE7DF;
+    --bg:#F6F2EA;
+    --surface:#FFFFFF;
+    --surface-alt:#EFEAE0;
+    --text:#17211E;
+    --text-2:#5C6B66;
+    --text-3:#8B968F;
+    --border:#E3DDCF;
+    --success:#2E7D5B;
+    --success-tint:#E3F1E9;
+    --warning:#B9791F;
+    --warning-tint:#FBEEDC;
+    --error:#BE4436;
+    --error-tint:#FBE7E3;
+    --r-sm:8px; --r-md:14px; --r-lg:22px; --r-pill:999px;
+    --shadow-card:0 2px 12px rgba(20,28,25,0.06);
+    --shadow-pop:0 16px 40px rgba(20,28,25,0.18);
+    --sans:'Manrope',sans-serif;
+    --serif:'Fraunces',serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#EAE4D6;font-family:var(--sans);color:var(--text);}
+  h1,h2,h3{font-family:var(--serif);margin:0;font-weight:600;}
+  p{margin:0;}
+  button{font-family:var(--sans);cursor:pointer;}
+  img{display:block;}
+
+  /* ---------- Shell ---------- */
+  .shell{max-width:1440px;margin:0 auto;padding:28px 28px 80px;}
+  .masthead{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+  .brandmark{display:flex;align-items:center;gap:10px;}
+  .brandmark .mark{width:34px;height:34px;border-radius:10px;background:var(--primary);position:relative;flex:none;}
+  .brandmark .mark::after{content:'';position:absolute;inset:9px;border-radius:50%;background:var(--accent);}
+  .brandmark span{font-family:var(--serif);font-size:20px;font-weight:600;color:var(--primary-dark);}
+  .modeswitch{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-pill);padding:4px;gap:2px;}
+  .modeswitch button{border:none;background:transparent;padding:9px 18px;border-radius:var(--r-pill);font-size:13px;font-weight:700;color:var(--text-2);transition:.15s;}
+  .modeswitch button.active{background:var(--primary);color:#fff;}
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* ---------- Design system tab ---------- */
+  .ds-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;}
+  .ds-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px;}
+  .ds-card h3{font-size:15px;margin-bottom:14px;color:var(--primary-dark);}
+  .swatchrow{display:flex;flex-wrap:wrap;gap:10px;}
+  .swatch{width:78px;}
+  .swatch .chip{height:52px;border-radius:var(--r-sm);border:1px solid rgba(0,0,0,.06);margin-bottom:6px;}
+  .swatch .lbl{font-size:11px;color:var(--text-2);font-weight:600;}
+  .swatch .hex{font-size:10px;color:var(--text-3);}
+  .typebit{margin-bottom:14px;}
+  .typebit .tag{font-size:10px;color:var(--text-3);font-weight:700;margin-bottom:3px;}
+  .btn{border:none;border-radius:var(--r-pill);padding:13px 22px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:8px;}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-accent{background:var(--accent);color:#fff;}
+  .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);}
+  .btn-ghost{background:var(--surface-alt);color:var(--text);}
+  .btn-sm{padding:8px 14px;font-size:12.5px;border-radius:var(--r-pill);}
+  .comp-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px;}
+  .chip-tag{background:var(--surface-alt);border:1px solid var(--border);padding:7px 13px;border-radius:var(--r-pill);font-size:12.5px;font-weight:600;color:var(--text-2);}
+  .chip-tag.on{background:var(--primary-tint);border-color:var(--primary);color:var(--primary-dark);}
+  .badge{padding:4px 10px;border-radius:var(--r-pill);font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px;}
+  .badge-success{background:var(--success-tint);color:var(--success);}
+  .badge-warning{background:var(--warning-tint);color:var(--warning);}
+  .badge-error{background:var(--error-tint);color:var(--error);}
+  .badge-accent{background:var(--accent-tint);color:var(--accent);}
+  .field{margin-bottom:12px;}
+  .field label{font-size:12px;font-weight:700;color:var(--text-2);display:block;margin-bottom:6px;}
+  .field input{width:100%;border:1.5px solid var(--border);border-radius:var(--r-md);padding:12px 14px;font-size:14px;font-family:var(--sans);background:var(--surface);}
+  .field input:focus{outline:2px solid var(--primary);outline-offset:1px;border-color:var(--primary);}
+  .qty{display:inline-flex;align-items:center;border:1.5px solid var(--border);border-radius:var(--r-pill);overflow:hidden;}
+  .qty button{width:32px;height:32px;border:none;background:var(--surface-alt);font-size:16px;font-weight:700;color:var(--primary-dark);}
+  .qty span{width:30px;text-align:center;font-weight:700;font-size:13px;}
+  .mini-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;width:150px;}
+  .mini-card .imgph{height:80px;border-radius:var(--r-sm);background:linear-gradient(135deg,var(--primary-tint),var(--surface-alt));margin-bottom:8px;}
+
+  /* ---------- Section headers within panels ---------- */
+  .section-title{display:flex;align-items:baseline;justify-content:space-between;margin:34px 0 14px;}
+  .section-title h2{font-size:20px;color:var(--primary-dark);}
+  .section-title .sub{font-size:13px;color:var(--text-2);}
+
+  /* ================= CUSTOMER APP ================= */
+  .cust-wrap{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;}
+  .screen-nav{display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:10px;min-width:190px;}
+  .screen-nav button{text-align:left;border:none;background:transparent;padding:10px 12px;border-radius:var(--r-md);font-size:13px;font-weight:600;color:var(--text-2);}
+  .screen-nav button.active{background:var(--primary-tint);color:var(--primary-dark);}
+  .phone{width:375px;height:812px;background:var(--bg);border-radius:44px;border:10px solid #14201D;box-shadow:var(--shadow-pop);position:relative;overflow:hidden;flex:none;}
+  .phone .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:26px;background:#14201D;border-radius:0 0 16px 16px;z-index:5;}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;overflow-y:auto;}
+  .screen.active{display:flex;}
+  .screen::-webkit-scrollbar{display:none;}
+  .status-fake{height:26px;flex:none;}
+
+  .cust-topbar{padding:14px 18px 10px;display:flex;align-items:center;justify-content:space-between;background:var(--bg);flex:none;}
+  .locpill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--primary-dark);}
+  .locpill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);}
+  .icon-btn{width:34px;height:34px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;}
+
+  .search-bar{margin:8px 18px 14px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-pill);padding:12px 16px;font-size:13px;color:var(--text-3);display:flex;align-items:center;gap:8px;flex:none;}
+
+  .hero-banner{margin:0 18px 18px;border-radius:var(--r-lg);background:linear-gradient(120deg,var(--primary) 0%,#2C6259 100%);padding:22px;color:#fff;flex:none;position:relative;overflow:hidden;}
+  .hero-banner::after{content:'';position:absolute;right:-20px;bottom:-30px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.08);}
+  .hero-banner h3{font-size:21px;color:#fff;margin-bottom:4px;line-height:1.15;}
+  .hero-banner p{font-size:12.5px;color:rgba(255,255,255,.8);margin-bottom:14px;}
+
+  .cat-scroll{display:flex;gap:12px;padding:0 18px 20px;overflow-x:auto;flex:none;}
+  .cat-item{flex:none;width:78px;text-align:center;}
+  .cat-item .ico{width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 6px;}
+  .cat-item .lbl{font-size:11.5px;font-weight:700;color:var(--text);}
+
+  .hscroll{display:flex;gap:12px;padding:0 18px 6px;overflow-x:auto;flex:none;}
+  .pcard{flex:none;width:140px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;}
+  .pcard .imgph{height:96px;position:relative;background:linear-gradient(135deg,#DCE7E3,#F1EBDF);}
+  .pcard .imgph .fresh{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.92);padding:3px 8px;border-radius:var(--r-pill);font-size:9.5px;font-weight:800;color:var(--success);display:flex;gap:4px;align-items:center;}
+  .pcard .imgph .fresh::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--success);}
+  .pcard .imgph .fav{position:absolute;top:8px;right:8px;width:22px;height:22px;background:rgba(255,255,255,.92);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;}
+  .pcard .body{padding:10px;}
+  .pcard .name{font-size:12.5px;font-weight:700;margin-bottom:2px;}
+  .pcard .sub{font-size:10.5px;color:var(--text-3);margin-bottom:6px;}
+  .pcard .pricerow{display:flex;align-items:center;justify-content:space-between;}
+  .pcard .price{font-size:13px;font-weight:800;color:var(--primary-dark);}
+  .pcard .price .unit{font-size:10px;font-weight:600;color:var(--text-3);}
+  .addbtn{width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+  .section-inline{padding:0 18px;display:flex;align-items:baseline;justify-content:space-between;margin:18px 0 10px;flex:none;}
+  .section-inline h3{font-size:15px;}
+  .section-inline .link{font-size:11.5px;font-weight:700;color:var(--accent);}
+
+  .offer-card{flex:none;width:200px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;display:flex;gap:10px;}
+  .offer-card .imgph{width:60px;height:60px;border-radius:var(--r-sm);background:linear-gradient(135deg,#F3E0D6,#EFEAE0);flex:none;}
+  .offer-card .name{font-size:12px;font-weight:700;margin-bottom:3px;}
+  .offer-card .pricewrap{display:flex;gap:6px;align-items:baseline;}
+  .offer-card .was{font-size:11px;color:var(--text-3);text-decoration:line-through;}
+  .offer-card .now{font-size:13px;font-weight:800;color:var(--accent);}
+  .offer-card .save{font-size:9.5px;color:var(--success);font-weight:700;margin-top:3px;}
+
+  .need-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 18px 24px;flex:none;}
+  .need-item{background:var(--surface-alt);border-radius:var(--r-md);padding:14px;font-size:12px;font-weight:700;color:var(--primary-dark);}
+
+  .bottom-nav{flex:none;display:flex;justify-content:space-around;background:var(--surface);border-top:1px solid var(--border);padding:10px 0 14px;}
+  .bnav-item{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;font-weight:700;color:var(--text-3);}
+  .bnav-item.active{color:var(--primary);}
+  .bnav-item .ic{font-size:17px;}
+
+  .screen-header{flex:none;padding:16px 18px 10px;display:flex;align-items:center;gap:12px;background:var(--bg);}
+  .backbtn{width:32px;height:32px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;}
+  .screen-header h3{font-size:16px;}
+
+  /* splash */
+  .splash{background:var(--primary);align-items:center;justify-content:center;color:#fff;}
+  .splash .mark{width:70px;height:70px;border-radius:22px;background:#fff;position:relative;margin-bottom:16px;}
+  .splash .mark::after{content:'';position:absolute;inset:18px;border-radius:50%;background:var(--accent);}
+  .splash h1{color:#fff;font-size:24px;}
+  .splash p{color:rgba(255,255,255,.7);font-size:12px;margin-top:6px;}
+
+  /* onboarding */
+  .onb{padding:0;}
+  .onb .art{height:56%;background:linear-gradient(160deg,#2C6259,#173F38);flex:none;position:relative;}
+  .onb .art .badge-fresh{position:absolute;bottom:16px;left:16px;background:rgba(255,255,255,.15);color:#fff;padding:6px 12px;border-radius:var(--r-pill);font-size:11px;font-weight:700;backdrop-filter:blur(4px);}
+  .onb .content{padding:26px 22px;flex:1;display:flex;flex-direction:column;}
+  .onb .dots{display:flex;gap:6px;margin-bottom:16px;}
+  .onb .dots span{width:20px;height:5px;border-radius:3px;background:var(--border);}
+  .onb .dots span.on{background:var(--primary);width:28px;}
+  .onb h2{font-size:22px;line-height:1.2;margin-bottom:8px;}
+  .onb p.desc{font-size:13px;color:var(--text-2);line-height:1.5;}
+  .onb .footer{margin-top:auto;display:flex;align-items:center;justify-content:space-between;}
+  .skiplink{font-size:13px;font-weight:700;color:var(--text-3);}
+
+  /* auth */
+  .auth-body{padding:10px 22px;flex:1;display:flex;flex-direction:column;}
+  .auth-body h2{font-size:22px;margin-bottom:6px;}
+  .auth-body p.desc{font-size:13px;color:var(--text-2);margin-bottom:24px;}
+  .otp-row{display:flex;gap:8px;margin-bottom:20px;}
+  .otp-row div{width:44px;height:52px;border:1.5px solid var(--border);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;background:var(--surface);}
+  .otp-row div.filled{border-color:var(--primary);color:var(--primary-dark);}
+  .resend{font-size:12.5px;color:var(--text-2);text-align:center;margin-top:14px;}
+  .resend b{color:var(--accent);}
+
+  /* location */
+  .map-ph{height:230px;background:repeating-linear-gradient(45deg,#E7E1D2,#E7E1D2 10px,#EFE9DB 10px,#EFE9DB 20px);flex:none;position:relative;}
+  .map-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-100%);font-size:30px;}
+  .delivery-status{margin:14px 18px;padding:12px 14px;border-radius:var(--r-md);display:flex;align-items:center;gap:10px;}
+  .delivery-status.yes{background:var(--success-tint);color:var(--success);}
+  .delivery-status.no{background:var(--error-tint);color:var(--error);}
+
+  .addr-type-row{display:flex;gap:8px;padding:0 18px;margin-bottom:6px;}
+
+  /* product listing/category */
+  .filter-row{display:flex;gap:8px;padding:12px 18px;overflow-x:auto;flex:none;}
+  .plist-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px 20px;}
+  .plist-grid .pcard{width:auto;}
+
+  /* product detail */
+  .pd-hero{height:280px;background:linear-gradient(160deg,#DCE7E3,#F1EBDF);flex:none;position:relative;}
+  .pd-hero .top{position:absolute;top:16px;left:16px;right:16px;display:flex;justify-content:space-between;}
+  .pd-info{padding:18px;flex:1;}
+  .pd-info h2{font-size:21px;margin-bottom:4px;}
+  .stars{color:var(--warning);font-size:12px;margin-bottom:8px;}
+  .pd-price{font-size:20px;font-weight:800;color:var(--primary-dark);margin-bottom:14px;}
+  .pd-price span{font-size:12px;color:var(--text-3);font-weight:600;}
+  .tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .weight-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .wpill{border:1.5px solid var(--border);border-radius:var(--r-md);padding:10px 6px;text-align:center;min-width:64px;}
+  .wpill.on{border-color:var(--primary);background:var(--primary-tint);}
+  .wpill .g{font-size:12.5px;font-weight:800;color:var(--text);}
+  .wpill .p{font-size:10.5px;color:var(--text-2);}
+  .prep-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;}
+  .prep-item{border:1.5px solid var(--border);border-radius:var(--r-md);padding:10px 12px;font-size:12.5px;font-weight:700;}
+  .prep-item.on{border-color:var(--primary);background:var(--primary-tint);color:var(--primary-dark);}
+  textarea.note{width:100%;border:1.5px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--sans);font-size:13px;resize:none;height:60px;}
+  .sticky-cta{flex:none;padding:14px 18px 20px;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:10px;}
+  .sticky-cta .btn{flex:1;justify-content:center;font-size:14px;}
+
+  /* cart */
+  .cart-item{display:flex;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border);}
+  .cart-item .imgph{width:58px;height:58px;border-radius:var(--r-sm);background:linear-gradient(135deg,#DCE7E3,#F1EBDF);flex:none;}
+  .cart-item .meta{flex:1;}
+  .cart-item .name{font-size:13px;font-weight:700;}
+  .cart-item .opt{font-size:11px;color:var(--text-2);margin:2px 0 6px;}
+  .cart-item .row2{display:flex;align-items:center;justify-content:space-between;}
+  .cart-item .price{font-size:13px;font-weight:800;}
+  .promo{margin:14px 18px;display:flex;gap:8px;}
+  .promo input{flex:1;border:1.5px dashed var(--border);border-radius:var(--r-md);padding:11px 14px;font-size:13px;}
+  .summary{margin:6px 18px 0;background:var(--surface-alt);border-radius:var(--r-md);padding:14px 16px;}
+  .summary .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text-2);padding:5px 0;}
+  .summary .row.total{border-top:1px solid var(--border);margin-top:6px;padding-top:10px;font-size:14px;font-weight:800;color:var(--text);}
+
+  /* checkout */
+  .steps{display:flex;padding:0 18px 16px;gap:6px;flex:none;}
+  .step{flex:1;height:4px;border-radius:2px;background:var(--border);}
+  .step.on{background:var(--primary);}
+  .addr-card{margin:0 18px 12px;border:1.5px solid var(--primary);background:var(--primary-tint);border-radius:var(--r-md);padding:14px;}
+  .slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 18px;}
+  .slot{border:1.5px solid var(--border);border-radius:var(--r-md);padding:10px;text-align:center;font-size:12px;font-weight:700;}
+  .slot.on{border-color:var(--primary);background:var(--primary-tint);color:var(--primary-dark);}
+  .slot.off{opacity:.4;text-decoration:line-through;}
+  .pay-row{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;}
+  .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);}
+  .radio.on{border-color:var(--primary);position:relative;}
+  .radio.on::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--primary);}
+
+  /* confirmation */
+  .confirm{align-items:center;text-align:center;padding:40px 26px;}
+  .confirm .tick{width:70px;height:70px;border-radius:50%;background:var(--success-tint);color:var(--success);font-size:32px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;}
+  .confirm h2{font-size:20px;margin-bottom:6px;}
+  .confirm p.desc{font-size:13px;color:var(--text-2);margin-bottom:20px;}
+  .confirm .card{width:100%;background:var(--surface-alt);border-radius:var(--r-md);padding:14px;text-align:left;margin-bottom:18px;}
+
+  /* tracking */
+  .timeline{padding:16px 18px;flex:none;}
+  .tl-row{display:flex;gap:12px;}
+  .tl-dot-wrap{display:flex;flex-direction:column;align-items:center;}
+  .tl-dot{width:20px;height:20px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;}
+  .tl-dot.done{background:var(--success);}
+  .tl-dot.now{background:var(--accent);}
+  .tl-line{width:2px;flex:1;background:var(--border);min-height:22px;}
+  .tl-line.done{background:var(--success);}
+  .tl-txt{padding-bottom:22px;}
+  .tl-txt .t{font-size:13px;font-weight:700;}
+  .tl-txt .s{font-size:11px;color:var(--text-3);}
+  .partner-card{margin:0 18px 14px;background:var(--surface-alt);border-radius:var(--r-md);padding:14px;display:flex;align-items:center;gap:12px;}
+  .partner-card .av{width:42px;height:42px;border-radius:50%;background:var(--primary-tint);}
+  .partner-card .call{width:36px;height:36px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;margin-left:auto;}
+
+  /* orders list / profile */
+  .tabbar{display:flex;gap:6px;padding:0 18px 12px;flex:none;}
+  .tabbar button{flex:1;padding:9px;border:none;border-radius:var(--r-pill);font-size:12.5px;font-weight:700;background:var(--surface-alt);color:var(--text-2);}
+  .tabbar button.on{background:var(--primary);color:#fff;}
+  .order-card{margin:0 18px 12px;border:1px solid var(--border);border-radius:var(--r-md);padding:14px;}
+  .order-card .top{display:flex;justify-content:space-between;margin-bottom:6px;}
+  .order-card .top .id{font-size:12.5px;font-weight:800;}
+  .order-card .items{font-size:12px;color:var(--text-2);margin-bottom:10px;}
+  .order-card .actions{display:flex;gap:8px;}
+  .profile-row{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;}
+  .profile-head{display:flex;align-items:center;gap:12px;padding:18px;flex:none;}
+  .profile-head .av{width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;}
+
+  /* ================= ADMIN ================= */
+  .admin-shell{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;min-height:760px;}
+  .admin-side{width:216px;flex:none;background:var(--primary-dark);color:#fff;padding:20px 12px;}
+  .admin-side .logo{display:flex;align-items:center;gap:9px;padding:0 10px 22px;}
+  .admin-side .logo span{font-family:var(--serif);font-weight:600;font-size:16px;}
+  .admin-side .mark{width:26px;height:26px;border-radius:8px;background:#fff;position:relative;}
+  .admin-side .mark::after{content:'';position:absolute;inset:6px;border-radius:50%;background:var(--accent);}
+  .admin-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-sm);font-size:13px;font-weight:600;color:rgba(255,255,255,.65);margin-bottom:2px;}
+  .admin-nav-item.on{background:rgba(255,255,255,.1);color:#fff;}
+  .admin-main{flex:1;padding:26px 30px;overflow-x:auto;}
+  .admin-topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;}
+  .admin-topbar h2{font-size:22px;}
+  .admin-topbar .meta{font-size:12.5px;color:var(--text-2);}
+  .kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:22px;}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;}
+  .kpi .val{font-size:19px;font-weight:800;}
+  .kpi .lbl{font-size:11px;color:var(--text-2);margin-top:3px;}
+  .kpi.accentbg{background:var(--primary);color:#fff;}
+  .kpi.accentbg .lbl{color:rgba(255,255,255,.7);}
+  .grid2{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:22px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:18px;}
+  .card h3{font-size:14px;margin-bottom:14px;}
+  .bars{display:flex;align-items:flex-end;gap:10px;height:150px;}
+  .bars .b{flex:1;background:linear-gradient(180deg,var(--primary),var(--primary-dark));border-radius:6px 6px 2px 2px;position:relative;}
+  .bars .b .bl{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:10px;color:var(--text-3);}
+  .liverow{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+  .liverow:last-child{border:none;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table th{text-align:left;padding:10px 12px;color:var(--text-2);font-weight:700;border-bottom:1.5px solid var(--border);font-size:11.5px;}
+  table td{padding:12px;border-bottom:1px solid var(--border);}
+  table tr:hover td{background:var(--surface-alt);}
+  .table-toolbar{display:flex;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .table-toolbar .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .selectlike{border:1.5px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;font-size:12px;font-weight:600;color:var(--text-2);background:var(--surface);}
+  .stock-bar{width:70px;height:6px;background:var(--surface-alt);border-radius:3px;overflow:hidden;display:inline-block;margin-right:6px;vertical-align:middle;}
+  .stock-bar div{height:100%;background:var(--success);}
+  .stock-bar.low div{background:var(--warning);}
+
+  /* ================= DELIVERY PORTAL ================= */
+  .dp-shell{max-width:460px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+  .dp-top{background:var(--primary-dark);color:#fff;padding:20px;display:flex;justify-content:space-between;align-items:center;}
+  .dp-top .name{font-size:14px;font-weight:700;}
+  .dp-top .sub{font-size:11px;color:rgba(255,255,255,.6);}
+  .toggle{width:46px;height:26px;border-radius:var(--r-pill);background:var(--success);position:relative;flex:none;}
+  .toggle::after{content:'';position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;}
+  .dp-nav{display:flex;border-bottom:1px solid var(--border);}
+  .dp-nav button{flex:1;padding:13px;border:none;background:transparent;font-size:12.5px;font-weight:700;color:var(--text-2);border-bottom:2px solid transparent;}
+  .dp-nav button.on{color:var(--primary);border-color:var(--primary);}
+  .dp-body{padding:20px;}
+  .dp-kpi-row{display:flex;gap:10px;margin-bottom:18px;}
+  .dp-kpi{flex:1;background:var(--surface-alt);border-radius:var(--r-md);padding:14px;text-align:center;}
+  .dp-kpi .v{font-size:18px;font-weight:800;}
+  .dp-kpi .l{font-size:10.5px;color:var(--text-2);margin-top:2px;}
+  .assign-card{border:1.5px solid var(--border);border-radius:var(--r-md);padding:16px;margin-bottom:14px;}
+  .assign-card .row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;}
+  .assign-card .row .k{color:var(--text-2);}
+  .assign-card .row .v{font-weight:700;}
+  .dp-map{height:180px;border-radius:var(--r-md);background:repeating-linear-gradient(45deg,#E7E1D2,#E7E1D2 10px,#EFE9DB 10px,#EFE9DB 20px);margin-bottom:14px;position:relative;}
+  .dp-flow{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;}
+  .dp-flow .f{padding:7px 12px;border-radius:var(--r-pill);font-size:11px;font-weight:700;background:var(--surface-alt);color:var(--text-3);}
+  .dp-flow .f.done{background:var(--success-tint);color:var(--success);}
+  .dp-flow .f.now{background:var(--accent);color:#fff;}
+
+  .note-box{background:var(--accent-tint);border:1px dashed var(--accent);border-radius:var(--r-md);padding:14px;font-size:12.5px;color:#7A3A26;margin:20px 0;}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,18px);background:var(--primary-dark);color:#fff;padding:12px 16px;border-radius:var(--r-pill);font-size:12.5px;font-weight:700;box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:20;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  button:disabled{cursor:not-allowed;opacity:.55;}
+  .clickable{cursor:pointer;}
+  @media (max-width:760px){
+    .shell{padding:18px 12px 60px;}
+    .modeswitch{width:100%;overflow-x:auto;justify-content:flex-start;}
+    .modeswitch button{white-space:nowrap;padding:8px 13px;}
+    .cust-wrap{justify-content:center;}
+    .screen-nav{order:2;width:100%;min-width:0;display:grid;grid-template-columns:repeat(3,1fr);}
+    .screen-nav button{font-size:11px;padding:9px 7px;text-align:center;}
+    .admin-side{width:74px;padding:16px 8px;}
+    .admin-side .logo span,.admin-nav-item{font-size:0;}
+    .admin-nav-item{justify-content:center;padding:12px 4px;}
+    .admin-side .logo{justify-content:center;padding:0 0 20px;}
+    .admin-main{padding:20px 14px;}
+    .kpi-grid{grid-template-columns:repeat(2,1fr)!important;}
+    .grid2{grid-template-columns:1fr;}
+    .admin-main table{min-width:720px;}
+    .admin-main .card{overflow:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="masthead">
+    <div class="brandmark"><div class="mark"></div><span>Fresh Food</span></div>
+    <div class="modeswitch">
+      <button class="active" data-mode="ds">Design System</button>
+      <button data-mode="customer">Customer App</button>
+      <button data-mode="admin">Admin Dashboard</button>
+      <button data-mode="delivery">Delivery Portal</button>
+    </div>
+  </div>
+
+  <!-- ============ DESIGN SYSTEM ============ -->
+  <div class="panel active" id="panel-ds">
+    <div class="ds-grid">
+      <div class="ds-card">
+        <h3>Color</h3>
+        <div class="swatchrow">
+          <div class="swatch"><div class="chip" style="background:#1F4D46"></div><div class="lbl">Primary</div><div class="hex">#1F4D46</div></div>
+          <div class="swatch"><div class="chip" style="background:#0F2E29"></div><div class="lbl">Primary Dark</div><div class="hex">#0F2E29</div></div>
+          <div class="swatch"><div class="chip" style="background:#E5623E"></div><div class="lbl">Accent</div><div class="hex">#E5623E</div></div>
+          <div class="swatch"><div class="chip" style="background:#F6F2EA;border:1px solid #ddd"></div><div class="lbl">Background</div><div class="hex">#F6F2EA</div></div>
+          <div class="swatch"><div class="chip" style="background:#FFFFFF;border:1px solid #ddd"></div><div class="lbl">Surface</div><div class="hex">#FFFFFF</div></div>
+          <div class="swatch"><div class="chip" style="background:#17211E"></div><div class="lbl">Text</div><div class="hex">#17211E</div></div>
+          <div class="swatch"><div class="chip" style="background:#5C6B66"></div><div class="lbl">Text 2</div><div class="hex">#5C6B66</div></div>
+          <div class="swatch"><div class="chip" style="background:#2E7D5B"></div><div class="lbl">Success</div><div class="hex">#2E7D5B</div></div>
+          <div class="swatch"><div class="chip" style="background:#B9791F"></div><div class="lbl">Warning</div><div class="hex">#B9791F</div></div>
+          <div class="swatch"><div class="chip" style="background:#BE4436"></div><div class="lbl">Error</div><div class="hex">#BE4436</div></div>
+        </div>
+        <p style="font-size:12px;color:var(--text-2);margin-top:14px;line-height:1.5;">A deep marine teal reads as trust and cold-chain hygiene without leaning on produce-green. Coral-orange (the color of fresh-cut salmon and prawns) does the work of "fresh" instead. Parchment background evokes butcher paper, not a sterile app.</p>
+      </div>
+
+      <div class="ds-card">
+        <h3>Typography</h3>
+        <div class="typebit"><div class="tag">DISPLAY — Fraunces 600, 40px</div><div style="font-family:'Fraunces';font-size:34px;font-weight:600;">Fresh catch, every day</div></div>
+        <div class="typebit"><div class="tag">H2 — Fraunces 600, 22px</div><div style="font-family:'Fraunces';font-size:22px;font-weight:600;">Choose it your way</div></div>
+        <div class="typebit"><div class="tag">BODY — Manrope 500, 14px</div><div style="font-size:14px;">Cleaned, cut and delivered within the hour.</div></div>
+        <div class="typebit"><div class="tag">CAPTION — Manrope 600, 11px</div><div style="font-size:11px;font-weight:600;color:var(--text-2);">Delivery slot · 6:00–8:00 PM</div></div>
+        <p style="font-size:11.5px;color:var(--text-3);margin-top:8px;">Fraunces (warm, characterful serif) for anything that needs to feel like a trusted fishmonger's sign. Manrope for everything functional — prices, forms, tables.</p>
+      </div>
+
+      <div class="ds-card">
+        <h3>Buttons &amp; inputs</h3>
+        <div class="comp-row">
+          <button class="btn btn-primary">Add to cart — ₹360</button>
+          <button class="btn btn-accent">Shop now</button>
+          <button class="btn btn-outline">Edit order</button>
+          <button class="btn btn-ghost btn-sm">View invoice</button>
+        </div>
+        <div class="field" style="max-width:280px;"><label>Delivery instructions</label><input placeholder="e.g. Please remove the skin"></div>
+        <div class="comp-row">
+          <div class="qty"><button>–</button><span>2</span><button>+</button></div>
+          <span class="chip-tag on">Curry Cut</span>
+          <span class="chip-tag">Fillet</span>
+        </div>
+      </div>
+
+      <div class="ds-card">
+        <h3>Status &amp; badges</h3>
+        <div class="comp-row">
+          <span class="badge badge-success">● Fresh today</span>
+          <span class="badge badge-warning">Low stock</span>
+          <span class="badge badge-error">Out of stock</span>
+          <span class="badge badge-accent">20% off</span>
+        </div>
+        <div class="comp-row">
+          <span class="badge badge-success">Delivered</span>
+          <span class="badge badge-warning">Preparing</span>
+          <span class="badge badge-error">Cancelled</span>
+        </div>
+      </div>
+
+      <div class="ds-card">
+        <h3>Product card</h3>
+        <div class="mini-card">
+          <div class="imgph"></div>
+          <div style="font-size:12.5px;font-weight:700;">Seer Fish</div>
+          <div style="font-size:10.5px;color:var(--text-3);margin-bottom:6px;">Marine · 1.2 kg avail.</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:13px;font-weight:800;color:var(--primary-dark);">₹720<span style="font-size:10px;color:var(--text-3);font-weight:600;">/kg</span></span>
+            <button class="addbtn">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ds-card">
+        <h3>Grid, radius, elevation</h3>
+        <p style="font-size:12px;color:var(--text-2);line-height:1.6;">
+          4px spacing base · Cards: 14px radius (customer), 8–14px (admin, flatter for density) · Elevation reserved for the sticky cart CTA, modals and bottom sheets only — flat surfaces + hairline borders everywhere else, so the one shadow that appears (a live action) is meaningful.<br><br>
+          Mobile app: 1-column, edge padding 18px · Admin: 12-column, sidebar 216px fixed · Delivery portal: single column, thumb-reachable actions pinned low.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CUSTOMER APP ============ -->
+  <div class="panel" id="panel-customer">
+    <div class="cust-wrap">
+      <div class="screen-nav" id="cust-nav"></div>
+
+      <div class="phone">
+        <div class="notch"></div>
+
+        <!-- SPLASH -->
+        <div class="screen splash active" data-screen="splash">
+          <div class="mark"></div>
+          <h1>Fresh Food</h1>
+          <p>Fresh, cleaned, cut &amp; delivered.</p>
+        </div>
+
+        <!-- ONBOARDING -->
+        <div class="screen onb" data-screen="onboarding">
+          <div class="status-fake"></div>
+          <div class="art"><span class="badge-fresh">🐟 🥩 🥬 sourced daily</span></div>
+          <div class="content">
+            <div class="dots"><span class="on"></span><span></span><span></span></div>
+            <h2>Fresh food.<br>Delivered fresh.</h2>
+            <p class="desc">Fish, meat and vegetables sourced each morning and delivered the way you order it.</p>
+            <div class="footer">
+              <span class="skiplink">Skip</span>
+              <button class="btn btn-primary btn-sm">Next</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LOGIN -->
+        <div class="screen" data-screen="login">
+          <div class="status-fake"></div>
+          <div class="auth-body">
+            <div style="height:40px;"></div>
+            <h2>Enter your mobile number</h2>
+            <p class="desc">We'll send a one-time code to verify it's you.</p>
+            <div class="field"><label>Mobile number</label><input placeholder="+91 98765 43210"></div>
+            <button class="btn btn-primary" style="justify-content:center;">Send OTP</button>
+          </div>
+        </div>
+
+        <!-- OTP -->
+        <div class="screen" data-screen="otp">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Verify number</h3></div>
+          <div class="auth-body" style="padding-top:6px;">
+            <p class="desc">Code sent to +91 98765 43210</p>
+            <div class="otp-row">
+              <div class="filled">4</div><div class="filled">8</div><div class="filled">2</div><div>·</div><div>·</div><div>·</div>
+            </div>
+            <button class="btn btn-primary" style="justify-content:center;">Verify &amp; continue</button>
+            <p class="resend">Didn't get it? <b>Resend in 0:24</b></p>
+          </div>
+        </div>
+
+        <!-- LOCATION -->
+        <div class="screen" data-screen="location">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Set delivery location</h3></div>
+          <div class="search-bar">🔍 Search area, street or PIN code</div>
+          <div class="map-ph"><div class="map-pin">📍</div></div>
+          <div class="delivery-status yes"><span>✓</span><div><b style="font-size:13px;">We deliver to this location</b><div style="font-size:11px;">Kozhikode · usually delivers in 45–70 min</div></div></div>
+          <div style="padding:0 18px;">
+            <div class="field"><label>Receiver name</label><input placeholder="Thashreef"></div>
+            <div class="field"><label>House / building</label><input placeholder="Flat 4B, Palm Residency"></div>
+          </div>
+          <div class="addr-type-row">
+            <span class="chip-tag on">Home</span><span class="chip-tag">Work</span><span class="chip-tag">Other</span>
+          </div>
+          <div style="padding:14px 18px;"><button class="btn btn-primary" style="width:100%;justify-content:center;">Save &amp; continue</button></div>
+        </div>
+
+        <!-- HOME -->
+        <div class="screen" data-screen="home">
+          <div class="status-fake"></div>
+          <div class="cust-topbar">
+            <div class="locpill"><span class="dot"></span>Deliver to · Palm Residency ▾</div>
+            <div style="display:flex;gap:8px;"><div class="icon-btn">🔔</div><div class="icon-btn">👤</div></div>
+          </div>
+          <div class="search-bar">🔍 What are you looking for?</div>
+          <div class="hero-banner">
+            <h3>Fresh Catch.<br>Every Day.</h3>
+            <p>Line-caught this morning, cleaned your way.</p>
+            <button class="btn btn-accent btn-sm">Shop now</button>
+          </div>
+          <div class="cat-scroll">
+            <div class="cat-item"><div class="ico" style="background:#E4ECE9;">🐟</div><div class="lbl">Fish</div></div>
+            <div class="cat-item"><div class="ico" style="background:#FBE7DF;">🥩</div><div class="lbl">Meat</div></div>
+            <div class="cat-item"><div class="ico" style="background:#EAF3E6;">🥬</div><div class="lbl">Vegetables</div></div>
+            <div class="cat-item"><div class="ico" style="background:#FBEEDC;">🔥</div><div class="lbl">Offers</div></div>
+          </div>
+          <div class="section-inline"><h3>Fresh today</h3><span class="link">See all</span></div>
+          <div class="hscroll">
+            <div class="pcard"><div class="imgph"><span class="fresh">fresh</span><span class="fav">♡</span></div><div class="body"><div class="name">Seer Fish</div><div class="sub">Marine · 1.2 kg avail.</div><div class="pricerow"><span class="price">₹720<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fresh">fresh</span><span class="fav">♡</span></div><div class="body"><div class="name">Tiger Prawns</div><div class="sub">Shellfish · 800 g avail.</div><div class="pricerow"><span class="price">₹640<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fresh">fresh</span><span class="fav">♡</span></div><div class="body"><div class="name">Country Chicken</div><div class="sub">Poultry · 3 kg avail.</div><div class="pricerow"><span class="price">₹340<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+          </div>
+          <div class="section-inline"><h3>Best sellers</h3><span class="link">See all</span></div>
+          <div class="hscroll">
+            <div class="pcard"><div class="imgph"><span class="fav">♡</span></div><div class="body"><div class="name">Rohu Fish</div><div class="sub">Freshwater</div><div class="pricerow"><span class="price">₹280<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fav">♡</span></div><div class="body"><div class="name">Mutton Curry Cut</div><div class="sub">Goat</div><div class="pricerow"><span class="price">₹780<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fav">♡</span></div><div class="body"><div class="name">Spinach Bunch</div><div class="sub">Leafy greens</div><div class="pricerow"><span class="price">₹40<span class="unit">/bunch</span></span><button class="addbtn">+</button></div></div></div>
+          </div>
+          <div class="section-inline"><h3>Today's offers</h3><span class="link">See all</span></div>
+          <div class="hscroll">
+            <div class="offer-card"><div class="imgph"></div><div><div class="name">Pomfret · 500 g pack</div><div class="pricewrap"><span class="was">₹460</span><span class="now">₹368</span></div><div class="save">You save ₹92</div></div></div>
+            <div class="offer-card"><div class="imgph"></div><div><div class="name">Family Meat Pack</div><div class="pricewrap"><span class="was">₹1,240</span><span class="now">₹999</span></div><div class="save">You save ₹241</div></div></div>
+          </div>
+          <div class="section-inline"><h3>Shop by need</h3></div>
+          <div class="need-grid">
+            <div class="need-item">Today's Fish</div><div class="need-item">Family Meat Packs</div>
+            <div class="need-item">Daily Vegetables</div><div class="need-item">Weekend Specials</div>
+            <div class="need-item">Budget Picks</div><div class="need-item">Premium Selection</div>
+          </div>
+          <div class="bottom-nav">
+            <div class="bnav-item active"><span class="ic">⌂</span>Home</div>
+            <div class="bnav-item"><span class="ic">🔍</span>Search</div>
+            <div class="bnav-item"><span class="ic">🧺</span>Cart</div>
+            <div class="bnav-item"><span class="ic">📦</span>Orders</div>
+            <div class="bnav-item"><span class="ic">☰</span>Profile</div>
+          </div>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="screen" data-screen="search">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Search</h3></div>
+          <div class="search-bar">🔍 seer fi|</div>
+          <div class="section-inline"><h3>Suggestions</h3></div>
+          <div style="padding:0 18px;">
+            <div class="liverow" style="border-color:var(--border)"><span>🔍 Seer fish curry cut</span><span>›</span></div>
+            <div class="liverow" style="border-color:var(--border)"><span>🔍 Seer fish steaks</span><span>›</span></div>
+          </div>
+          <div class="section-inline"><h3>Popular searches</h3></div>
+          <div class="cat-scroll" style="padding-top:0;">
+            <span class="chip-tag">Prawns</span><span class="chip-tag">Chicken breast</span><span class="chip-tag">Mutton</span><span class="chip-tag">Tomato</span>
+          </div>
+          <div class="section-inline"><h3>Results · Fish</h3></div>
+          <div class="plist-grid">
+            <div class="pcard"><div class="imgph"><span class="fresh">fresh</span></div><div class="body"><div class="name">Seer Fish</div><div class="sub">₹720/kg</div><div class="pricerow"><span class="price">1.2 kg</span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"></div><div class="body"><div class="name">Seer Fish Steaks</div><div class="sub">₹780/kg</div><div class="pricerow"><span class="price">600 g</span><button class="addbtn">+</button></div></div></div>
+          </div>
+        </div>
+
+        <!-- CATEGORY -->
+        <div class="screen" data-screen="category">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Fish &amp; Seafood</h3></div>
+          <div class="filter-row">
+            <span class="chip-tag on">All</span><span class="chip-tag">Marine</span><span class="chip-tag">Freshwater</span><span class="chip-tag">Shellfish</span><span class="chip-tag">Premium</span>
+          </div>
+          <div class="plist-grid">
+            <div class="pcard"><div class="imgph"><span class="fresh">fresh</span><span class="fav">♡</span></div><div class="body"><div class="name">Seer Fish</div><div class="sub">★4.8 · Marine</div><div class="pricerow"><span class="price">₹720<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fav">♡</span></div><div class="body"><div class="name">Pomfret</div><div class="sub">★4.6 · Marine</div><div class="pricerow"><span class="price">₹520<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fav">♡</span></div><div class="body"><div class="name">Rohu</div><div class="sub">★4.5 · Freshwater</div><div class="pricerow"><span class="price">₹280<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+            <div class="pcard"><div class="imgph"><span class="fresh">fresh</span><span class="fav">♡</span></div><div class="body"><div class="name">Tiger Prawns</div><div class="sub">★4.9 · Shellfish</div><div class="pricerow"><span class="price">₹640<span class="unit">/kg</span></span><button class="addbtn">+</button></div></div></div>
+          </div>
+        </div>
+
+        <!-- PRODUCT DETAIL -->
+        <div class="screen" data-screen="product">
+          <div class="pd-hero">
+            <div class="top"><div class="backbtn">←</div><div class="icon-btn">♡</div></div>
+          </div>
+          <div class="pd-info">
+            <h2>Seer Fish</h2>
+            <div class="stars">★★★★★ 4.8 (1,204 orders)</div>
+            <div class="pd-price">₹720 <span>/ kg · usually 1.1–1.3 kg avail.</span></div>
+            <div class="tag-row"><span class="badge badge-success">● Caught today</span><span class="badge badge-accent">Kozhikode coast</span></div>
+
+            <div class="typebit"><div class="tag" style="font-size:12px;color:var(--text);font-weight:700;">Select weight</div></div>
+            <div class="weight-grid">
+              <div class="wpill"><div class="g">250 g</div><div class="p">₹180</div></div>
+              <div class="wpill"><div class="g">500 g</div><div class="p">₹360</div></div>
+              <div class="wpill on"><div class="g">1 kg</div><div class="p">₹720</div></div>
+              <div class="wpill"><div class="g">2 kg</div><div class="p">₹1,440</div></div>
+              <div class="wpill"><div class="g">Custom</div><div class="p">Enter</div></div>
+            </div>
+
+            <div class="typebit"><div class="tag" style="font-size:12px;color:var(--text);font-weight:700;">Preparation</div></div>
+            <div class="prep-grid">
+              <div class="prep-item">Whole</div>
+              <div class="prep-item on">Curry Cut</div>
+              <div class="prep-item">Fillet</div>
+              <div class="prep-item">Fry Cut</div>
+            </div>
+
+            <div class="typebit"><div class="tag" style="font-size:12px;color:var(--text);font-weight:700;">Any special instructions?</div></div>
+            <textarea class="note" placeholder="e.g. Please remove the skin"></textarea>
+
+            <div style="margin-top:16px;font-size:12px;color:var(--text-2);line-height:1.6;">
+              <b style="color:var(--text);">Storage:</b> Keep refrigerated, use within 24 hours.<br>
+              <b style="color:var(--text);">Cutting charge:</b> ₹10 included in price above.
+            </div>
+          </div>
+          <div class="sticky-cta">
+            <div class="qty"><button>–</button><span>1</span><button>+</button></div>
+            <button class="btn btn-primary">Add to cart — ₹720</button>
+          </div>
+        </div>
+
+        <!-- CART -->
+        <div class="screen" data-screen="cart">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Your cart (3)</h3></div>
+          <div class="cart-item">
+            <div class="imgph"></div>
+            <div class="meta">
+              <div class="name">Seer Fish</div>
+              <div class="opt">1 kg · Curry Cut</div>
+              <div class="row2"><div class="qty"><button>–</button><span>1</span><button>+</button></div><span class="price">₹720</span></div>
+            </div>
+          </div>
+          <div class="cart-item">
+            <div class="imgph"></div>
+            <div class="meta">
+              <div class="name">Tiger Prawns</div>
+              <div class="opt">500 g · Deveined</div>
+              <div class="row2"><div class="qty"><button>–</button><span>1</span><button>+</button></div><span class="price">₹320</span></div>
+            </div>
+          </div>
+          <div class="cart-item">
+            <div class="imgph"></div>
+            <div class="meta">
+              <div class="name">Country Chicken</div>
+              <div class="opt">1 kg · Curry Cut, Skinless</div>
+              <div class="row2"><div class="qty"><button>–</button><span>1</span><button>+</button></div><span class="price">₹340</span></div>
+            </div>
+          </div>
+          <div class="promo"><input placeholder="Enter coupon code"><button class="btn btn-outline btn-sm">Apply</button></div>
+          <div class="summary">
+            <div class="row"><span>Subtotal</span><span>₹1,380</span></div>
+            <div class="row"><span>Cleaning &amp; cutting charge</span><span>₹30</span></div>
+            <div class="row"><span>Delivery fee</span><span>₹25</span></div>
+            <div class="row"><span>Discount</span><span style="color:var(--success)">−₹92</span></div>
+            <div class="row"><span>Tax</span><span>₹18</span></div>
+            <div class="row total"><span>Total</span><span>₹1,361</span></div>
+          </div>
+          <div style="padding:16px 18px;"><button class="btn btn-primary" style="width:100%;justify-content:center;">Proceed to checkout</button></div>
+        </div>
+
+        <!-- CHECKOUT -->
+        <div class="screen" data-screen="checkout">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Checkout</h3></div>
+          <div class="steps"><div class="step on"></div><div class="step on"></div><div class="step"></div></div>
+          <div class="section-inline"><h3>Delivery address</h3><span class="link">Change</span></div>
+          <div class="addr-card">
+            <b style="font-size:13px;">Home</b><span class="badge badge-success" style="margin-left:6px;">Default</span>
+            <div style="font-size:12px;color:var(--text-2);margin-top:6px;">Flat 4B, Palm Residency, Nilambūr, Kerala — 679329</div>
+          </div>
+          <div class="section-inline"><h3>Delivery time</h3></div>
+          <div class="filter-row" style="padding-top:0;">
+            <span class="chip-tag on">ASAP · 45–70 min</span><span class="chip-tag">Schedule</span>
+          </div>
+          <div class="slot-grid">
+            <div class="slot on">10:00–12:00</div>
+            <div class="slot">12:00–14:00</div>
+            <div class="slot off">16:00–18:00</div>
+            <div class="slot">18:00–20:00</div>
+          </div>
+          <div class="section-inline"><h3>Payment method</h3></div>
+          <div class="pay-row" style="opacity:.45;"><span>UPI <small>(coming soon)</small></span><div class="radio"></div></div>
+          <div class="pay-row" style="opacity:.45;"><span>Card <small>(coming soon)</small></span><div class="radio"></div></div>
+          <div class="pay-row clickable"><span>Cash on Delivery</span><div class="radio on"></div></div>
+          <div style="padding:16px 18px;"><button class="btn btn-primary" data-action="place-order" style="width:100%;justify-content:center;">Place order — ₹1,361</button></div>
+        </div>
+
+        <!-- CONFIRMATION -->
+        <div class="screen confirm" data-screen="confirmation">
+          <div class="tick">✓</div>
+          <h2>Order confirmed</h2>
+          <p class="desc">Order #FF10284 · Estimated delivery today, 6:00–8:00 PM</p>
+          <div class="card">
+            <div class="row" style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;"><span>Items</span><span>3</span></div>
+            <div class="row" style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;"><span>Address</span><span>Home</span></div>
+            <div class="row" style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;"><span>Payment</span><span>Cash on Delivery</span></div>
+            <div class="row" style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:800;padding:8px 0 0;"><span>Total</span><span>₹1,361</span></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;">Track order</button>
+        </div>
+
+        <!-- TRACKING -->
+        <div class="screen" data-screen="tracking">
+          <div class="screen-header"><div class="backbtn">←</div><h3>Order #FF10284</h3></div>
+          <div class="map-ph"><div class="map-pin">🛵</div></div>
+          <div class="partner-card">
+            <div class="av"></div>
+            <div><div style="font-size:13px;font-weight:700;">Arun K.</div><div style="font-size:11px;color:var(--text-2);">★4.9 · Bike · Arriving in 12 min</div></div>
+            <div class="call">📞</div>
+          </div>
+          <div class="timeline">
+            <div class="tl-row"><div class="tl-dot-wrap"><div class="tl-dot done">✓</div><div class="tl-line done"></div></div><div class="tl-txt"><div class="t">Order placed</div><div class="s">6:02 PM</div></div></div>
+            <div class="tl-row"><div class="tl-dot-wrap"><div class="tl-dot done">✓</div><div class="tl-line done"></div></div><div class="tl-txt"><div class="t">Confirmed &amp; preparing</div><div class="s">6:05 PM</div></div></div>
+            <div class="tl-row"><div class="tl-dot-wrap"><div class="tl-dot done">✓</div><div class="tl-line done"></div></div><div class="tl-txt"><div class="t">Packed</div><div class="s">6:24 PM</div></div></div>
+            <div class="tl-row"><div class="tl-dot-wrap"><div class="tl-dot now">●</div><div class="tl-line"></div></div><div class="tl-txt"><div class="t">Out for delivery</div><div class="s">Arun is on the way</div></div></div>
+            <div class="tl-row"><div class="tl-dot-wrap"><div class="tl-dot">4</div></div><div class="tl-txt"><div class="t" style="color:var(--text-3);">Delivered</div><div class="s">Estimated 6:45 PM</div></div></div>
+          </div>
+        </div>
+
+        <!-- ORDERS -->
+        <div class="screen" data-screen="orders">
+          <div class="screen-header"><h3>My orders</h3></div>
+          <div class="tabbar"><button class="on">Active</button><button>Completed</button><button>Cancelled</button></div>
+          <div class="order-card">
+            <div class="top"><span class="id">#FF10284</span><span class="badge badge-accent">Out for delivery</span></div>
+            <div class="items">Seer Fish, Tiger Prawns +1 · ₹1,361</div>
+            <div class="actions"><button class="btn btn-outline btn-sm">Track</button><button class="btn btn-ghost btn-sm">Details</button></div>
+          </div>
+          <div class="order-card">
+            <div class="top"><span class="id">#FF10201</span><span class="badge badge-success">Delivered</span></div>
+            <div class="items">Country Chicken, Spinach · ₹520</div>
+            <div class="actions"><button class="btn btn-outline btn-sm">Reorder</button><button class="btn btn-ghost btn-sm">Invoice</button></div>
+          </div>
+        </div>
+
+        <!-- PROFILE -->
+        <div class="screen" data-screen="profile">
+          <div class="profile-head"><div class="av">TR</div><div><div style="font-weight:700;">Thashreef</div><div style="font-size:12px;color:var(--text-2);">+91 98765 43210</div></div></div>
+          <div class="profile-row"><span>📍 Addresses</span><span>›</span></div>
+          <div class="profile-row"><span>💳 Payment methods</span><span>›</span></div>
+          <div class="profile-row"><span>📦 Orders</span><span>›</span></div>
+          <div class="profile-row"><span>♡ Favorites</span><span>›</span></div>
+          <div class="profile-row"><span>🏷 Coupons</span><span>›</span></div>
+          <div class="profile-row"><span>🔔 Notifications</span><span>›</span></div>
+          <div class="profile-row"><span>💬 Support</span><span>›</span></div>
+          <div class="profile-row"><span>⚙ Settings</span><span>›</span></div>
+          <div class="profile-row" style="color:var(--error);"><span>Log out</span><span></span></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN DASHBOARD ============ -->
+  <div class="panel" id="panel-admin">
+    <div class="admin-shell">
+      <div class="admin-side">
+        <div class="logo"><div class="mark"></div><span>Fresh Food</span></div>
+        <div class="admin-nav-item on" data-ascreen="dashboard">📊 Dashboard</div>
+        <div class="admin-nav-item" data-ascreen="orders">🧾 Orders</div>
+        <div class="admin-nav-item" data-ascreen="products">🐟 Products</div>
+        <div class="admin-nav-item" data-ascreen="inventory">📦 Inventory</div>
+        <div class="admin-nav-item" data-ascreen="delivery">🛵 Delivery</div>
+        <div class="admin-nav-item" style="opacity:.5;">👥 Customers</div>
+        <div class="admin-nav-item" style="opacity:.5;">🏷 Coupons &amp; Offers</div>
+        <div class="admin-nav-item" style="opacity:.5;">💳 Payments &amp; Refunds</div>
+        <div class="admin-nav-item" style="opacity:.5;">⭐ Reviews</div>
+        <div class="admin-nav-item" style="opacity:.5;">📈 Analytics</div>
+        <div class="admin-nav-item" style="opacity:.5;">⚙ Settings</div>
+      </div>
+
+      <div class="admin-main">
+        <!-- DASHBOARD -->
+        <div class="ascreen active" data-ascreen="dashboard">
+          <div class="admin-topbar"><h2>Dashboard</h2><span class="meta">Wed, 16 Sep 2026 · Kozhikode hub</span></div>
+          <div class="kpi-grid">
+            <div class="kpi accentbg"><div class="val">₹2.84L</div><div class="lbl">Today's revenue</div></div>
+            <div class="kpi"><div class="val">312</div><div class="lbl">Orders today</div></div>
+            <div class="kpi"><div class="val">18</div><div class="lbl">Pending</div></div>
+            <div class="kpi"><div class="val">24</div><div class="lbl">Preparing</div></div>
+            <div class="kpi"><div class="val">41</div><div class="lbl">Out for delivery</div></div>
+            <div class="kpi"><div class="val">6</div><div class="lbl">Low stock items</div></div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>Revenue — last 7 days</h3>
+              <div class="bars">
+                <div class="b" style="height:52%"><span class="bl">Wed</span></div>
+                <div class="b" style="height:64%"><span class="bl">Thu</span></div>
+                <div class="b" style="height:48%"><span class="bl">Fri</span></div>
+                <div class="b" style="height:80%"><span class="bl">Sat</span></div>
+                <div class="b" style="height:92%"><span class="bl">Sun</span></div>
+                <div class="b" style="height:70%"><span class="bl">Mon</span></div>
+                <div class="b" style="height:85%;background:linear-gradient(180deg,var(--accent),#B8452A);"><span class="bl">Tue</span></div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Needs attention</h3>
+              <div class="liverow"><span>Order #FF10284 delayed</span><span class="badge badge-error">12 min</span></div>
+              <div class="liverow"><span>Seer Fish — low stock</span><span class="badge badge-warning">8 kg left</span></div>
+              <div class="liverow"><span>3 unassigned deliveries</span><span class="badge badge-warning">Zone 2</span></div>
+              <div class="liverow"><span>Payment failed — #FF10279</span><span class="badge badge-error">Retry</span></div>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <h3>Category sales split</h3>
+              <div class="comp-row">
+                <span class="chip-tag on">Fish · ₹1.2L</span>
+                <span class="chip-tag on">Meat · ₹94K</span>
+                <span class="chip-tag on">Vegetables · ₹50K</span>
+              </div>
+              <p style="font-size:12px;color:var(--text-2);">Average order value: <b style="color:var(--text)">₹910</b> · Repeat customer rate: <b style="color:var(--text)">61%</b></p>
+            </div>
+            <div class="card">
+              <h3>Top products</h3>
+              <div class="liverow"><span>Seer Fish</span><span>142 kg</span></div>
+              <div class="liverow"><span>Tiger Prawns</span><span>98 kg</span></div>
+              <div class="liverow"><span>Country Chicken</span><span>210 kg</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ORDERS -->
+        <div class="ascreen" data-ascreen="orders">
+          <div class="admin-topbar"><h2>Orders</h2><span class="meta">312 today</span></div>
+          <div class="table-toolbar">
+            <div class="filters">
+              <span class="selectlike">Status: All ▾</span>
+              <span class="selectlike">Payment: All ▾</span>
+              <span class="selectlike">Delivery partner ▾</span>
+              <span class="selectlike">Today ▾</span>
+            </div>
+            <input placeholder="Search order, customer, phone" style="border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;">
+          </div>
+          <table>
+            <tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Amount</th><th>Payment</th><th>Status</th><th>Partner</th><th>Slot</th><th></th></tr>
+            <tr><td><b>#FF10284</b></td><td>Thashreef R.</td><td>Seer Fish +2</td><td>₹1,361</td><td>UPI</td><td><span class="badge badge-accent">Out for delivery</span></td><td>Arun K.</td><td>6:00–8:00 PM</td><td>View ›</td></tr>
+            <tr><td><b>#FF10283</b></td><td>Meera S.</td><td>Mutton Curry Cut</td><td>₹890</td><td>COD</td><td><span class="badge badge-warning">Preparing</span></td><td>—</td><td>4:00–6:00 PM</td><td>View ›</td></tr>
+            <tr><td><b>#FF10282</b></td><td>Nikhil V.</td><td>Family Meat Pack</td><td>₹999</td><td>Card</td><td><span class="badge badge-warning">Pending</span></td><td>—</td><td>ASAP</td><td>View ›</td></tr>
+            <tr><td><b>#FF10281</b></td><td>Fathima P.</td><td>Rohu, Spinach</td><td>₹340</td><td>UPI</td><td><span class="badge badge-success">Delivered</span></td><td>Ravi T.</td><td>2:00–4:00 PM</td><td>View ›</td></tr>
+            <tr><td><b>#FF10280</b></td><td>Deepak N.</td><td>Chicken Breast</td><td>₹410</td><td>UPI</td><td><span class="badge badge-error">Cancelled</span></td><td>—</td><td>—</td><td>View ›</td></tr>
+          </table>
+        </div>
+
+        <!-- PRODUCTS -->
+        <div class="ascreen" data-ascreen="products">
+          <div class="admin-topbar"><h2>Products</h2><button class="btn btn-primary btn-sm">+ Add product</button></div>
+          <div class="table-toolbar">
+            <div class="filters">
+              <span class="selectlike">Category: All ▾</span>
+              <span class="selectlike">Status: All ▾</span>
+            </div>
+          </div>
+          <table>
+            <tr><th>Product</th><th>Category</th><th>Price</th><th>Unit</th><th>Stock</th><th>Status</th><th>Updated</th><th></th></tr>
+            <tr><td><b>Seer Fish</b></td><td>Fish · Marine</td><td>₹720</td><td>/kg</td><td><span class="stock-bar low"><div style="width:30%"></div></span>8 kg</td><td><span class="badge badge-success">Active</span></td><td>2h ago</td><td>Edit ›</td></tr>
+            <tr><td><b>Tiger Prawns</b></td><td>Fish · Shellfish</td><td>₹640</td><td>/kg</td><td><span class="stock-bar"><div style="width:70%"></div></span>22 kg</td><td><span class="badge badge-success">Active</span></td><td>1h ago</td><td>Edit ›</td></tr>
+            <tr><td><b>Mutton Curry Cut</b></td><td>Meat · Goat</td><td>₹780</td><td>/kg</td><td><span class="stock-bar"><div style="width:85%"></div></span>40 kg</td><td><span class="badge badge-success">Active</span></td><td>Today</td><td>Edit ›</td></tr>
+            <tr><td><b>Country Chicken</b></td><td>Meat · Poultry</td><td>₹340</td><td>/kg</td><td><span class="stock-bar low"><div style="width:10%"></div></span>3 kg</td><td><span class="badge badge-warning">Low stock</span></td><td>3h ago</td><td>Edit ›</td></tr>
+            <tr><td><b>Baby Spinach</b></td><td>Vegetables · Leafy</td><td>₹40</td><td>/bunch</td><td><span class="stock-bar"><div style="width:0%"></div></span>0</td><td><span class="badge badge-error">Out of stock</span></td><td>5h ago</td><td>Edit ›</td></tr>
+          </table>
+        </div>
+
+        <!-- INVENTORY -->
+        <div class="ascreen" data-ascreen="inventory">
+          <div class="admin-topbar"><h2>Inventory</h2><span class="meta">Kozhikode hub</span></div>
+          <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);">
+            <div class="kpi"><div class="val">1,240 kg</div><div class="lbl">Available</div></div>
+            <div class="kpi"><div class="val">86 kg</div><div class="lbl">Reserved</div></div>
+            <div class="kpi"><div class="val">6 items</div><div class="lbl">Low stock</div></div>
+            <div class="kpi"><div class="val">210 kg</div><div class="lbl">Incoming today</div></div>
+          </div>
+          <div class="card">
+            <h3>Batch &amp; freshness</h3>
+            <table>
+              <tr><th>Product</th><th>Batch</th><th>Received</th><th>Freshness window</th><th>Qty</th><th></th></tr>
+              <tr><td>Seer Fish</td><td>SF-0916-A</td><td>Today, 5:40 AM</td><td>Use within 24h</td><td>8 kg</td><td>Adjust ›</td></tr>
+              <tr><td>Tiger Prawns</td><td>PR-0916-B</td><td>Today, 6:10 AM</td><td>Use within 20h</td><td>22 kg</td><td>Adjust ›</td></tr>
+              <tr><td>Country Chicken</td><td>CK-0916-A</td><td>Today, 5:00 AM</td><td>Use within 30h</td><td>3 kg</td><td>Adjust ›</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- DELIVERY -->
+        <div class="ascreen" data-ascreen="delivery">
+          <div class="admin-topbar"><h2>Delivery dispatch</h2><span class="meta">Zone 1–3 · Kozhikode</span></div>
+          <div class="grid2">
+            <div class="card">
+              <h3>Live map</h3>
+              <div class="dp-map" style="height:280px;"></div>
+            </div>
+            <div class="card">
+              <h3>Available partners</h3>
+              <div class="liverow"><span>Arun K. · Bike</span><span class="badge badge-accent">On delivery</span></div>
+              <div class="liverow"><span>Ravi T. · Bike</span><span class="badge badge-success">Available</span></div>
+              <div class="liverow"><span>Sona M. · Scooter</span><span class="badge badge-success">Available</span></div>
+              <h3 style="margin-top:16px;">Unassigned orders</h3>
+              <div class="liverow"><span>#FF10282 · Zone 2</span><button class="btn btn-primary btn-sm">Assign</button></div>
+              <div class="liverow"><span>#FF10286 · Zone 1</span><button class="btn btn-primary btn-sm">Assign</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DELIVERY PORTAL ============ -->
+  <div class="panel" id="panel-delivery">
+    <div class="dp-shell">
+      <div class="dp-top">
+        <div><div class="name">Arun K.</div><div class="sub">Bike · Zone 1</div></div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="font-size:11px;">Online</span><div class="toggle"></div></div>
+      </div>
+      <div class="dp-nav">
+        <button class="on" data-dscreen="dashboard">Dashboard</button>
+        <button data-dscreen="assignment">New delivery</button>
+        <button data-dscreen="active">Active</button>
+        <button data-dscreen="earnings">Earnings</button>
+      </div>
+
+      <div class="dp-body">
+        <div class="dscreen active" data-dscreen="dashboard">
+          <div class="dp-kpi-row">
+            <div class="dp-kpi"><div class="v">14</div><div class="l">Today's deliveries</div></div>
+            <div class="dp-kpi"><div class="v">2</div><div class="l">Active</div></div>
+            <div class="dp-kpi"><div class="v">₹1,120</div><div class="l">Today's earnings</div></div>
+          </div>
+          <h3 style="font-size:14px;margin-bottom:10px;">Upcoming</h3>
+          <div class="assign-card">
+            <div class="row"><span class="k">Order</span><span class="v">#FF10284</span></div>
+            <div class="row"><span class="k">Customer</span><span class="v">Thashreef R.</span></div>
+            <div class="row"><span class="k">Distance</span><span class="v">3.2 km</span></div>
+            <div class="row"><span class="k">Payment</span><span class="v">UPI (Paid)</span></div>
+          </div>
+        </div>
+
+        <div class="dscreen" data-dscreen="assignment">
+          <h3 style="font-size:14px;margin-bottom:10px;">New delivery request</h3>
+          <div class="assign-card">
+            <div class="row"><span class="k">Order</span><span class="v">#FF10286</span></div>
+            <div class="row"><span class="k">Pickup</span><span class="v">Fresh Food Hub, MG Road</span></div>
+            <div class="row"><span class="k">Drop</span><span class="v">Palm Residency, Flat 4B</span></div>
+            <div class="row"><span class="k">Items</span><span class="v">Mutton (1kg), Spinach</span></div>
+            <div class="row"><span class="k">Weight</span><span class="v">1.1 kg total</span></div>
+            <div class="row"><span class="k">Payment</span><span class="v">COD · ₹890</span></div>
+            <div class="row"><span class="k">Instructions</span><span class="v">Call before arriving</span></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;">Accept delivery</button>
+        </div>
+
+        <div class="dscreen" data-dscreen="active">
+          <div class="dp-flow">
+            <span class="f done">Accepted</span><span class="f done">Navigate</span><span class="f now">Arrived at store</span><span class="f">Picked up</span><span class="f">Delivering</span><span class="f">Delivered</span>
+          </div>
+          <div class="dp-map"></div>
+          <div class="assign-card">
+            <div class="row"><span class="k">Customer</span><span class="v">Thashreef R. · 📞</span></div>
+            <div class="row"><span class="k">Address</span><span class="v">Palm Residency, Flat 4B</span></div>
+            <div class="row"><span class="k">Payment</span><span class="v">UPI (Paid)</span></div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-outline" style="flex:1;justify-content:center;">Navigate</button>
+            <button class="btn btn-primary" style="flex:1;justify-content:center;">Confirm pickup</button>
+          </div>
+        </div>
+
+        <div class="dscreen" data-dscreen="earnings">
+          <div class="dp-kpi-row">
+            <div class="dp-kpi"><div class="v">₹1,120</div><div class="l">Today</div></div>
+            <div class="dp-kpi"><div class="v">₹6,840</div><div class="l">This week</div></div>
+            <div class="dp-kpi"><div class="v">₹24,300</div><div class="l">This month</div></div>
+          </div>
+          <div class="card">
+            <h3>Recent payouts</h3>
+            <div class="liverow"><span>#FF10281 delivered</span><span>+₹42</span></div>
+            <div class="liverow"><span>Peak-hour incentive</span><span>+₹60</span></div>
+            <div class="liverow"><span>Weekly payout — Sun</span><span class="badge badge-success">Paid</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <b>Scope note:</b> this prototype covers the full design system plus the highest-priority screens in each product — customer app (splash through profile), admin dashboard (overview, orders, products, inventory, dispatch), and delivery portal (dashboard, assignment, active delivery, earnings). Screens not built out yet (favorites, notifications, support, coupons, refunds workflow, delivery zones, analytics, partner profile) follow the same tokens and components shown here, so they're a fast extension rather than a new design pass.
+  </div>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // mode switch
+  document.querySelectorAll('.modeswitch button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('.modeswitch button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById('panel-'+b.dataset.mode).classList.add('active');
+    });
+  });
+
+  // customer screen nav
+  const custScreens = [
+    ['splash','Splash'],['onboarding','Onboarding'],['login','Login'],['otp','OTP verify'],
+    ['location','Location'],['home','Home'],['search','Search'],['category','Category'],
+    ['product','Product detail'],['cart','Cart'],['checkout','Checkout'],['confirmation','Confirmation'],
+    ['tracking','Order tracking'],['orders','Orders'],['profile','Profile']
+  ];
+  const custNav = document.getElementById('cust-nav');
+  custScreens.forEach(([id,label],i)=>{
+    const btn=document.createElement('button');
+    btn.textContent=label;
+    if(i===0)btn.classList.add('active');
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('#cust-nav button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.phone .screen').forEach(s=>s.classList.remove('active'));
+      document.querySelector('.phone .screen[data-screen="'+id+'"]').classList.add('active');
+    });
+    custNav.appendChild(btn);
+  });
+
+  // admin nav
+  document.querySelectorAll('.admin-nav-item[data-ascreen]').forEach(item=>{
+    item.addEventListener('click',()=>{
+      document.querySelectorAll('.admin-nav-item[data-ascreen]').forEach(x=>x.classList.remove('on'));
+      item.classList.add('on');
+      document.querySelectorAll('.ascreen').forEach(s=>s.classList.remove('active'));
+      document.querySelector('.ascreen[data-ascreen="'+item.dataset.ascreen+'"]').classList.add('active');
+    });
+  });
+
+  // delivery nav
+  document.querySelectorAll('.dp-nav button').forEach(item=>{
+    item.addEventListener('click',()=>{
+      document.querySelectorAll('.dp-nav button').forEach(x=>x.classList.remove('on'));
+      item.classList.add('on');
+      document.querySelectorAll('.dscreen').forEach(s=>s.classList.remove('active'));
+      document.querySelector('.dscreen[data-dscreen="'+item.dataset.dscreen+'"]').classList.add('active');
+    });
+  });
+
+  // Lightweight prototype behavior for the core customer, admin, and partner flows.
+  const toast = document.getElementById('toast');
+  let toastTimer;
+  const showToast = message => {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  };
+  const goCustomer = screen => {
+    const target = document.querySelector('.phone .screen[data-screen="'+screen+'"]');
+    if (!target) return;
+    document.querySelectorAll('.phone .screen').forEach(item => item.classList.remove('active'));
+    target.classList.add('active');
+    document.querySelectorAll('#cust-nav button').forEach(item => item.classList.toggle('active', item.textContent.toLowerCase().replace(/ /g,'-').includes(screen)));
+  };
+  const setDeliveryScreen = screen => {
+    const navItem = document.querySelector('.dp-nav button[data-dscreen="'+screen+'"]');
+    if (navItem) navItem.click();
+  };
+
+  document.addEventListener('click', event => {
+    const target = event.target.closest('button, .clickable, .backbtn, .cat-item, .link, .fav');
+    if (!target) return;
+    const label = target.textContent.trim().toLowerCase();
+    const screen = target.closest('.screen');
+
+    if (target.classList.contains('addbtn')) {
+      showToast('Added to cart');
+      return;
+    }
+    if (target.classList.contains('qty') || target.closest('.qty')) {
+      const qty = target.closest('.qty');
+      if (target.tagName !== 'BUTTON') return;
+      const value = qty.querySelector('span');
+      const next = Math.max(1, Number(value.textContent) + (target.textContent.trim() === '+' ? 1 : -1));
+      value.textContent = next;
+      showToast('Quantity updated');
+      return;
+    }
+    if (target.classList.contains('backbtn')) {
+      goCustomer('home');
+      return;
+    }
+    if (label === 'shop now' || target.classList.contains('cat-item')) {
+      goCustomer('category');
+      return;
+    }
+    if (label === 'send otp') {
+      goCustomer('otp');
+      return;
+    }
+    if (label.includes('verify & continue')) {
+      goCustomer('location');
+      return;
+    }
+    if (label.includes('save & continue')) {
+      goCustomer('home');
+      showToast('Address saved');
+      return;
+    }
+    if (label.includes('add to cart')) {
+      goCustomer('cart');
+      showToast('Added Seer Fish to cart');
+      return;
+    }
+    if (label.includes('proceed to checkout')) {
+      goCustomer('checkout');
+      return;
+    }
+    if (target.dataset.action === 'place-order' || label.includes('place order')) {
+      goCustomer('confirmation');
+      showToast('Order placed with Cash on Delivery');
+      return;
+    }
+    if (label === 'track order' || label === 'track') {
+      goCustomer('tracking');
+      return;
+    }
+    if (label === 'accept delivery') {
+      setDeliveryScreen('active');
+      showToast('Delivery accepted');
+      return;
+    }
+    if (label === 'confirm pickup') {
+      target.textContent = 'Mark delivered';
+      showToast('Pickup confirmed');
+      return;
+    }
+    if (label === 'assign') {
+      target.textContent = 'Assigned';
+      target.disabled = true;
+      showToast('Order assigned to Ravi T.');
+      return;
+    }
+    if (target.classList.contains('fav')) {
+      target.textContent = target.textContent.trim() === '♡' ? '♥' : '♡';
+      showToast(target.textContent === '♥' ? 'Saved to favorites' : 'Removed from favorites');
+      return;
+    }
+    if (screen && target.classList.contains('clickable')) {
+      screen.querySelectorAll('.clickable').forEach(item => item.classList.remove('on'));
+      target.classList.add('on');
+    }
+  });
+</script>
+</body>
+</html>

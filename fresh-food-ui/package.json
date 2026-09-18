@@ -1,0 +1,16 @@
+{
+  "name": "fresh-food-ui",
+  "private": true,
+  "scripts": {
+    "dev:admin": "npm --workspace apps/admin run dev",
+    "dev:delivery": "npm --workspace apps/delivery run dev",
+    "dev:customer": "npm --workspace apps/customer start",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "workspaces": ["apps/*", "packages/*"],
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "allowJs": true,
+    "skipLibCheck": true,
+    "types": [
+      "react",
+      "react-native"
+    ],
+    "paths": {
+      "@fresh-food/design-tokens": [
+        "../../packages/design-tokens/src"
+      ],
+      "@fresh-food/ui": [
+        "../../packages/ui/src"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../../packages/design-tokens/src/**/*.ts",
+    "../../packages/ui/src/**/*.ts",
+    "../../packages/ui/src/**/*.tsx"
+  ],
+  "extends": "expo/tsconfig.base"
+}

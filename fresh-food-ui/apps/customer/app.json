@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Fresh Food",
+    "slug": "fresh-food",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-notifications"]
+  }
+}

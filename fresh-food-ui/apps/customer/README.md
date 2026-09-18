@@ -1,0 +1,1 @@
+Expo customer app UI. The first screen covers location, discovery, product add-to-cart, COD checkout, and a simple preparation status state. Add Expo Router, notifications, camera proof, and maps as the backend contracts land.
