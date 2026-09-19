@@ -2,11 +2,18 @@ import { Bell, Bike, ShieldAlert } from "lucide-react";
 
 type DeliveryHeaderProps = {
   isOnline: boolean;
-  onToggleOnline: () => void;
+  onToggleOnline?: () => void;
   onOpenSafety?: () => void;
+  onOpenNotifications?: () => void;
+  unreadNotificationsCount?: number;
 };
 
-export function DeliveryHeader({ isOnline, onToggleOnline, onOpenSafety }: DeliveryHeaderProps) {
+export function DeliveryHeader({
+  isOnline,
+  onOpenSafety,
+  onOpenNotifications,
+  unreadNotificationsCount = 0,
+}: DeliveryHeaderProps) {
   return (
     <header className="delivery-header">
       <div className="driver-profile">
@@ -25,8 +32,23 @@ export function DeliveryHeader({ isOnline, onToggleOnline, onOpenSafety }: Deliv
             <ShieldAlert size={18} />
           </button>
         )}
-        <button className="icon-control" type="button" aria-label="Notifications"><Bell size={18} /><span className="notification-dot" /></button>
-        <button className={`availability ${isOnline ? "online" : "offline"}`} type="button" aria-pressed={isOnline} onClick={onToggleOnline}><i /> {isOnline ? "Online" : "Offline"}</button>
+        <button
+          className="icon-control"
+          type="button"
+          aria-label={`Notifications${unreadNotificationsCount > 0 ? ` (${unreadNotificationsCount} unread)` : ""}`}
+          onClick={onOpenNotifications}
+          title="Notifications"
+        >
+          <Bell size={18} />
+          {unreadNotificationsCount > 0 && <span className="notification-dot" aria-hidden="true" />}
+        </button>
+        <div
+          className={`availability ${isOnline ? "online" : "offline"} display-only`}
+          role="status"
+          aria-label={`Current status: ${isOnline ? "Online" : "Offline"}`}
+        >
+          <i /> {isOnline ? "Online" : "Offline"}
+        </div>
       </div>
     </header>
   );

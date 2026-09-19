@@ -6,7 +6,8 @@ export type DeliveryTab =
   | "settings"
   | "help"
   | "safety"
-  | "report";
+  | "report"
+  | "notifications";
 
 export type DeliveryPhase = "accepted" | "at-pickup" | "on-the-way";
 export type HistoryStatus = "Delivered" | "Cancelled";
@@ -43,14 +44,14 @@ export type DeliverySettings = {
   orderAlerts: boolean;
   earningsAlerts: boolean;
   soundAlerts: boolean;
-  vehicle: "Bike" | "Scooter" | "Car";
+  vehicle: "Bike" | "Scooter";
   preferredZone: string;
 };
 
 export const pendingRequest: DeliveryRequest = {
   id: "FF10286",
   customer: "Thashreef R.",
-  pickup: "Fresh Food Hub",
+  pickup: "Fresh GO Hub",
   pickupAddress: "Mavoor Road, Kozhikode",
   dropAddress: "Palm Residency, Flat 4B, Kottooli",
   instructions: "Call before arriving",
@@ -85,6 +86,64 @@ export const initialSettings: DeliverySettings = {
   vehicle: "Bike",
   preferredZone: "Zone 1 · Kozhikode Central",
 };
+
+export type NotificationCategory = "incentive" | "payout" | "order" | "safety" | "system";
+
+export type DeliveryNotification = {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  category: NotificationCategory;
+  isRead: boolean;
+  actionLabel?: string;
+};
+
+export const initialNotifications: DeliveryNotification[] = [
+  {
+    id: "notif-1",
+    title: "Rain Surge Active · +₹35/drop",
+    message: "Earn an extra ₹35 per order across Kozhikode Central. Heavy evening demand active till 11:00 PM.",
+    timestamp: "10m ago",
+    category: "incentive",
+    isRead: false,
+    actionLabel: "View Map",
+  },
+  {
+    id: "notif-2",
+    title: "Weekly Payout Transferred",
+    message: "₹6,840 for the cycle Mar 10 – Mar 16 has been credited to your HDFC bank account (ending in 4821).",
+    timestamp: "2h ago",
+    category: "payout",
+    isRead: false,
+    actionLabel: "View Earnings",
+  },
+  {
+    id: "notif-3",
+    title: "Safety Toolkit: 24/7 SOS Desk Live",
+    message: "Direct emergency dispatch, police (112), and ambulance (108) hotlines are now accessible directly from your header.",
+    timestamp: "Yesterday",
+    category: "safety",
+    isRead: true,
+    actionLabel: "Open Safety",
+  },
+  {
+    id: "notif-4",
+    title: "Milestone Incentive Unlocked",
+    message: "You've successfully completed 15 deliveries this week! An extra ₹500 bonus will be included in your Tuesday payout.",
+    timestamp: "2d ago",
+    category: "incentive",
+    isRead: true,
+  },
+  {
+    id: "notif-5",
+    title: "High Demand Zone Alert",
+    message: "Order surge predicted near Mavoor Road Hub between 7:00 PM and 10:00 PM tonight. Head over to maximize orders.",
+    timestamp: "3d ago",
+    category: "order",
+    isRead: true,
+  },
+];
 
 export type HelpCategory = "all" | "orders" | "earnings" | "account" | "safety";
 
@@ -129,7 +188,7 @@ export const helpFaqs: HelpFaqItem[] = [
     id: "faq-5",
     category: "account",
     question: "How do I update my delivery vehicle or preferred delivery zone?",
-    answer: "You can change your vehicle type (Bike, Scooter, Car) instantly in Settings > Work Preferences. For delivery zone transfers (e.g., Kozhikode Central to South Hub), submit a zone change request through 'Report an issue' > 'Account update'.",
+    answer: "You can change your vehicle type (Bike, Scooter) instantly in Settings > Work Preferences. For delivery zone transfers (e.g., Kozhikode Central to South Hub), submit a zone change request through 'Report an issue' > 'Account update'.",
     tags: ["vehicle", "zone change", "preferences", "hub"],
   },
   {

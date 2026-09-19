@@ -3,11 +3,13 @@
 import { useState } from "react";
 import {
   ActiveDelivery,
+  DeliveryNotification,
   DeliveryPhase,
   DeliveryRequest,
   DeliverySettings,
   DeliveryTab,
   initialHistory,
+  initialNotifications,
   initialSettings,
   initialTickets,
   IssueTicket,
@@ -35,6 +37,7 @@ export function useDeliveryController() {
   const [selectedReportOrderId, setSelectedReportOrderId] = useState<string | undefined>(undefined);
   const [isLiveTripShared, setIsLiveTripShared] = useState(false);
   const [isSosModalOpen, setIsSosModalOpen] = useState(false);
+  const [notifications, setNotifications] = useState<DeliveryNotification[]>(initialNotifications);
 
   const acceptRequest = () => {
     if (!request || !isOnline) return;
@@ -80,7 +83,30 @@ export function useDeliveryController() {
     setTab("report");
   };
 
+  const openNotifications = () => {
+    setPreviousTab(tab);
+    setTab("notifications");
+  };
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((current) =>
+      current.map((notif) => (notif.id === id ? { ...notif, isRead: true } : notif))
+    );
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((current) => current.map((notif) => ({ ...notif, isRead: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
+
   const goBack = () => {
+    if (tab === "notifications") {
+      setTab(previousTab === "notifications" ? "dashboard" : previousTab);
+      return;
+    }
     setTab(previousTab === "help" || previousTab === "safety" || previousTab === "report" ? "settings" : previousTab);
   };
 
@@ -95,17 +121,24 @@ export function useDeliveryController() {
     return newTicket;
   };
 
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+
   return {
     activeDelivery,
     acceptRequest,
     advanceDelivery,
+    clearNotifications,
     declineRequest,
     goBack,
     history,
     isLiveTripShared,
     isOnline,
     isSosModalOpen,
+    markAllNotificationsAsRead,
+    markNotificationAsRead,
+    notifications,
     openHelp,
+    openNotifications,
     openReport,
     openSafety,
     request,
@@ -120,6 +153,7 @@ export function useDeliveryController() {
     tab,
     tickets,
     todayEarnings,
+    unreadNotificationCount,
     updateSettings,
     weeklyEarnings: baseWeeklyEarnings + todayEarnings - baseTodayEarnings,
   };
