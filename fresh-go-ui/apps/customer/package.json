@@ -1,5 +1,5 @@
 {
-  "name": "@fresh-food/customer",
+  "name": "@fresh-go/customer",
   "private": true,
   "main": "expo/AppEntry.js",
   "scripts": {

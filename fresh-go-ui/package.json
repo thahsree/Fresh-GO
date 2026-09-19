@@ -1,5 +1,5 @@
 {
-  "name": "fresh-food-ui",
+  "name": "fresh-go-ui",
   "private": true,
   "scripts": {
     "dev:admin": "npm --workspace apps/admin run dev",
