@@ -5,17 +5,25 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/freshgologo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.freshgo.customer",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
     "plugins": [
       "expo-notifications"
     ],
-    "android": {
-      "package": "com.freshgo.customer"
-    },
     "extra": {
       "eas": {
         "projectId": "1ee809c0-0054-4b5c-8770-5dc8aafb4f05"
