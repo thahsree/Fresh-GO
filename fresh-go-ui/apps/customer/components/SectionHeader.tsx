@@ -1,13 +1,26 @@
 import { colors } from "@fresh-food/design-tokens";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-type SectionHeaderProps = { title: string; action?: string };
+type SectionHeaderProps = {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+};
 
-export function SectionHeader({ title, action }: SectionHeaderProps) {
+export function SectionHeader({ title, action, onAction }: SectionHeaderProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
-      {action && <Text style={styles.action}>{action}</Text>}
+      {action && (
+        <Pressable
+          onPress={onAction}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`${action} for ${title}`}
+        >
+          <Text style={styles.action}>{action}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

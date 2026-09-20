@@ -4,7 +4,8 @@
   "scripts": {
     "dev:admin": "npm --workspace apps/admin run dev",
     "dev:delivery": "npm --workspace apps/delivery run dev",
-    "dev:customer": "npm --workspace apps/customer start",
+    "dev:customer": "npm --workspace apps/customer start -- --go",
+    "dev:customer:tunnel": "npm --workspace apps/customer start -- --go --tunnel",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "workspaces": ["apps/*", "packages/*"],
