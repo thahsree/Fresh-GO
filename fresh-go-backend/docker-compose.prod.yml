@@ -12,12 +12,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-freshgo}:${POSTGRES_PASSWORD:-freshgo_secure_pass}@postgres:5432/${POSTGRES_DB:-freshgo_db}?schema=public
-      DIRECT_URL: postgresql://${POSTGRES_USER:-freshgo}:${POSTGRES_PASSWORD:-freshgo_secure_pass}@postgres:5432/${POSTGRES_DB:-freshgo_db}?schema=public
-      REDIS_URL: ""
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_TLS: "false"
     depends_on:
       postgres:
         condition: service_healthy
@@ -28,16 +22,14 @@ services:
     image: postgres:16-alpine
     container_name: freshgo-postgres-prod
     restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-freshgo}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-freshgo_secure_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-freshgo_db}
+    env_file:
+      - .env.production
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-freshgo} -d ${POSTGRES_DB:-freshgo_db}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 5
