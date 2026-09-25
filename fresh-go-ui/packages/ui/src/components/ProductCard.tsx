@@ -17,6 +17,11 @@ export type ProductCardData = {
   price: number;
   unit?: string;
   fresh?: boolean;
+  isDailyCatch?: boolean;
+  isFlashFrozen?: boolean;
+  tag?: string;
+  availableStockKg?: number;
+  isInStock?: boolean;
   image?: string;
 };
 
@@ -25,6 +30,7 @@ export type ProductCardProps = {
   isFavorite?: boolean;
   onAdd?: () => void;
   onToggleFavorite?: () => void;
+  onPress?: () => void;
   favoriteIcon?: React.ReactNode;
   addIcon?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -35,13 +41,41 @@ export function ProductCard({
   isFavorite = false,
   onAdd,
   onToggleFavorite,
+  onPress,
   favoriteIcon,
   addIcon,
   style,
 }: ProductCardProps) {
+  const isOutOfStock =
+    product.isInStock === false ||
+    (product.availableStockKg !== undefined && product.availableStockKg <= 0);
+
+  const isLowStock =
+    !isOutOfStock &&
+    product.availableStockKg !== undefined &&
+    product.availableStockKg > 0 &&
+    product.availableStockKg <= 5;
+
+  const displayTag =
+    product.tag ||
+    (product.isDailyCatch
+      ? "Fresh Catch"
+      : product.isFlashFrozen
+      ? "Frozen"
+      : product.fresh
+      ? "Fresh"
+      : undefined);
+
   return (
     <View style={[styles.card, style]}>
-      <View style={styles.imageContainer}>
+      {/* Clickable Image Container */}
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        style={styles.imageContainer}
+        accessibilityRole={onPress ? "button" : undefined}
+        accessibilityLabel={`${product.name} details`}
+      >
         {product.image ? (
           <Image
             accessibilityLabel={product.name}
@@ -53,52 +87,105 @@ export function ProductCard({
           <View style={styles.imagePlaceholder} />
         )}
 
-        {product.fresh && (
-          <View style={styles.freshBadge}>
-            <View style={styles.freshDot} />
-            <Text style={styles.freshText}>fresh</Text>
+        {/* Out of Stock Pill */}
+        {isOutOfStock && (
+          <View style={[styles.freshBadge, { backgroundColor: "#BE4436" }]}>
+            <Text style={[styles.freshText, { color: "#FFFFFF", fontWeight: "900" }]}>
+              OUT OF STOCK
+            </Text>
           </View>
         )}
 
-        {onToggleFavorite && (
-          <Pressable
-            accessibilityLabel={
-              isFavorite
-                ? `Remove ${product.name} from favorites`
-                : `Add ${product.name} to favorites`
-            }
-            accessibilityRole="button"
-            onPress={onToggleFavorite}
-            style={styles.favoriteButton}
-          >
-            {favoriteIcon || (
-              <Text style={[styles.heartIcon, isFavorite && styles.heartActive]}>
-                ♥
-              </Text>
-            )}
-          </Pressable>
+        {/* Low Stock Warning Pill */}
+        {isLowStock && (
+          <View style={[styles.freshBadge, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B", borderWidth: 1 }]}>
+            <Text style={[styles.freshText, { color: "#B45309", fontWeight: "800" }]}>
+              ⚠️ Only {product.availableStockKg} left
+            </Text>
+          </View>
         )}
-      </View>
 
+        {/* Tag Pill when in stock and not low stock */}
+        {!isOutOfStock && !isLowStock && displayTag && (
+          <View
+            style={[
+              styles.freshBadge,
+              displayTag === "Frozen"
+                ? { backgroundColor: "#E0F2FE" }
+                : displayTag === "Fresh Cut"
+                ? { backgroundColor: "#FEF9C3" }
+                : displayTag === "Fresh Produce"
+                ? { backgroundColor: "#DCFCE7" }
+                : { backgroundColor: "rgba(255, 255, 255, 0.95)" },
+            ]}
+          >
+            {displayTag === "Fresh Catch" && <View style={styles.freshDot} />}
+            {displayTag === "Fresh" && <View style={[styles.freshDot, { backgroundColor: "#15803D" }]} />}
+            {displayTag === "Frozen" && <Text style={{ fontSize: 9, marginRight: 2 }}>❄️</Text>}
+            {displayTag === "Fresh Cut" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥩</Text>}
+            {displayTag === "Fresh Produce" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥬</Text>}
+            <Text
+              style={[
+                styles.freshText,
+                displayTag === "Frozen"
+                  ? { color: "#0369A1" }
+                  : displayTag === "Fresh Cut"
+                  ? { color: "#854D0E" }
+                  : displayTag === "Fresh Produce"
+                  ? { color: "#166534" }
+                  : {},
+              ]}
+            >
+              {displayTag}
+            </Text>
+          </View>
+        )}
+      </Pressable>
+
+      {/* Floating Favorite Button (Sibling, not nested) */}
+      {onToggleFavorite && (
+        <Pressable
+          accessibilityLabel={
+            isFavorite
+              ? `Remove ${product.name} from favorites`
+              : `Add ${product.name} to favorites`
+          }
+          accessibilityRole="button"
+          onPress={onToggleFavorite}
+          style={styles.favoriteButton}
+        >
+          {favoriteIcon || (
+            <Text style={[styles.heartIcon, isFavorite && styles.heartActive]}>
+              ♥
+            </Text>
+          )}
+        </Pressable>
+      )}
+
+      {/* Body Details Area */}
       <View style={styles.body}>
-        <Text numberOfLines={1} style={styles.name}>
-          {product.name}
-        </Text>
-        {product.detail ? (
-          <Text numberOfLines={1} style={styles.detail}>
-            {product.detail}
+        <Pressable onPress={onPress} disabled={!onPress}>
+          <Text numberOfLines={1} style={styles.name}>
+            {product.name}
           </Text>
-        ) : null}
+          {product.detail ? (
+            <Text numberOfLines={1} style={styles.detail}>
+              {product.detail}
+            </Text>
+          ) : null}
+        </Pressable>
 
         <View style={styles.priceRow}>
-          <Text style={styles.price}>
-            Rs {product.price.toLocaleString()}
-            {product.unit ? (
-              <Text style={styles.unit}> {product.unit}</Text>
-            ) : null}
-          </Text>
+          <Pressable onPress={onPress} disabled={!onPress} style={{ flex: 1 }}>
+            <Text style={styles.price}>
+              Rs {product.price.toLocaleString()}
+              {product.unit ? (
+                <Text style={styles.unit}> {product.unit}</Text>
+              ) : null}
+            </Text>
+          </Pressable>
 
-          {onAdd && (
+          {onAdd && !isOutOfStock && (
             <Pressable
               accessibilityLabel={`Add ${product.name} to cart`}
               accessibilityRole="button"
@@ -110,6 +197,16 @@ export function ProductCard({
             >
               {addIcon || <Text style={styles.addIconText}>+</Text>}
             </Pressable>
+          )}
+          {isOutOfStock && (
+            <View
+              style={[
+                styles.addButton,
+                { backgroundColor: "#E2E8F0", borderColor: "#CBD5E1" },
+              ]}
+            >
+              <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "800" }}>✕</Text>
+            </View>
           )}
         </View>
       </View>

@@ -4,8 +4,9 @@
   "scripts": {
     "dev:admin": "npm --workspace apps/admin run dev",
     "dev:delivery": "npm --workspace apps/delivery run dev",
-    "dev:customer": "npm --workspace apps/customer start -- --go",
+    "dev:customer": "npm --workspace apps/customer start -- --go --host lan",
     "dev:customer:tunnel": "npm --workspace apps/customer start -- --go --tunnel",
+    "ngrok:auth": "node_modules/@expo/ngrok-bin-win32-x64/ngrok.exe authtoken",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "workspaces": ["apps/*", "packages/*"],

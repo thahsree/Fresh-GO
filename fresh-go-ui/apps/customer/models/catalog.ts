@@ -1,34 +1,53 @@
 export type Category = {
+  id?: string;
   name: string;
+  slug?: string;
   icon: string;
   tint: string;
+  sortOrder?: number;
+};
+
+export type ProductCut = {
+  id: string;
+  name: string;
+  priceModifier?: number;
+  isDefault?: boolean;
 };
 
 export type Product = {
   id: string;
+  slug?: string;
   name: string;
   detail: string;
   price: number;
   unit: string;
-  category: "Fish" | "Meat" | "Vegetables" | "Offers" | string;
+  category: "Fish" | "Meat" | "Vegetables" | "Frozen" | "Offers" | string;
+  categoryId?: string;
   fresh?: boolean;
+  isDailyCatch?: boolean;
+  isFlashFrozen?: boolean;
   image: string;
   description: string;
   origin?: string;
   netWeight?: string;
   grossWeight?: string;
   cuts?: string[];
+  cutOptions?: ProductCut[];
   storageTip?: string;
   rating?: number;
   reviewsCount?: number;
   isBestSeller?: boolean;
+  availableStockKg?: number;
+  isInStock?: boolean;
+  tag?: string;
 };
 
 export const categories: Category[] = [
-  { name: "Fish", icon: "🐟", tint: "#E4ECE9" },
-  { name: "Meat", icon: "🥩", tint: "#FBE7DF" },
-  { name: "Vegetables", icon: "🥬", tint: "#EAF3E6" },
-  { name: "Offers", icon: "🔥", tint: "#FBEEDC" },
+  { id: "cat-fish", name: "Fish", slug: "fish", icon: "🐟", tint: "#E4ECE9", sortOrder: 1 },
+  { id: "cat-meat", name: "Meat", slug: "meat", icon: "🥩", tint: "#FBE7DF", sortOrder: 2 },
+  { id: "cat-veg", name: "Vegetables", slug: "vegetables", icon: "🥬", tint: "#EAF3E6", sortOrder: 3 },
+  { id: "cat-frozen", name: "Frozen", slug: "frozen", icon: "❄️", tint: "#E0F2FE", sortOrder: 4 },
+  { id: "cat-offers", name: "Offers", slug: "offers", icon: "🔥", tint: "#FBEEDC", sortOrder: 5 },
 ];
 
 export const freshProducts: Product[] = [
@@ -397,15 +416,115 @@ export const offerProducts: Product[] = [
   },
 ];
 
+export const frozenProducts: Product[] = [
+  {
+    id: "frozen-tenderloin-beef",
+    slug: "frozen-tenderloin-beef",
+    name: "Frozen Tenderloin Beef Steak",
+    detail: "Frozen · 35 kg avail.",
+    price: 560,
+    unit: "/kg",
+    category: "Frozen",
+    fresh: false,
+    image:
+      "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=600&auto=format&fit=crop&q=80",
+    description:
+      "Flash-frozen premium tenderloin beef steaks, vacuum packed to lock in juices and tender texture. Ideal for grilling, pan-searing, or stir fry.",
+    origin: "Wayanad High-Range Farms",
+    netWeight: "500g net steaks",
+    grossWeight: "550g pack",
+    cuts: ["1-inch Thick Steaks", "Stir-Fry Strips", "Curry Cut Cubes"],
+    storageTip: "Keep frozen below -18°C. Thaw in refrigerator before cooking.",
+    rating: 4.8,
+    reviewsCount: 38,
+    isBestSeller: true,
+    availableStockKg: 35,
+    isInStock: true,
+  },
+  {
+    id: "frozen-chicken-sausages-nuggets",
+    slug: "frozen-chicken-sausages-nuggets",
+    name: "Frozen Chicken Sausages & Nuggets Pack",
+    detail: "Frozen · 40 packs avail.",
+    price: 320,
+    unit: "/pack",
+    category: "Frozen",
+    fresh: false,
+    image:
+      "https://images.unsplash.com/photo-1562967914-608f82629710?w=600&auto=format&fit=crop&q=80",
+    description:
+      "Quick-cook frozen artisanal chicken sausages and crispy nuggets. 100% real breast meat, no artificial preservatives.",
+    origin: "FreshGo Kitchen Facility, Kozhikode",
+    netWeight: "500g combo pack",
+    grossWeight: "550g sealed pack",
+    cuts: ["500g Value Pack", "1kg Family Pack"],
+    storageTip: "Store in deep freezer at -18°C. Cook directly from frozen.",
+    rating: 4.8,
+    reviewsCount: 29,
+    isBestSeller: true,
+    availableStockKg: 40,
+    isInStock: true,
+  },
+  {
+    id: "frozen-mutton-chops",
+    slug: "frozen-mutton-chops",
+    name: "Frozen Prime Mutton Chops & Ribs",
+    detail: "Frozen · 20 kg avail.",
+    price: 840,
+    unit: "/kg",
+    category: "Frozen",
+    fresh: false,
+    image:
+      "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop&q=80",
+    description:
+      "Succulent prime-cut goat chops and ribs, individually quick frozen (IQF) at -40°C to lock in exceptional tenderness and natural moisture.",
+    origin: "Grass-Fed Livestock Reserve",
+    netWeight: "500g vacuum sealed",
+    grossWeight: "550g with glaze",
+    cuts: ["Rib Chops", "Shoulder Cuts", "Curry Mix"],
+    storageTip: "Keep in freezer at -18°C. Do not refreeze after thawing.",
+    rating: 4.9,
+    reviewsCount: 45,
+    isBestSeller: true,
+    availableStockKg: 20,
+    isInStock: true,
+  },
+  {
+    id: "frozen-tiger-prawns-glazed",
+    slug: "frozen-tiger-prawns-glazed",
+    name: "Frozen Glazed Tiger Prawns (IQF)",
+    detail: "Shellfish · IQF Quick Frozen",
+    price: 680,
+    unit: "/kg",
+    category: "Frozen",
+    fresh: false,
+    image:
+      "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?w=600&auto=format&fit=crop&q=80",
+    description:
+      "Peeled, deveined, and individually quick frozen (IQF) jumbo tiger prawns with a protective ice glaze. Fresh-off-the-boat taste whenever you cook.",
+    origin: "Mangalore Deep Sea Fisheries",
+    netWeight: "450g net thawed meat",
+    grossWeight: "500g frozen with glaze",
+    cuts: ["Tail-on IQF", "Tail-off Peeled"],
+    storageTip: "Store in freezer. Thaw under running cold water in 5 minutes.",
+    rating: 4.9,
+    reviewsCount: 62,
+    availableStockKg: 25,
+    isInStock: true,
+  },
+];
+
 export const allProducts: Product[] = [
   ...freshProducts,
   ...bestSellers,
+  ...frozenProducts,
   ...offerProducts,
 ];
 
 export const needs = [
   "Today's Fish",
   "Family Meat Packs",
+  "Frozen Meats",
   "Daily Vegetables",
   "Weekend Specials",
   "Budget Picks",

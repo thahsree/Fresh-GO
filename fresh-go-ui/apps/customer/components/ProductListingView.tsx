@@ -23,8 +23,9 @@ import {
   View,
 } from "react-native";
 import {
-  allProducts,
-  categories,
+  allProducts as defaultAllProducts,
+  categories as defaultCategories,
+  type Category,
   type Product,
 } from "../models/catalog";
 
@@ -41,6 +42,8 @@ type ProductListingViewProps = {
   initialCategory?: string | null;
   initialSearch?: string;
   favorites: string[];
+  categories?: Category[];
+  products?: Product[];
   onBack: () => void;
   onSelectProduct: (product: Product) => void;
   onAddProduct: (productId: string) => void;
@@ -51,6 +54,8 @@ export function ProductListingView({
   initialCategory = null,
   initialSearch = "",
   favorites,
+  categories = defaultCategories,
+  products = defaultAllProducts,
   onBack,
   onSelectProduct,
   onAddProduct,
@@ -67,7 +72,7 @@ export function ProductListingView({
 
   // Filter & Sort Logic
   const filteredProducts = useMemo(() => {
-    let list = [...allProducts];
+    let list = [...products];
 
     // Category Filter
     if (selectedCategory && selectedCategory !== "All") {
@@ -114,7 +119,7 @@ export function ProductListingView({
     }
 
     return list;
-  }, [selectedCategory, searchQuery, priceFilter, onlyFresh, sortBy]);
+  }, [products, selectedCategory, searchQuery, priceFilter, onlyFresh, sortBy]);
 
   const resetFilters = () => {
     setSelectedCategory(null);
@@ -195,7 +200,7 @@ export function ProductListingView({
                 !selectedCategory && styles.catChipTextActive,
               ]}
             >
-              All ({allProducts.length})
+              All ({products.length})
             </Text>
           </Pressable>
 
@@ -270,12 +275,29 @@ export function ProductListingView({
           <View style={styles.grid}>
             {filteredProducts.map((product) => {
               const isFav = favorites.includes(product.id);
+              const isOutOfStock =
+                product.isInStock === false ||
+                (product.availableStockKg !== undefined && product.availableStockKg <= 0);
+              const isLowStock =
+                !isOutOfStock &&
+                product.availableStockKg !== undefined &&
+                product.availableStockKg > 0 &&
+                product.availableStockKg <= 5;
+              const displayTag =
+                product.tag ||
+                (product.isDailyCatch
+                  ? "Fresh Catch"
+                  : product.isFlashFrozen
+                  ? "Frozen"
+                  : product.fresh
+                  ? "Fresh"
+                  : undefined);
+
               return (
                 <Pressable
                   key={product.id}
                   style={styles.productCard}
                   onPress={() => onSelectProduct(product)}
-                  accessibilityRole="button"
                 >
                   {/* Image Container */}
                   <View style={styles.cardImageWrapper}>
@@ -285,10 +307,57 @@ export function ProductListingView({
                       resizeMode="cover"
                     />
 
-                    {product.fresh && (
-                      <View style={styles.freshTag}>
-                        <View style={styles.freshDot} />
-                        <Text style={styles.freshTagText}>Fresh</Text>
+                    {/* Out of stock pill */}
+                    {isOutOfStock && (
+                      <View style={[styles.freshTag, { backgroundColor: "#BE4436", borderColor: "#991B1B" }]}>
+                        <Text style={[styles.freshTagText, { color: "#FFFFFF", fontWeight: "900" }]}>
+                          OUT OF STOCK
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Low stock pill */}
+                    {isLowStock && (
+                      <View style={[styles.freshTag, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B" }]}>
+                        <Text style={[styles.freshTagText, { color: "#B45309", fontWeight: "800" }]}>
+                          ⚠️ Only {product.availableStockKg} left
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Tag badge when in stock */}
+                    {!isOutOfStock && !isLowStock && displayTag && (
+                      <View
+                        style={[
+                          styles.freshTag,
+                          displayTag === "Frozen"
+                            ? { backgroundColor: "#E0F2FE", borderColor: "#BAE6FD" }
+                            : displayTag === "Fresh Cut"
+                            ? { backgroundColor: "#FEF9C3", borderColor: "#FEF08A" }
+                            : displayTag === "Fresh Produce"
+                            ? { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" }
+                            : {},
+                        ]}
+                      >
+                        {displayTag === "Fresh Catch" && <View style={styles.freshDot} />}
+                        {displayTag === "Fresh" && <View style={[styles.freshDot, { backgroundColor: "#15803D" }]} />}
+                        {displayTag === "Frozen" && <Text style={{ fontSize: 9, marginRight: 2 }}>❄️</Text>}
+                        {displayTag === "Fresh Cut" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥩</Text>}
+                        {displayTag === "Fresh Produce" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥬</Text>}
+                        <Text
+                          style={[
+                            styles.freshTagText,
+                            displayTag === "Frozen"
+                              ? { color: "#0369A1" }
+                              : displayTag === "Fresh Cut"
+                              ? { color: "#854D0E" }
+                              : displayTag === "Fresh Produce"
+                              ? { color: "#166534" }
+                              : {},
+                          ]}
+                        >
+                          {displayTag}
+                        </Text>
                       </View>
                     )}
 
@@ -338,17 +407,28 @@ export function ProductListingView({
                         <Text style={styles.unitText}>{product.unit}</Text>
                       </View>
 
-                      <Pressable
-                        style={styles.addBtn}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          onAddProduct(product.id);
-                        }}
-                        accessibilityRole="button"
-                        accessibilityLabel="Add to cart"
-                      >
-                        <Plus size={16} color="#FFFFFF" strokeWidth={3} />
-                      </Pressable>
+                      {!isOutOfStock ? (
+                        <Pressable
+                          style={styles.addBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            onAddProduct(product.id);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel="Add to cart"
+                        >
+                          <Plus size={16} color="#FFFFFF" strokeWidth={3} />
+                        </Pressable>
+                      ) : (
+                        <View
+                          style={[
+                            styles.addBtn,
+                            { backgroundColor: "#CBD5E1" },
+                          ]}
+                        >
+                          <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "800" }}>✕</Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </Pressable>

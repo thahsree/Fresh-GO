@@ -1,22 +1,31 @@
+export type ProductTag =
+  | "Fresh Catch"
+  | "Fresh"
+  | "Fresh Cut"
+  | "Frozen"
+  | "Fresh Produce"
+  | string;
+
 export type Product = {
   id: string;
   name: string;
-  category: "Fish" | "Meat" | "Vegetables";
-  unit: "kg" | "bunch" | "pack";
+  category: "Fish" | "Meat" | "Vegetables" | "Frozen" | string;
+  categoryId?: string;
+  unit: "kg" | "bunch" | "pack" | string;
   price: number;
   stock: number;
   active: boolean;
   image?: string;
+  description?: string;
+  origin?: string;
+  isDailyCatch?: boolean;
+  isFlashFrozen?: boolean;
+  tag?: ProductTag;
 };
 
 export type ProductInput = Omit<Product, "id">;
 
-export const initialProducts: Product[] = [
-  { id: "prd-seer-fish", name: "Seer Fish", category: "Fish", unit: "kg", price: 890, stock: 8, active: true, image: "" },
-  { id: "prd-tiger-prawns", name: "Tiger Prawns", category: "Fish", unit: "kg", price: 760, stock: 22, active: true, image: "" },
-  { id: "prd-country-chicken", name: "Country Chicken", category: "Meat", unit: "kg", price: 540, stock: 3, active: true, image: "" },
-  { id: "prd-baby-spinach", name: "Baby Spinach", category: "Vegetables", unit: "bunch", price: 80, stock: 0, active: false, image: "" },
-];
+export const initialProducts: Product[] = [];
 
 export function createProduct(input: ProductInput): Product {
   return { ...input, id: `prd-${Date.now()}` };

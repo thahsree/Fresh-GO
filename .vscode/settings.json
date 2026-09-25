@@ -1,0 +1,4 @@
+{
+  "typescript.tsdk": "fresh-go-backend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

@@ -22,7 +22,7 @@ export function AdminNavigation({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <img src="/fresh-food-logo.png" alt="Fresh Food" />
+        <img src="/FreshGOlogo.png" alt="FreshGO" />
       </div>
       <nav className="nav">
         {navItems.map(([id, icon, label]) => (

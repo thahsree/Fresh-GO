@@ -1,12 +1,12 @@
 import { colors } from "@fresh-food/design-tokens";
 import { Plus } from "lucide-react-native";
+import React, { useEffect, useRef } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
-  bestSellers,
-  categories,
-  freshProducts,
+  allProducts as defaultAllProducts,
+  categories as defaultCategories,
   needs,
-  offerProducts,
+  type Category,
   type Product,
 } from "../models/catalog";
 import { CategoryRail } from "./CategoryRail";
@@ -18,44 +18,105 @@ type HomeViewProps = {
   searchValue: string;
   selectedCategory: string | null;
   favorites: string[];
+  categories?: Category[];
+  products?: Product[];
+  address?: string;
   onSearchChange: (value: string) => void;
   onSelectCategory: (category: string) => void;
   onAddProduct: (productId: string) => void;
   onToggleFavorite: (productId: string) => void;
   onSelectProduct: (product: Product) => void;
   onNavigateToListing: (category?: string | null, search?: string) => void;
+  onPressProfile?: () => void;
 };
 
 export function HomeView({
   searchValue,
   selectedCategory,
   favorites,
+  categories = defaultCategories,
+  products = defaultAllProducts,
+  address,
   onSearchChange,
   onSelectCategory,
   onAddProduct,
   onToggleFavorite,
   onSelectProduct,
   onNavigateToListing,
+  onPressProfile,
 }: HomeViewProps) {
   const matchesSearch = (name: string) =>
     name.toLowerCase().includes(searchValue.toLowerCase());
   const matchesCategory = (category: string) =>
     !selectedCategory ||
     selectedCategory === "Offers" ||
-    category === selectedCategory;
+    category.toLowerCase() === selectedCategory.toLowerCase();
 
-  const visibleFreshProducts = freshProducts.filter(
+  const isProductFrozen = (product: Product) =>
+    Boolean(product.isFlashFrozen) ||
+    (!product.isDailyCatch && (
+      product.category.toLowerCase() === "frozen" ||
+      Boolean(product.slug?.toLowerCase().includes("frozen")) ||
+      product.name.toLowerCase().includes("frozen")
+    ));
+
+  // Main Category / Fresh items
+  const visibleCategoryProducts = products.filter((product) => {
+    if (!matchesSearch(product.name)) return false;
+
+    if (selectedCategory) {
+      if (selectedCategory.toLowerCase() === "frozen") {
+        return isProductFrozen(product);
+      }
+      return (
+        !isProductFrozen(product) &&
+        matchesCategory(product.category)
+      );
+    }
+
+    // Default: Fresh today (non-frozen, non-offers)
+    return (
+      !isProductFrozen(product) &&
+      product.category !== "Offers"
+    );
+  });
+
+  // Best sellers
+  const visibleBestSellers = products.filter(
     (product) =>
-      matchesSearch(product.name) && matchesCategory(product.category),
+      product.isBestSeller &&
+      matchesSearch(product.name) &&
+      (selectedCategory
+        ? selectedCategory.toLowerCase() === "frozen"
+          ? isProductFrozen(product)
+          : matchesCategory(product.category)
+        : true),
   );
-  const visibleBestSellers = bestSellers.filter(
+
+  // Frozen meats & ready-to-cook items
+  const visibleFrozenProducts = products.filter(
     (product) =>
-      matchesSearch(product.name) && matchesCategory(product.category),
+      isProductFrozen(product) &&
+      matchesSearch(product.name),
   );
-  const visibleOfferProducts = offerProducts.filter(
+
+  // Offers
+  const visibleOfferProducts = products.filter(
     (product) =>
-      matchesSearch(product.name) && matchesCategory(product.category),
+      (product.category === "Offers" || product.price < 400) &&
+      matchesSearch(product.name) &&
+      (selectedCategory
+        ? selectedCategory.toLowerCase() === "frozen"
+          ? isProductFrozen(product)
+          : matchesCategory(product.category)
+        : true),
   );
+
+  const offersScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    offersScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+  }, [selectedCategory, visibleOfferProducts.length]);
 
   return (
     <ScrollView
@@ -65,68 +126,123 @@ export function HomeView({
       <CustomerHeader
         searchValue={searchValue}
         onSearchChange={onSearchChange}
+        address={address}
+        onPressProfile={onPressProfile}
       />
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Fresh Catch.{"\n"}Every Day.</Text>
+        <Text style={styles.heroTitle}>Fresh Catch &{"\n"}Daily Sourced.</Text>
         <Text style={styles.heroCopy}>
-          Line-caught this morning, cleaned your way.
+          Line-caught coastal seafood & farm-fresh cuts, delivered cold.
         </Text>
-        <Pressable
-          style={styles.shopButton}
-          onPress={() => onNavigateToListing("Fish")}
-          accessibilityRole="button"
-        >
-          <Text style={styles.shopButtonText}>Shop now</Text>
-        </Pressable>
+        <View style={styles.heroButtons}>
+          <Pressable
+            style={styles.shopButton}
+            onPress={() => onNavigateToListing("Fish")}
+            accessibilityRole="button"
+          >
+            <Text style={styles.shopButtonText}>Shop Fresh</Text>
+          </Pressable>
+        </View>
       </View>
-      <CategoryRail
-        categories={categories}
-        selectedCategory={selectedCategory}
-        onSelect={onSelectCategory}
-      />
+      <View style={styles.categoryWrap}>
+        <CategoryRail
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelect={(cat) => {
+            if (selectedCategory?.toLowerCase() === cat.toLowerCase()) {
+              onSelectCategory("");
+            } else {
+              onSelectCategory(cat);
+            }
+          }}
+        />
+      </View>
+
+      {/* 1. Main Category / Fresh Items Section */}
       <SectionHeader
-        title="Fresh today"
+        title={
+          selectedCategory
+            ? selectedCategory.toLowerCase() === "frozen"
+              ? "Frozen meats & specials ❄️"
+              : selectedCategory
+            : "Fresh today"
+        }
         action="See all"
-        onAction={() => onNavigateToListing(selectedCategory)}
+        onAction={() => onNavigateToListing(selectedCategory || "Fish")}
       />
       <ProductRail
-        products={visibleFreshProducts}
+        products={visibleCategoryProducts}
         favorites={favorites}
         onAddProduct={onAddProduct}
         onToggleFavorite={onToggleFavorite}
         onSelectProduct={onSelectProduct}
+        resetKey={selectedCategory}
       />
-      <SectionHeader
-        title="Best sellers"
-        action="See all"
-        onAction={() => onNavigateToListing(selectedCategory)}
-      />
-      <ProductRail
-        products={visibleBestSellers}
-        favorites={favorites}
-        onAddProduct={onAddProduct}
-        onToggleFavorite={onToggleFavorite}
-        onSelectProduct={onSelectProduct}
-      />
-      <SectionHeader
-        title="Today's offers"
-        action="See all"
-        onAction={() => onNavigateToListing("Offers")}
-      />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.rail}
-      >
-        {visibleOfferProducts.map((product) => (
-          <OfferCard
-            key={product.id}
-            product={product}
-            onSelect={() => onSelectProduct(product)}
-            onAdd={() => onAddProduct(product.id)}
+
+      {/* 2. Best Sellers */}
+      {visibleBestSellers.length > 0 && (
+        <>
+          <SectionHeader
+            title="Best sellers"
+            action="See all"
+            onAction={() => onNavigateToListing(selectedCategory)}
           />
-        ))}
-      </ScrollView>
+          <ProductRail
+            products={visibleBestSellers}
+            favorites={favorites}
+            onAddProduct={onAddProduct}
+            onToggleFavorite={onToggleFavorite}
+            onSelectProduct={onSelectProduct}
+            resetKey={selectedCategory}
+          />
+        </>
+      )}
+
+      {/* 3. Today's Offers */}
+      {visibleOfferProducts.length > 0 && (
+        <>
+          <SectionHeader
+            title="Today's offers"
+            action="See all"
+            onAction={() => onNavigateToListing("Offers")}
+          />
+          <ScrollView
+            ref={offersScrollRef}
+            key={selectedCategory ? `offers-${selectedCategory}` : "offers-all"}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.rail}
+          >
+            {visibleOfferProducts.map((product) => (
+              <OfferCard
+                key={product.id}
+                product={product}
+                onSelect={() => onSelectProduct(product)}
+                onAdd={() => onAddProduct(product.id)}
+              />
+            ))}
+          </ScrollView>
+        </>
+      )}
+
+      {/* 4. Frozen Meats & Specials (Moved to BOTTOM of product lists!) */}
+      {!selectedCategory && (
+        <>
+          <SectionHeader
+            title="Frozen meats & specials ❄️"
+            action="See all"
+            onAction={() => onNavigateToListing("Frozen")}
+          />
+          <ProductRail
+            products={visibleFrozenProducts}
+            favorites={favorites}
+            onAddProduct={onAddProduct}
+            onToggleFavorite={onToggleFavorite}
+            onSelectProduct={onSelectProduct}
+            resetKey={selectedCategory}
+          />
+        </>
+      )}
       <SectionHeader
         title="Shop by need"
         action="Explore all"
@@ -137,7 +253,12 @@ export function HomeView({
           <Pressable
             key={need}
             style={styles.needItem}
-            onPress={() => onNavigateToListing(null, need)}
+            onPress={() =>
+              onNavigateToListing(
+                need.includes("Frozen") ? "Frozen" : null,
+                need,
+              )
+            }
             accessibilityRole="button"
           >
             <Text style={styles.needText}>{need}</Text>
@@ -154,11 +275,21 @@ function ProductRail({
   onAddProduct,
   onToggleFavorite,
   onSelectProduct,
+  resetKey,
 }: Pick<HomeViewProps, "favorites" | "onAddProduct" | "onToggleFavorite" | "onSelectProduct"> & {
   products: Product[];
+  resetKey?: string | null;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+  }, [resetKey, products.length]);
+
   return (
     <ScrollView
+      ref={scrollRef}
+      key={resetKey ? `rail-${resetKey}` : "rail-all"}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.rail}
@@ -196,7 +327,6 @@ function OfferCard({
     <Pressable
       style={styles.offerCard}
       onPress={onSelect}
-      accessibilityRole="button"
     >
       <Image
         source={{ uri: product.image }}
@@ -236,11 +366,15 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 8 },
   hero: {
     marginHorizontal: 18,
-    marginBottom: 18,
+    marginBottom: 24,
     padding: 22,
     borderRadius: 22,
     backgroundColor: colors.primary,
     overflow: "hidden",
+  },
+  categoryWrap: {
+    marginTop: 6,
+    marginBottom: 8,
   },
   heroTitle: {
     color: "#FFFFFF",
@@ -254,6 +388,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 14,
   },
+  heroButtons: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
   shopButton: {
     alignSelf: "flex-start",
     paddingVertical: 8,
@@ -262,6 +401,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   shopButtonText: { color: "#FFFFFF", fontSize: 12.5, fontWeight: "800" },
+  shopFrozenButton: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E0F2FE",
+  },
+  shopFrozenText: {
+    color: colors.primaryDark,
+    fontSize: 12.5,
+    fontWeight: "800",
+  },
   rail: { gap: 12, paddingHorizontal: 18, paddingBottom: 6 },
   offerCard: {
     width: 240,

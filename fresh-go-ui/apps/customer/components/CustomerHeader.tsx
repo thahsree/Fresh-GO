@@ -5,18 +5,22 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 type CustomerHeaderProps = {
   searchValue: string;
   onSearchChange: (value: string) => void;
+  address?: string;
+  onPressProfile?: () => void;
 };
 
 export function CustomerHeader({
   searchValue,
   onSearchChange,
+  address = "Palm Residency, Flat 4B",
+  onPressProfile,
 }: CustomerHeaderProps) {
   return (
     <>
       <View style={styles.topbar}>
         <Pressable style={styles.location} accessibilityRole="button">
           <View style={styles.dot} />
-          <Text style={styles.locationText}>Deliver to · Palm Residency</Text>
+          <Text style={styles.locationText} numberOfLines={1}>Deliver to · {address}</Text>
           <ChevronDown size={13} color={colors.primaryDark} />
         </Pressable>
         <View style={styles.actions}>
@@ -26,7 +30,11 @@ export function CustomerHeader({
           >
             <Bell size={16} color={colors.primaryDark} />
           </Pressable>
-          <Pressable style={styles.iconButton} accessibilityLabel="Profile">
+          <Pressable
+            style={styles.iconButton}
+            accessibilityLabel="Profile"
+            onPress={onPressProfile}
+          >
             <UserRound size={16} color={colors.primaryDark} />
           </Pressable>
         </View>

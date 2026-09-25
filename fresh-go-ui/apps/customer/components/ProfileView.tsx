@@ -21,7 +21,7 @@ import {
 
 export type UserProfile = {
   name: string;
-  email: string;
+  email?: string;
   phone: string;
   isLoggedIn: boolean;
 };
@@ -71,7 +71,7 @@ export function ProfileView({
               </View>
             </View>
             <Text style={styles.userPhone}>{user.phone}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
+            {!!user.email && <Text style={styles.userEmail}>{user.email}</Text>}
           </View>
         ) : (
           <View style={styles.userInfo}>

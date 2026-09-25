@@ -21,6 +21,8 @@ import {
   View,
 } from "react-native";
 import { allProducts, type Product } from "../models/catalog";
+import { dispatchOrderNotification } from "../lib/notifications";
+import { OrderCountdownModal } from "./OrderCountdownModal";
 
 export type CartItem = {
   productId: string;
@@ -30,6 +32,8 @@ export type CartItem = {
 
 type CartViewProps = {
   cart: { [productId: string]: number };
+  products?: Product[];
+  deliveryAddress?: string;
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveItem: (productId: string) => void;
   onExploreProducts: () => void;
@@ -43,6 +47,8 @@ type CartViewProps = {
 
 export function CartView({
   cart,
+  products = allProducts,
+  deliveryAddress: initialDeliveryAddress,
   onUpdateQuantity,
   onRemoveItem,
   onExploreProducts,
@@ -52,18 +58,30 @@ export function CartView({
   const [couponApplied, setCouponApplied] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "upi">("cod");
   const [deliveryAddress, setDeliveryAddress] = useState(
-    "Palm Residency, Flat 402, 4th Cross Road",
+    initialDeliveryAddress || "Palm Residency, Flat 4B, 4th Cross Road",
   );
+
+  // 5-Second Animated Countdown Confirmation State (Prevents Double Tapping & Accidental Placements)
+  const [isCountdownOpen, setIsCountdownOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const cartEntries = Object.entries(cart).filter(([_, qty]) => qty > 0);
   const itemsWithProduct = cartEntries
     .map(([id, qty]) => {
-      const product = allProducts.find((p) => p.id === id);
+      const product = products.find((p) => p.id === id || p.slug === id);
       return product ? { product, quantity: qty } : null;
     })
     .filter(
       (item): item is { product: Product; quantity: number } => item !== null,
     );
+
+  const stockExceededItems = itemsWithProduct.filter(
+    ({ product, quantity }) =>
+      (product.availableStockKg !== undefined && quantity > product.availableStockKg) ||
+      (product.isInStock === false) ||
+      (product.availableStockKg !== undefined && product.availableStockKg <= 0)
+  );
+  const hasStockIssue = stockExceededItems.length > 0;
 
   const itemsTotal = itemsWithProduct.reduce(
     (sum, { product, quantity }) => sum + product.price * quantity,
@@ -81,8 +99,37 @@ export function CartView({
     }
   };
 
-  const handleCheckout = () => {
-    if (itemsWithProduct.length === 0) return;
+  const handleInitiateCheckout = () => {
+    if (itemsWithProduct.length === 0 || isSubmitting || isCountdownOpen) return;
+    if (hasStockIssue) {
+      dispatchOrderNotification({
+        orderId: "STOCK",
+        status: "cancelled",
+        title: "Stock Limit Exceeded",
+        message:
+          "Some items in your cart exceed available stock. Please adjust quantities to continue.",
+      });
+      return;
+    }
+    setIsCountdownOpen(true);
+  };
+
+  const handleCancelCountdown = () => {
+    setIsCountdownOpen(false);
+    setIsSubmitting(false);
+    dispatchOrderNotification({
+      orderId: "CART",
+      status: "cancelled",
+      title: "Order Placement Cancelled",
+      message: "Your fresh catch items are safely kept in your cart.",
+    });
+  };
+
+  const handleConfirmOrder = () => {
+    if (isSubmitting || itemsWithProduct.length === 0) return;
+    setIsSubmitting(true);
+    setIsCountdownOpen(false);
+
     onPlaceOrder({
       items: itemsWithProduct,
       total: grandTotal,
@@ -183,15 +230,98 @@ export function CartView({
                   <Text style={styles.qtyText}>{quantity}</Text>
                   <Pressable
                     style={styles.stepBtn}
-                    onPress={() => onUpdateQuantity(product.id, quantity + 1)}
+                    onPress={() => {
+                      const max =
+                        product.availableStockKg !== undefined
+                          ? Math.floor(product.availableStockKg)
+                          : 99;
+                      if (quantity < max) {
+                        onUpdateQuantity(product.id, quantity + 1);
+                      }
+                    }}
+                    disabled={
+                      product.availableStockKg !== undefined &&
+                      quantity >= product.availableStockKg
+                    }
                   >
-                    <Plus size={13} color={colors.primaryDark} />
+                    <Plus
+                      size={13}
+                      color={
+                        product.availableStockKg !== undefined &&
+                        quantity >= product.availableStockKg
+                          ? "#CBD5E1"
+                          : colors.primaryDark
+                      }
+                    />
                   </Pressable>
                 </View>
                 <Text style={styles.lineTotal}>
                   Rs {(product.price * quantity).toLocaleString()}
                 </Text>
               </View>
+
+              {product.availableStockKg !== undefined &&
+                quantity > product.availableStockKg && (
+                  <View
+                    style={{
+                      marginTop: 6,
+                      backgroundColor: "#FBE7E3",
+                      padding: 6,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: "#BE4436",
+                        fontWeight: "700",
+                      }}
+                    >
+                      ⚠️ Exceeds stock! Only {product.availableStockKg}{" "}
+                      {product.unit || "kg"} left.
+                    </Text>
+                  </View>
+                )}
+
+              {product.availableStockKg !== undefined &&
+                quantity === product.availableStockKg &&
+                product.availableStockKg > 0 && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text
+                      style={{
+                        fontSize: 10.5,
+                        color: "#B45309",
+                        fontWeight: "600",
+                      }}
+                    >
+                      Max available stock reached ({product.availableStockKg}{" "}
+                      {product.unit || "kg"})
+                    </Text>
+                  </View>
+                )}
+
+              {((product.availableStockKg !== undefined &&
+                product.availableStockKg <= 0) ||
+                product.isInStock === false) && (
+                <View
+                  style={{
+                    marginTop: 6,
+                    backgroundColor: "#FBE7E3",
+                    padding: 6,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#BE4436",
+                      fontWeight: "700",
+                    }}
+                  >
+                    ❌ Item is out of stock. Please remove to continue.
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         ))}
@@ -306,15 +436,61 @@ export function CartView({
           <Text style={styles.checkoutTotalLabel}>Grand Total</Text>
           <Text style={styles.checkoutTotal}>Rs {grandTotal.toLocaleString()}</Text>
         </View>
+
+        {hasStockIssue && (
+          <View
+            style={{
+              padding: 8,
+              borderRadius: 8,
+              backgroundColor: "#FBE7E3",
+              borderWidth: 1,
+              borderColor: "#BE4436",
+              marginBottom: 8,
+              width: "100%",
+            }}
+          >
+            <Text style={{ fontSize: 11.5, color: "#9C2B1F", fontWeight: "700" }}>
+              ⚠️ Adjust cart: items exceed available stock.
+            </Text>
+          </View>
+        )}
+
         <Pressable
-          style={styles.placeOrderBtn}
-          onPress={handleCheckout}
+          style={[
+            styles.placeOrderBtn,
+            (isSubmitting || isCountdownOpen || hasStockIssue) &&
+              styles.placeOrderBtnDisabled,
+          ]}
+          onPress={handleInitiateCheckout}
+          disabled={isSubmitting || isCountdownOpen || hasStockIssue}
           accessibilityRole="button"
+          accessibilityLabel="Place Order"
         >
-          <Text style={styles.placeOrderBtnText}>Place Order</Text>
+          <Text style={styles.placeOrderBtnText}>
+            {isSubmitting
+              ? "Placing Order..."
+              : isCountdownOpen
+              ? "Confirming..."
+              : hasStockIssue
+              ? "Stock Exceeded"
+              : "Place Order"}
+          </Text>
           <ArrowRight size={18} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {/* 5-Second Animated Countdown Confirmation Modal */}
+      <OrderCountdownModal
+        visible={isCountdownOpen}
+        orderDetails={{
+          items: itemsWithProduct,
+          total: grandTotal,
+          paymentMethod,
+          address: deliveryAddress,
+        }}
+        onConfirm={handleConfirmOrder}
+        onCancel={handleCancelCountdown}
+      />
     </ScrollView>
   );
 }
@@ -687,6 +863,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 22,
     borderRadius: 12,
+  },
+  placeOrderBtnDisabled: {
+    opacity: 0.65,
   },
   placeOrderBtnText: {
     color: "#FFFFFF",

@@ -1,17 +1,21 @@
 import { colors } from "@fresh-food/design-tokens";
 import {
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
+  ArrowLeft,
+  CheckCircle2,
   Phone,
+  RotateCw,
+  ShieldCheck,
   Sparkles,
   User,
   X,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +23,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { customerApi } from "../lib/api";
+import { dispatchOrderNotification } from "../lib/notifications";
 import type { UserProfile } from "./ProfileView";
 
 type AuthViewProps = {
@@ -28,36 +34,102 @@ type AuthViewProps = {
 };
 
 export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
-  const [tab, setTab] = useState<"login" | "signup">("login");
-  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [phone, setPhone] = useState("9876543210");
+  const [name, setName] = useState("");
+  const [otp, setOtp] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [timer, setTimer] = useState(30);
 
-  // Form states
-  const [loginIdentifier, setLoginIdentifier] = useState("+91 98765 43210");
-  const [loginPassword, setLoginPassword] = useState("freshgo123");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [signupName, setSignupName] = useState("");
-  const [signupPhone, setSignupPhone] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
+  // Reset state when modal opens
+  useEffect(() => {
+    if (visible) {
+      setStep("phone");
+      setErrorMessage("");
+      setOtp("");
+    }
+  }, [visible]);
 
-  const handleLogin = () => {
-    onSuccess({
-      name: "Thashreef R.",
-      phone: loginIdentifier.includes("@") ? "+91 98765 43210" : loginIdentifier,
-      email: loginIdentifier.includes("@") ? loginIdentifier : "thashreef@freshgo.in",
-      isLoggedIn: true,
-    });
-    onClose();
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    if (step === "otp" && timer > 0) {
+      timerRef.current = setTimeout(() => {
+        setTimer((t) => t - 1);
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [step, timer]);
+
+  const handleSendOtp = async () => {
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      setErrorMessage("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      await customerApi.sendOtp(cleanPhone);
+      setStep("otp");
+      setOtp("");
+      setTimer(30);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSignup = () => {
-    onSuccess({
-      name: signupName.trim() || "Thashreef R.",
-      phone: signupPhone.trim() || "+91 98765 43210",
-      email: signupEmail.trim() || "thashreef@freshgo.in",
-      isLoggedIn: true,
-    });
-    onClose();
+  const handleVerifyOtp = async () => {
+    const cleanOtp = otp.trim();
+    if (cleanOtp.length < 4) {
+      setErrorMessage("Please enter the verification code");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const res = await customerApi.verifyOtp(phone, cleanOtp, name);
+      if (res.success && res.user) {
+        onSuccess(res.user);
+        dispatchOrderNotification({
+          orderId: "LOGIN",
+          status: "confirmed",
+          title: "Welcome to FreshGo! 🌿",
+          message: `Logged in as ${res.user.name} (${res.user.phone})`,
+        });
+        onClose();
+      } else {
+        setErrorMessage(res.error || "Invalid OTP. Please try 123456.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || "Verification failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (timer > 0) return;
+    setIsLoading(true);
+    setErrorMessage("");
+    try {
+      await customerApi.sendOtp(phone);
+      setTimer(30);
+    } catch (err: any) {
+      setErrorMessage("Failed to resend code");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,223 +139,228 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.overlay}
+      >
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.container}>
-          {/* Header */}
+          {/* Header with FreshGo Logo & Title */}
           <View style={styles.header}>
             <View style={styles.logoRow}>
-              <View style={styles.logoBadge}>
-                <Sparkles size={16} color="#FFFFFF" />
+              <Image
+                source={require("../assets/freshgologo.png")}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+              <View>
+                <Text style={styles.logoText}>FreshGo</Text>
+                <Text style={styles.logoTagline}>Fresh Catch & Direct Meats</Text>
               </View>
-              <Text style={styles.logoText}>FreshGo</Text>
             </View>
             <Pressable
               style={styles.closeBtn}
               onPress={onClose}
               accessibilityRole="button"
+              accessibilityLabel="Close"
             >
               <X size={18} color={colors.primaryDark} />
             </Pressable>
           </View>
 
-          {/* Tab Switcher */}
-          <View style={styles.tabSwitcher}>
-            <Pressable
-              style={[styles.tabBtn, tab === "login" && styles.tabBtnActive]}
-              onPress={() => setTab("login")}
-            >
-              <Text
-                style={[
-                  styles.tabBtnText,
-                  tab === "login" && styles.tabBtnTextActive,
-                ]}
-              >
-                Log In
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.tabBtn, tab === "signup" && styles.tabBtnActive]}
-              onPress={() => setTab("signup")}
-            >
-              <Text
-                style={[
-                  styles.tabBtnText,
-                  tab === "signup" && styles.tabBtnTextActive,
-                ]}
-              >
-                Sign Up
-              </Text>
-            </Pressable>
-          </View>
-
           <ScrollView showsVerticalScrollIndicator={false}>
-            {tab === "login" ? (
-              /* LOGIN FORM */
-              <View style={styles.form}>
-                <Text style={styles.formTitle}>Welcome Back!</Text>
-                <Text style={styles.formSubtitle}>
-                  Enter your phone number or email to access your fresh basket.
-                </Text>
+            {step === "phone" ? (
+              /* STEP 1: MOBILE NUMBER */
+              <View style={styles.content}>
+                <View style={styles.titleSection}>
+                  <Text style={styles.mainTitle}>Login with Mobile</Text>
+                  <Text style={styles.subtitle}>
+                    Enter your mobile number to get a one-time verification code.
+                    No password or email needed.
+                  </Text>
+                </View>
 
+                {/* Mobile Input */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Phone or Email</Text>
-                  <View style={styles.inputWrapper}>
-                    <Mail size={16} color={colors.textSoft} />
+                  <Text style={styles.inputLabel}>Mobile Number</Text>
+                  <View style={styles.phoneInputWrapper}>
+                    <View style={styles.countryCodeBadge}>
+                      <Text style={styles.flagText}>🇮🇳</Text>
+                      <Text style={styles.countryCodeText}>+91</Text>
+                    </View>
                     <TextInput
-                      value={loginIdentifier}
-                      onChangeText={setLoginIdentifier}
-                      placeholder="e.g. +91 98765 43210"
-                      style={styles.input}
+                      value={phone}
+                      onChangeText={(val) => {
+                        setPhone(val);
+                        if (errorMessage) setErrorMessage("");
+                      }}
+                      placeholder="98765 43210"
+                      keyboardType="phone-pad"
+                      maxLength={12}
+                      style={styles.phoneInput}
                       placeholderTextColor={colors.textSoft}
-                      autoCapitalize="none"
                     />
                   </View>
                 </View>
 
+                {/* Name Input (Optional) */}
                 <View style={styles.inputGroup}>
-                  <View style={styles.passwordLabelRow}>
-                    <Text style={styles.inputLabel}>Password</Text>
-                    <Pressable>
-                      <Text style={styles.forgotLink}>Forgot?</Text>
-                    </Pressable>
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <Lock size={16} color={colors.textSoft} />
+                  <Text style={styles.inputLabel}>Your Name (Optional)</Text>
+                  <View style={styles.textInputWrapper}>
+                    <User size={16} color={colors.textSoft} />
                     <TextInput
-                      value={loginPassword}
-                      onChangeText={setLoginPassword}
-                      placeholder="Enter password"
-                      secureTextEntry={!showPassword}
-                      style={styles.input}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder="e.g. Thashreef R."
+                      style={styles.textInput}
                       placeholderTextColor={colors.textSoft}
                     />
-                    <Pressable
-                      onPress={() => setShowPassword((p) => !p)}
-                      style={styles.eyeBtn}
-                    >
-                      {showPassword ? (
-                        <EyeOff size={16} color={colors.textSoft} />
-                      ) : (
-                        <Eye size={16} color={colors.textSoft} />
-                      )}
-                    </Pressable>
                   </View>
                 </View>
 
+                {/* Error message */}
+                {!!errorMessage && (
+                  <View style={styles.errorBox}>
+                    <Text style={styles.errorText}>{errorMessage}</Text>
+                  </View>
+                )}
+
+                {/* Demo number quick-fill pill */}
                 <Pressable
-                  style={styles.submitBtn}
-                  onPress={handleLogin}
-                  accessibilityRole="button"
+                  style={styles.demoPill}
+                  onPress={() => {
+                    setPhone("9876543210");
+                    setName("Thashreef R.");
+                    setErrorMessage("");
+                  }}
                 >
-                  <Text style={styles.submitBtnText}>Log In to FreshGo</Text>
+                  <Sparkles size={13} color={colors.primary} />
+                  <Text style={styles.demoPillText}>
+                    Use demo account: +91 98765 43210
+                  </Text>
                 </Pressable>
 
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchText}>Don't have an account?</Text>
-                  <Pressable onPress={() => setTab("signup")}>
-                    <Text style={styles.switchLink}> Sign Up</Text>
-                  </Pressable>
+                {/* Submit button */}
+                <Pressable
+                  style={[styles.primaryBtn, isLoading && styles.disabledBtn]}
+                  onPress={handleSendOtp}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Get OTP</Text>
+                  )}
+                </Pressable>
+
+                {/* Trust info */}
+                <View style={styles.trustBadge}>
+                  <ShieldCheck size={14} color={colors.primary} />
+                  <Text style={styles.trustText}>
+                    100% Secure · Instant SMS OTP · No passwords required
+                  </Text>
                 </View>
               </View>
             ) : (
-              /* SIGNUP FORM */
-              <View style={styles.form}>
-                <Text style={styles.formTitle}>Create Account</Text>
-                <Text style={styles.formSubtitle}>
-                  Join FreshGo for daily fresh catch & farm-direct meats.
-                </Text>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Full Name</Text>
-                  <View style={styles.inputWrapper}>
-                    <User size={16} color={colors.textSoft} />
-                    <TextInput
-                      value={signupName}
-                      onChangeText={setSignupName}
-                      placeholder="e.g. Thashreef R."
-                      style={styles.input}
-                      placeholderTextColor={colors.textSoft}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Mobile Number</Text>
-                  <View style={styles.inputWrapper}>
-                    <Phone size={16} color={colors.textSoft} />
-                    <TextInput
-                      value={signupPhone}
-                      onChangeText={setSignupPhone}
-                      placeholder="+91 98765 43210"
-                      keyboardType="phone-pad"
-                      style={styles.input}
-                      placeholderTextColor={colors.textSoft}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Email Address</Text>
-                  <View style={styles.inputWrapper}>
-                    <Mail size={16} color={colors.textSoft} />
-                    <TextInput
-                      value={signupEmail}
-                      onChangeText={setSignupEmail}
-                      placeholder="name@example.com"
-                      keyboardType="email-address"
-                      style={styles.input}
-                      placeholderTextColor={colors.textSoft}
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <Lock size={16} color={colors.textSoft} />
-                    <TextInput
-                      value={signupPassword}
-                      onChangeText={setSignupPassword}
-                      placeholder="Create a strong password"
-                      secureTextEntry={!showPassword}
-                      style={styles.input}
-                      placeholderTextColor={colors.textSoft}
-                    />
-                    <Pressable
-                      onPress={() => setShowPassword((p) => !p)}
-                      style={styles.eyeBtn}
-                    >
-                      {showPassword ? (
-                        <EyeOff size={16} color={colors.textSoft} />
-                      ) : (
-                        <Eye size={16} color={colors.textSoft} />
-                      )}
-                    </Pressable>
-                  </View>
-                </View>
-
+              /* STEP 2: OTP VERIFICATION */
+              <View style={styles.content}>
                 <Pressable
-                  style={styles.submitBtn}
-                  onPress={handleSignup}
-                  accessibilityRole="button"
+                  style={styles.backRow}
+                  onPress={() => {
+                    setStep("phone");
+                    setErrorMessage("");
+                  }}
                 >
-                  <Text style={styles.submitBtnText}>Create Account</Text>
+                  <ArrowLeft size={16} color={colors.primary} />
+                  <Text style={styles.backText}>Change Mobile Number</Text>
                 </Pressable>
 
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchText}>Already have an account?</Text>
-                  <Pressable onPress={() => setTab("login")}>
-                    <Text style={styles.switchLink}> Log In</Text>
-                  </Pressable>
+                <View style={styles.titleSection}>
+                  <Text style={styles.mainTitle}>Enter Verification Code</Text>
+                  <Text style={styles.subtitle}>
+                    We've sent a 6-digit verification code to{" "}
+                    <Text style={styles.phoneHighlight}>+91 {phone}</Text>
+                  </Text>
+                </View>
+
+                {/* OTP Input */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>One-Time Password (OTP)</Text>
+                  <View style={styles.otpInputWrapper}>
+                    <TextInput
+                      value={otp}
+                      onChangeText={(val) => {
+                        setOtp(val);
+                        if (errorMessage) setErrorMessage("");
+                      }}
+                      placeholder="123456"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      style={styles.otpInput}
+                      placeholderTextColor={colors.textSoft}
+                      autoFocus
+                    />
+                  </View>
+                </View>
+
+                {/* Dev hint / autofill */}
+                <Pressable
+                  style={styles.demoPill}
+                  onPress={() => {
+                    setOtp("123456");
+                    setErrorMessage("");
+                  }}
+                >
+                  <CheckCircle2 size={13} color={colors.primary} />
+                  <Text style={styles.demoPillText}>
+                    Development OTP: 123456 (Tap to auto-fill)
+                  </Text>
+                </Pressable>
+
+                {/* Error message */}
+                {!!errorMessage && (
+                  <View style={styles.errorBox}>
+                    <Text style={styles.errorText}>{errorMessage}</Text>
+                  </View>
+                )}
+
+                {/* Verify button */}
+                <Pressable
+                  style={[styles.primaryBtn, isLoading && styles.disabledBtn]}
+                  onPress={handleVerifyOtp}
+                  disabled={isLoading}
+                  accessibilityRole="button"
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Verify & Continue</Text>
+                  )}
+                </Pressable>
+
+                {/* Resend OTP */}
+                <View style={styles.resendRow}>
+                  {timer > 0 ? (
+                    <Text style={styles.resendTimerText}>
+                      Resend OTP in <Text style={styles.timerBold}>{timer}s</Text>
+                    </Text>
+                  ) : (
+                    <Pressable
+                      style={styles.resendBtn}
+                      onPress={handleResendOtp}
+                      disabled={isLoading}
+                    >
+                      <RotateCw size={13} color={colors.accent} />
+                      <Text style={styles.resendBtnText}>Resend OTP Code</Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             )}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -299,154 +376,256 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 28,
-    maxHeight: "90%",
+    paddingTop: 18,
+    paddingBottom: Platform.OS === "ios" ? 36 : 24,
+    maxHeight: "92%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   logoRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
   },
-  logoBadge: {
-    width: 28,
-    height: 28,
+  logoImage: {
+    width: 38,
+    height: 38,
     borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
   logoText: {
     color: colors.primaryDark,
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 19,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  logoTagline: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "600",
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
-  tabSwitcher: {
-    flexDirection: "row",
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  tabBtnActive: {
-    backgroundColor: colors.surface,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  tabBtnText: {
-    color: colors.textSoft,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  tabBtnTextActive: {
-    color: colors.primaryDark,
-  },
-  form: {
+  content: {
     paddingBottom: 10,
   },
-  formTitle: {
-    color: colors.primaryDark,
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  formSubtitle: {
-    color: colors.textMuted,
-    fontSize: 12.5,
-    lineHeight: 18,
+  titleSection: {
     marginBottom: 18,
   },
+  mainTitle: {
+    color: colors.primaryDark,
+    fontSize: 21,
+    fontWeight: "800",
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  phoneHighlight: {
+    color: colors.primaryDark,
+    fontWeight: "700",
+  },
   inputGroup: {
-    marginBottom: 14,
+    marginBottom: 16,
   },
   inputLabel: {
     color: colors.primaryDark,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: "700",
-    marginBottom: 6,
+    marginBottom: 7,
   },
-  passwordLabelRow: {
+  phoneInputWrapper: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 14,
+    height: 52,
+    overflow: "hidden",
   },
-  forgotLink: {
-    color: colors.accent,
-    fontSize: 11.5,
+  countryCodeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    height: "100%",
+    backgroundColor: colors.surface,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  flagText: {
+    fontSize: 16,
+  },
+  countryCodeText: {
+    color: colors.primaryDark,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  phoneInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    fontSize: 16,
     fontWeight: "700",
+    color: colors.primaryDark,
+    letterSpacing: 1,
   },
-  inputWrapper: {
+  textInputWrapper: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 46,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
   },
-  input: {
+  textInput: {
     flex: 1,
+    fontSize: 14,
     color: colors.text,
-    fontSize: 13,
   },
-  eyeBtn: {
-    padding: 6,
-  },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 12,
+  otpInputWrapper: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 14,
+    height: 56,
     alignItems: "center",
-    marginTop: 10,
+    justifyContent: "center",
+  },
+  otpInput: {
+    width: "100%",
+    textAlign: "center",
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: 12,
+    color: colors.primaryDark,
+  },
+  demoPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    backgroundColor: colors.surfaceAlt,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  demoPillText: {
+    fontSize: 11.5,
+    color: colors.primaryDark,
+    fontWeight: "700",
+  },
+  errorBox: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     marginBottom: 14,
   },
-  submitBtnText: {
+  errorText: {
+    color: "#DC2626",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  primaryBtn: {
+    backgroundColor: colors.primary,
+    height: 50,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  disabledBtn: {
+    opacity: 0.7,
+  },
+  primaryBtnText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "800",
   },
-  switchRow: {
+  trustBadge: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    marginTop: 6,
+    justifyContent: "center",
+    gap: 6,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
-  switchText: {
+  trustText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 14,
+    paddingVertical: 4,
+  },
+  backText: {
+    color: colors.primary,
+    fontSize: 12.5,
+    fontWeight: "700",
+  },
+  resendRow: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 6,
+    paddingBottom: 10,
+  },
+  resendTimerText: {
     color: colors.textMuted,
     fontSize: 12.5,
   },
-  switchLink: {
+  timerBold: {
+    color: colors.primaryDark,
+    fontWeight: "700",
+  },
+  resendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  resendBtnText: {
     color: colors.accent,
-    fontSize: 12.5,
-    fontWeight: "800",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

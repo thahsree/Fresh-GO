@@ -25,6 +25,7 @@ type ProductDetailModalProps = {
   product: Product | null;
   visible: boolean;
   isFavorite: boolean;
+  products?: Product[];
   onClose: () => void;
   onAddToCart: (productId: string, quantity: number, selectedCut?: string) => void;
   onToggleFavorite: (productId: string) => void;
@@ -35,6 +36,7 @@ export function ProductDetailModal({
   product,
   visible,
   isFavorite,
+  products = allProducts,
   onClose,
   onAddToCart,
   onToggleFavorite,
@@ -48,7 +50,7 @@ export function ProductDetailModal({
   );
   const [justAdded, setJustAdded] = useState(false);
 
-  const relatedProducts = allProducts
+  const relatedProducts = products
     .filter(
       (p) =>
         p.id !== product.id &&
@@ -56,7 +58,33 @@ export function ProductDetailModal({
     )
     .slice(0, 5);
 
+  const isOutOfStock =
+    product.isInStock === false ||
+    (product.availableStockKg !== undefined && product.availableStockKg <= 0);
+
+  const maxStock =
+    product.availableStockKg !== undefined
+      ? Math.max(0, Math.floor(product.availableStockKg))
+      : 99;
+
+  const isLowStock =
+    !isOutOfStock &&
+    product.availableStockKg !== undefined &&
+    product.availableStockKg > 0 &&
+    product.availableStockKg <= 5;
+
+  const displayTag =
+    product.tag ||
+    (product.isDailyCatch
+      ? "Fresh Catch"
+      : product.isFlashFrozen
+      ? "Frozen"
+      : product.fresh
+      ? "Fresh"
+      : undefined);
+
   const handleAdd = () => {
+    if (isOutOfStock || quantity > maxStock) return;
     onAddToCart(product.id, quantity, selectedCut);
     setJustAdded(true);
     setTimeout(() => {
@@ -113,12 +141,47 @@ export function ProductDetailModal({
                   fill={isFavorite ? colors.accent : "transparent"}
                 />
               </Pressable>
-              {product.fresh && (
-                <View style={styles.freshTag}>
-                  <View style={styles.freshDot} />
-                  <Text style={styles.freshTagText}>Daily Catch</Text>
+
+              {isOutOfStock ? (
+                <View style={[styles.freshTag, { backgroundColor: "#BE4436", borderColor: "#991B1B" }]}>
+                  <Text style={[styles.freshTagText, { color: "#FFFFFF", fontWeight: "900" }]}>
+                    OUT OF STOCK
+                  </Text>
                 </View>
-              )}
+              ) : displayTag ? (
+                <View
+                  style={[
+                    styles.freshTag,
+                    displayTag === "Frozen"
+                      ? styles.frozenTag
+                      : displayTag === "Fresh Cut"
+                      ? { backgroundColor: "#FEF9C3", borderColor: "#FEF08A" }
+                      : displayTag === "Fresh Produce"
+                      ? { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" }
+                      : {},
+                  ]}
+                >
+                  {displayTag === "Fresh Catch" && <View style={styles.freshDot} />}
+                  {displayTag === "Fresh" && <View style={[styles.freshDot, { backgroundColor: "#15803D" }]} />}
+                  {displayTag === "Frozen" && <Text style={styles.frozenTagEmoji}>❄️</Text>}
+                  {displayTag === "Fresh Cut" && <Text style={{ fontSize: 10, marginRight: 2 }}>🥩</Text>}
+                  {displayTag === "Fresh Produce" && <Text style={{ fontSize: 10, marginRight: 2 }}>🥬</Text>}
+                  <Text
+                    style={[
+                      styles.freshTagText,
+                      displayTag === "Frozen"
+                        ? styles.frozenTagText
+                        : displayTag === "Fresh Cut"
+                        ? { color: "#854D0E" }
+                        : displayTag === "Fresh Produce"
+                        ? { color: "#166534" }
+                        : {},
+                    ]}
+                  >
+                    {displayTag}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Product Meta */}
@@ -147,6 +210,62 @@ export function ProductDetailModal({
                 <Text style={styles.weightTag}>{product.netWeight}</Text>
               )}
             </View>
+
+            {/* Out of Stock Warning */}
+            {isOutOfStock && (
+              <View
+                style={{
+                  marginHorizontal: 20,
+                  marginTop: 12,
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: "#FBE7E3",
+                  borderWidth: 1,
+                  borderColor: "#BE4436",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>❌</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#9C2B1F" }}>
+                    Currently Out of Stock
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#BE4436" }}>
+                    Fresh stock will be replenished in the next hub dispatch.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Low Stock Warning */}
+            {isLowStock && (
+              <View
+                style={{
+                  marginHorizontal: 20,
+                  marginTop: 12,
+                  padding: 10,
+                  borderRadius: 10,
+                  backgroundColor: "#FEF3C7",
+                  borderWidth: 1,
+                  borderColor: "#F59E0B",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 14 }}>⚠️</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: "#B45309" }}>
+                    Low Stock: Only {product.availableStockKg} {product.unit} left!
+                  </Text>
+                  <Text style={{ fontSize: 10.5, color: "#D97706" }}>
+                    Order now before this fresh batch sells out.
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Cuts Selection */}
             {product.cuts && product.cuts.length > 0 && (
@@ -255,27 +374,34 @@ export function ProductDetailModal({
 
           {/* Bottom Action Bar */}
           <View style={styles.bottomBar}>
-            <View style={styles.stepper}>
+            <View style={[styles.stepper, (isOutOfStock || maxStock <= 0) && { opacity: 0.5 }]}>
               <Pressable
                 style={styles.stepperBtn}
                 onPress={() => setQuantity((q) => Math.max(1, q - 1))}
                 accessibilityLabel="Decrease quantity"
+                disabled={isOutOfStock || maxStock <= 0 || quantity <= 1}
               >
-                <Minus size={16} color={colors.primaryDark} />
+                <Minus size={16} color={quantity <= 1 || isOutOfStock ? "#94A3B8" : colors.primaryDark} />
               </Pressable>
-              <Text style={styles.quantityText}>{quantity}</Text>
+              <Text style={styles.quantityText}>{isOutOfStock || maxStock <= 0 ? 0 : quantity}</Text>
               <Pressable
                 style={styles.stepperBtn}
-                onPress={() => setQuantity((q) => q + 1)}
+                onPress={() => setQuantity((q) => Math.min(maxStock, q + 1))}
                 accessibilityLabel="Increase quantity"
+                disabled={isOutOfStock || maxStock <= 0 || quantity >= maxStock}
               >
-                <Plus size={16} color={colors.primaryDark} />
+                <Plus size={16} color={quantity >= maxStock || isOutOfStock ? "#94A3B8" : colors.primaryDark} />
               </Pressable>
             </View>
 
             <Pressable
-              style={[styles.addBtn, justAdded && styles.addBtnSuccess]}
+              style={[
+                styles.addBtn,
+                justAdded && styles.addBtnSuccess,
+                (isOutOfStock || maxStock <= 0) && { backgroundColor: "#94A3B8" },
+              ]}
               onPress={handleAdd}
+              disabled={isOutOfStock || maxStock <= 0}
               accessibilityRole="button"
             >
               {justAdded ? (
@@ -283,12 +409,12 @@ export function ProductDetailModal({
                   <Check size={18} color="#FFFFFF" strokeWidth={3} />
                   <Text style={styles.addBtnText}>Added to Cart</Text>
                 </>
+              ) : isOutOfStock || maxStock <= 0 ? (
+                <Text style={styles.addBtnText}>Out of Stock</Text>
               ) : (
-                <>
-                  <Text style={styles.addBtnText}>
-                    Add to Cart · Rs {totalPrice.toLocaleString()}
-                  </Text>
-                </>
+                <Text style={styles.addBtnText}>
+                  Add to Cart · Rs {totalPrice.toLocaleString()}
+                </Text>
               )}
             </Pressable>
           </View>
@@ -388,6 +514,20 @@ const styles = StyleSheet.create({
   },
   freshTagText: {
     color: colors.success,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  frozenTag: {
+    backgroundColor: "#F0F9FF",
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  frozenTagEmoji: {
+    fontSize: 12,
+  },
+  frozenTagText: {
+    color: "#0369A1",
     fontSize: 10,
     fontWeight: "800",
     textTransform: "uppercase",

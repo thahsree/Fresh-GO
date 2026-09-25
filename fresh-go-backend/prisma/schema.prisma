@@ -1,0 +1,498 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  DELIVERY_PARTNER
+  ADMIN
+  DISPATCHER
+  HUB_MANAGER
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  CUTTING_PREPARING
+  PACKED
+  DISPATCH_READY
+  ASSIGNED
+  ARRIVED_AT_HUB
+  PICKED_UP
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED_DELIVERY
+  RETURNED_TO_HUB
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  RAZORPAY
+  WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum FreshnessStatus {
+  FRESH
+  AGING
+  EXPIRED
+  DISCARDED
+}
+
+enum VehicleType {
+  BIKE
+  SCOOTER
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DeliveryPhase {
+  ACCEPTED
+  AT_PICKUP
+  ON_THE_WAY
+  DELIVERED
+  CANCELLED
+}
+
+enum WalletTransactionType {
+  WEIGHT_SHORTFALL_CREDIT
+  ORDER_PAYMENT
+  CASHBACK
+  REFUND
+  MANUAL_ADJUSTMENT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT_AMOUNT
+}
+
+enum IssueCategory {
+  STORE_DELAY
+  CUSTOMER_UNREACHABLE
+  WRONG_ADDRESS
+  DAMAGED_FOOD
+  PAYMENT_COD
+  VEHICLE_BREAKDOWN
+  APP_GLITCH
+}
+
+enum IssuePriority {
+  NORMAL
+  URGENT
+  CRITICAL
+}
+
+enum IssueStatus {
+  UNDER_REVIEW
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ReviewStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum EarningType {
+  BASE_PAY
+  DISTANCE_SURGE
+  RAIN_SURGE
+  STORE_DELAY_COMPENSATION
+  BONUS
+}
+
+model User {
+  id           String    @id @default(uuid())
+  phone        String    @unique
+  email        String?   @unique
+  name         String
+  role         Role      @default(CUSTOMER)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customerProfile  CustomerProfile?
+  partnerProfile   DeliveryPartnerProfile?
+  addresses        Address[]
+  orders           Order[]            @relation("CustomerOrders")
+  wallet           Wallet?
+  reviews          Review[]
+  issueTickets     DeliveryIssueTicket[]
+  statusEvents     OrderStatusEvent[] @relation("ActorStatusEvents")
+  settlementsDone  CashSettlement[]   @relation("AdminSettler")
+}
+
+model CustomerProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultAddressId String?
+  notes            String?
+}
+
+model DeliveryPartnerProfile {
+  id                     String      @id @default(uuid())
+  userId                 String      @unique
+  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType            VehicleType @default(BIKE)
+  licenseNumber          String?
+  kycStatus              KycStatus   @default(PENDING)
+  kycDocsJson            String?     // URLs to R2 stored KYC documents
+  isOnline               Boolean     @default(false)
+  currentLat             Float?
+  currentLng             Float?
+  lastLocationUpdate     DateTime?
+  codCashInHand          Float       @default(0.0) // Tracked for max limit (Rs 2,500)
+  preferredZoneId        String?
+  preferredZone          DeliveryZone? @relation(fields: [preferredZoneId], references: [id])
+  rating                 Float       @default(5.0)
+  completedDeliveries    Int         @default(0)
+
+  trips                  DeliveryTrip[]
+  settlements            CashSettlement[]
+  earningEntries         PartnerEarningEntry[]
+  assignedOrders         Order[]     @relation("PartnerOrders")
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String   // e.g. "Home", "Work"
+  street    String
+  landmark  String?
+  area      String
+  city      String
+  pincode   String
+  latitude  Float
+  longitude Float
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Hub {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  address   String
+  latitude  Float
+  longitude Float
+  isActive  Boolean  @default(true)
+
+  orders       Order[]
+  batches      InventoryBatch[]
+  settlements  CashSettlement[]
+}
+
+model DeliveryZone {
+  id                       String   @id @default(uuid())
+  name                     String   @unique
+  centerLat                Float
+  centerLng                Float
+  radiusKm                 Float
+  polygonGeoJson           String?
+  baseDeliveryFee          Float    @default(35.0)
+  minOrderAmount           Float    @default(199.0)
+  freeDeliveryThreshold    Float    @default(799.0)
+  estimatedDeliveryMinutes Int      @default(30)
+  isActive                 Boolean  @default(true)
+
+  partners DeliveryPartnerProfile[]
+  orders   Order[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  icon      String    // emoji or icon key
+  tint      String    // hex color
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  products  Product[]
+}
+
+model Product {
+  id                     String             @id @default(uuid())
+  name                   String
+  slug                   String             @unique
+  categoryId             String
+  category               Category           @relation(fields: [categoryId], references: [id])
+  basePrice              Float              // base price per unit
+  unit                   String             // "kg", "pack", "bunch"
+  description            String
+  origin                 String?
+  storageTip             String?
+  grossWeightDescription String?            // e.g. "700g whole fish equivalent"
+  netWeightDescription   String?            // e.g. "480g - 520g cleaned per pack"
+  isActive               Boolean            @default(true)
+  isBestSeller           Boolean            @default(false)
+  isDailyCatch           Boolean            @default(false)
+  isFlashFrozen          Boolean            @default(false)
+  tag                    String?            @default("Fresh")
+  image                  String
+  rating                 Float              @default(4.8)
+  reviewsCount           Int                @default(0)
+
+  cuts                   ProductCutOption[]
+  batches                InventoryBatch[]
+  orderItems             OrderItem[]
+  reviews                Review[]
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+}
+
+model ProductCutOption {
+  id            String      @id @default(uuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String      // e.g. "Steak / Slice Cut", "Curry Cut (Medium)", "Whole Cleaned"
+  priceModifier Float       @default(0.0) // Surcharge for specialized cutting (e.g. +Rs 20 for fillets)
+  isDefault     Boolean     @default(false)
+  orderItems    OrderItem[]
+}
+
+model InventoryBatch {
+  id                  String          @id @default(uuid())
+  productId           String
+  product             Product         @relation(fields: [productId], references: [id])
+  hubId               String?
+  hub                 Hub?            @relation(fields: [hubId], references: [id])
+  batchNumber         String          @unique
+  catchOrHarvestDate  DateTime
+  originSource        String          // e.g. "Kochi Coastal Harbor", "Mysore Organic Farms"
+  initialQuantityKg   Float
+  remainingQuantityKg Float
+  temperatureAtIntake Float?          // e.g. 1.5 C cold chain check
+  freshnessStatus     FreshnessStatus @default(FRESH)
+  expiryDate          DateTime
+  version             Int             @default(0) // Optimistic locking
+  isActive            Boolean         @default(true)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  orderItems          OrderItem[]
+}
+
+model Order {
+  id                          String             @id @default(uuid())
+  orderNumber                 String             @unique // e.g. "FF10286"
+  idempotencyKey              String?            @unique
+  customerId                  String
+  customer                    User               @relation("CustomerOrders", fields: [customerId], references: [id])
+  deliveryPartnerId           String?
+  deliveryPartner             DeliveryPartnerProfile? @relation("PartnerOrders", fields: [deliveryPartnerId], references: [id])
+  hubId                       String?
+  hub                         Hub?               @relation(fields: [hubId], references: [id])
+  zoneId                      String?
+  zone                        DeliveryZone?      @relation(fields: [zoneId], references: [id])
+  status                      OrderStatus        @default(PLACED)
+
+  subtotal                    Float
+  cuttingChargesTotal         Float              @default(0.0)
+  deliveryFee                 Float              @default(0.0)
+  discountAmount              Float              @default(0.0)
+  couponId                    String?
+  coupon                      Coupon?            @relation(fields: [couponId], references: [id])
+  totalAmount                 Float
+
+  actualPackedWeightGrams     Float?             // Net scaled weight at hub packing
+  weightVarianceRefundAmount  Float?             // Refund credited to wallet if actual < estimated
+
+  paymentMethod               PaymentMethod      @default(COD)
+  paymentStatus               PaymentStatus      @default(PENDING)
+  deliveryAddressSnapshotJson String             // Complete serialized snapshot of delivery location
+  notes                       String?
+  cancelReason                String?
+
+  placedAt                    DateTime           @default(now())
+  confirmedAt                 DateTime?
+  preparingAt                 DateTime?
+  packedAt                    DateTime?
+  dispatchedAt                DateTime?
+  deliveredAt                 DateTime?
+  cancelledAt                 DateTime?
+  updatedAt                   DateTime           @updatedAt
+
+  items                       OrderItem[]
+  statusEvents                OrderStatusEvent[]
+  deliveryTrips               DeliveryTrip[]
+  paymentTransactions         PaymentTransaction[]
+  issueTickets                DeliveryIssueTicket[]
+  reviews                     Review[]
+}
+
+model OrderItem {
+  id                     String            @id @default(uuid())
+  orderId                String
+  order                  Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId              String
+  product                Product           @relation(fields: [productId], references: [id])
+  cutOptionId            String?
+  cutOption              ProductCutOption? @relation(fields: [cutOptionId], references: [id])
+  batchId                String?
+  batch                  InventoryBatch?   @relation(fields: [batchId], references: [id])
+
+  quantity               Int               @default(1)
+  unitPrice              Float
+  cuttingCharge          Float             @default(0.0)
+  grossWeightGrams       Float             // Expected gross weight (e.g. 700g)
+  expectedNetWeightGrams Float             // Expected net yield (e.g. 500g)
+  finalPackedWeightGrams Float?            // Scale weighed at packing
+  subtotal               Float
+}
+
+model OrderStatusEvent {
+  id         String      @id @default(uuid())
+  orderId    String
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  actorId    String?
+  actorRole  Role?
+  actor      User?       @relation("ActorStatusEvents", fields: [actorId], references: [id])
+  note       String?
+  createdAt  DateTime    @default(now())
+}
+
+model DeliveryTrip {
+  id                 String                 @id @default(uuid())
+  orderId            String
+  order              Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  partnerId          String
+  partner            DeliveryPartnerProfile @relation(fields: [partnerId], references: [id])
+  phase              DeliveryPhase          @default(ACCEPTED)
+  acceptedAt         DateTime               @default(now())
+  arrivedHubAt       DateTime?
+  pickedUpAt         DateTime?
+  arrivedCustomerAt  DateTime?
+  completedAt        DateTime?
+  distanceKm         Float                  @default(0.0)
+  earnings           Float                  @default(0.0)
+  codCollectedAmount Float                  @default(0.0)
+}
+
+model CashSettlement {
+  id               String                 @id @default(uuid())
+  partnerId        String
+  partner          DeliveryPartnerProfile @relation(fields: [partnerId], references: [id])
+  hubId            String
+  hub              Hub                    @relation(fields: [hubId], references: [id])
+  amount           Float
+  settledByAdminId String
+  settledByAdmin   User                   @relation("AdminSettler", fields: [settledByAdminId], references: [id])
+  receiptNumber    String                 @unique
+  notes            String?
+  settledAt        DateTime               @default(now())
+}
+
+model Wallet {
+  id           String              @id @default(uuid())
+  userId       String              @unique
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance      Float               @default(0.0)
+  updatedAt    DateTime            @updatedAt
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id           String                @id @default(uuid())
+  walletId     String
+  wallet       Wallet                @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  amount       Float                 // positive for credit, negative for debit
+  balanceAfter Float
+  type         WalletTransactionType
+  referenceId  String?               // e.g. orderId or refundId
+  description  String
+  createdAt    DateTime              @default(now())
+}
+
+model Coupon {
+  id           String       @id @default(uuid())
+  code         String       @unique
+  discountType DiscountType @default(PERCENTAGE)
+  discountValue Float
+  maxDiscount  Float?
+  minOrderValue Float       @default(0.0)
+  startDate    DateTime
+  endDate      DateTime
+  usageLimit   Int          @default(1000)
+  usedCount    Int          @default(0)
+  isActive     Boolean      @default(true)
+  orders       Order[]
+}
+
+model Review {
+  id              String       @id @default(uuid())
+  orderId         String
+  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  rating          Int          // 1 to 5
+  comment         String?
+  isVerifiedBuyer Boolean      @default(true)
+  status          ReviewStatus @default(APPROVED)
+  createdAt       DateTime     @default(now())
+}
+
+model PaymentTransaction {
+  id                String        @id @default(uuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  idempotencyKey    String?       @unique
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?       @unique
+  razorpaySignature String?
+  amount            Float
+  status            PaymentStatus @default(PENDING)
+  method            PaymentMethod @default(COD)
+  createdAt         DateTime      @default(now())
+}
+
+model DeliveryIssueTicket {
+  id                 String        @id @default(uuid())
+  orderId            String?
+  order              Order?        @relation(fields: [orderId], references: [id])
+  partnerId          String
+  partner            User          @relation(fields: [partnerId], references: [id])
+  category           IssueCategory
+  priority           IssuePriority @default(NORMAL)
+  description        String
+  status             IssueStatus   @default(UNDER_REVIEW)
+  resolutionNote     String?
+  compensationAmount Float         @default(0.0)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model PartnerEarningEntry {
+  id        String                 @id @default(uuid())
+  partnerId String
+  partner   DeliveryPartnerProfile @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  orderId   String?
+  type      EarningType            @default(BASE_PAY)
+  amount    Float
+  date      DateTime               @default(now())
+}

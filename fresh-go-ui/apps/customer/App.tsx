@@ -1,7 +1,7 @@
 import { colors } from "@fresh-food/design-tokens";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { BackHandler, Platform, StyleSheet, View } from "react-native";
 import {
   SafeAreaProvider,
   SafeAreaView,
@@ -16,9 +16,17 @@ import { ProductDetailModal } from "./components/ProductDetailModal";
 import { ProductListingView } from "./components/ProductListingView";
 import { type UserProfile, ProfileView } from "./components/ProfileView";
 import { SplashScreen } from "./components/SplashScreen";
+import { SnackbarNotification } from "./components/SnackbarNotification";
+import { customerApi } from "./lib/api";
+import {
+  dispatchOrderNotification,
+  requestNotificationPermission,
+} from "./lib/notifications";
 import {
   allProducts,
+  categories as defaultCategories,
   freshProducts,
+  type Category,
   type Product,
 } from "./models/catalog";
 
@@ -53,6 +61,10 @@ export default function App() {
   // Navigation: "Home" | "Cart" | "Orders" | "Profile"
   const [activeNavigation, setActiveNavigation] = useState("Home");
 
+  // Dynamic Catalog & Categories State
+  const [products, setProducts] = useState<Product[]>(allProducts);
+  const [categoriesList, setCategoriesList] = useState<Category[]>(defaultCategories);
+
   // Cart State: { [productId]: quantity }
   const [cart, setCart] = useState<{ [productId: string]: number }>({
     "seer-fish": 1,
@@ -62,6 +74,7 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>([
     "seer-fish",
     "tiger-prawns",
+    "frozen-tenderloin-beef",
   ]);
 
   // Search & Category Filters
@@ -84,31 +97,268 @@ export default function App() {
   const [user, setUser] = useState<UserProfile>({
     name: "Thashreef R.",
     phone: "+91 98765 43210",
-    email: "thashreef@freshgo.in",
     isLoggedIn: true,
   });
 
   // Orders State
   const [orders, setOrders] = useState<CustomerOrder[]>(INITIAL_ORDERS);
 
+  // Address State
+  const [customerAddress, setCustomerAddress] = useState(
+    "Palm Residency, Flat 4B, 4th Cross Road",
+  );
+
+  // --------------------------------------------------------------------------
+  // Backend Integration & Synchronization
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncWithBackend() {
+      try {
+        // 1. Auto-authenticate with backend customer account
+        const authUser = await customerApi.ensureCustomerAuth();
+        if (authUser && isMounted) {
+          setUser(authUser);
+        }
+
+        // 2. Fetch categories directly from backend database
+        const liveCats = await customerApi.getCategories();
+        if (liveCats && liveCats.length > 0 && isMounted) {
+          setCategoriesList(liveCats);
+        }
+
+        // 3. Fetch live products directly from backend database
+        const liveProducts = await customerApi.getProducts();
+        if (liveProducts && liveProducts.length > 0 && isMounted) {
+          setProducts(liveProducts);
+        }
+
+        // 4. Fetch live customer orders from backend database
+        const liveOrders = await customerApi.getMyOrders();
+        if (liveOrders && liveOrders.length > 0 && isMounted) {
+          setOrders(liveOrders);
+        }
+
+        // 5. Fetch customer address from backend database
+        const liveAddrs = await customerApi.getAddresses();
+        if (liveAddrs && liveAddrs.length > 0 && isMounted) {
+          const defaultAddr = liveAddrs.find((a) => a.isDefault) || liveAddrs[0];
+          const formatted = `${defaultAddr.street}, ${defaultAddr.area || defaultAddr.city}`;
+          setCustomerAddress(formatted);
+        }
+      } catch (err) {
+        console.warn("Backend synchronization notice (running in offline mode):", err);
+      }
+    }
+
+    requestNotificationPermission().catch(() => {});
+    syncWithBackend();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // --------------------------------------------------------------------------
+  // Mobile Screen & Hardware Back Navigation
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    const handleBackNavigation = () => {
+      // 1. Close Product Detail Modal
+      if (isProductModalOpen) {
+        setIsProductModalOpen(false);
+        return true;
+      }
+
+      // 2. Close Auth (Login / Signup) Modal
+      if (isAuthModalOpen) {
+        setIsAuthModalOpen(false);
+        return true;
+      }
+
+      // 3. Close Help & Support subview (in Profile tab)
+      if (isHelpOpen) {
+        setIsHelpOpen(false);
+        return true;
+      }
+
+      // 4. Close Product Listing Screen
+      if (isListingOpen) {
+        setIsListingOpen(false);
+        return true;
+      }
+
+      // 5. Navigate from sub-tabs (Cart, Orders, Profile) back to Home
+      if (activeNavigation !== "Home") {
+        setActiveNavigation("Home");
+        return true;
+      }
+
+      // 6. Reset Category Filter on Home
+      if (selectedCategory) {
+        setSelectedCategory(null);
+        return true;
+      }
+
+      // 7. Reset Search Query on Home
+      if (searchValue) {
+        setSearchValue("");
+        return true;
+      }
+
+      // 8. Default system exit/minimize when on root Home screen
+      return false;
+    };
+
+    // BackHandler is only supported on native platforms (Android/iOS)
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    const backSubscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleBackNavigation,
+    );
+
+    return () => {
+      backSubscription.remove();
+    };
+  }, [
+    isProductModalOpen,
+    isAuthModalOpen,
+    isHelpOpen,
+    isListingOpen,
+    activeNavigation,
+    selectedCategory,
+    searchValue,
+  ]);
+
+  // Web browser back button integration (popstate)
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+
+    const handleWebPop = () => {
+      if (isProductModalOpen) {
+        setIsProductModalOpen(false);
+      } else if (isAuthModalOpen) {
+        setIsAuthModalOpen(false);
+      } else if (isHelpOpen) {
+        setIsHelpOpen(false);
+      } else if (isListingOpen) {
+        setIsListingOpen(false);
+      } else if (activeNavigation !== "Home") {
+        setActiveNavigation("Home");
+      } else if (selectedCategory) {
+        setSelectedCategory(null);
+      } else if (searchValue) {
+        setSearchValue("");
+      }
+    };
+
+    window.addEventListener("popstate", handleWebPop);
+    return () => {
+      window.removeEventListener("popstate", handleWebPop);
+    };
+  }, [
+    isProductModalOpen,
+    isAuthModalOpen,
+    isHelpOpen,
+    isListingOpen,
+    activeNavigation,
+    selectedCategory,
+    searchValue,
+  ]);
+
+  // Sync browser history state on web for subviews/modals
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const isSubState =
+      isProductModalOpen ||
+      isAuthModalOpen ||
+      isHelpOpen ||
+      isListingOpen ||
+      activeNavigation !== "Home" ||
+      Boolean(selectedCategory);
+
+    if (isSubState) {
+      window.history.pushState({ freshgo: "subview" }, "");
+    }
+  }, [
+    isProductModalOpen,
+    isAuthModalOpen,
+    isHelpOpen,
+    isListingOpen,
+    activeNavigation,
+    selectedCategory,
+  ]);
+
   // Cart Operations
   const handleAddToCart = (
     productId: string,
     quantity: number = 1,
   ) => {
+    const matched = products.find((p) => p.id === productId || p.slug === productId);
+    const key = matched ? matched.id : productId;
+
+    // Check available stock
+    const available = matched?.availableStockKg;
+    if (available !== undefined && available <= 0) {
+      dispatchOrderNotification({
+        orderId: "STOCK",
+        status: "cancelled",
+        title: "Out of Stock",
+        message: `${matched?.name || "Product"} is currently out of stock.`,
+      });
+      return;
+    }
+
+    const currentQty = cart[key] ?? 0;
+    const nextQty = currentQty + quantity;
+
+    if (available !== undefined && nextQty > available) {
+      const allowedAdd = Math.max(0, Math.floor(available - currentQty));
+      dispatchOrderNotification({
+        orderId: "STOCK",
+        status: "cancelled",
+        title: "Stock Limit Reached",
+        message:
+          allowedAdd > 0
+            ? `Only ${allowedAdd} more ${matched?.unit || "kg"} can be added (${available} max).`
+            : `You have reached the maximum available stock (${available} ${matched?.unit || "kg"}).`,
+      });
+      if (allowedAdd <= 0) return;
+      setCart((prev) => ({
+        ...prev,
+        [key]: currentQty + allowedAdd,
+      }));
+      return;
+    }
+
     setCart((prev) => ({
       ...prev,
-      [productId]: (prev[productId] ?? 0) + quantity,
+      [key]: nextQty,
     }));
   };
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     setCart((prev) => {
       const next = { ...prev };
+      const matched = products.find((p) => p.id === productId || p.slug === productId);
       if (quantity <= 0) {
         delete next[productId];
+        if (matched?.slug) delete next[matched.slug];
+        if (matched?.id) delete next[matched.id];
       } else {
-        next[productId] = quantity;
+        const available = matched?.availableStockKg;
+        const cappedQty =
+          available !== undefined
+            ? Math.min(Math.floor(available), quantity)
+            : quantity;
+        delete next[productId];
+        if (matched?.slug) delete next[matched.slug];
+        const key = matched ? matched.id : productId;
+        next[key] = cappedQty;
       }
       return next;
     });
@@ -117,16 +367,21 @@ export default function App() {
   const handleRemoveFromCart = (productId: string) => {
     setCart((prev) => {
       const next = { ...prev };
+      const matched = products.find((p) => p.id === productId || p.slug === productId);
       delete next[productId];
+      if (matched?.slug) delete next[matched.slug];
+      if (matched?.id) delete next[matched.id];
       return next;
     });
   };
 
   const toggleFavorite = (productId: string) => {
+    const matched = products.find((p) => p.id === productId || p.slug === productId);
+    const key = matched ? matched.id : productId;
     setFavorites((current) =>
-      current.includes(productId)
-        ? current.filter((id) => id !== productId)
-        : [...current, productId],
+      current.includes(key) || (matched?.slug && current.includes(matched.slug))
+        ? current.filter((id) => id !== key && id !== matched?.slug)
+        : [...current, key],
     );
   };
 
@@ -147,28 +402,117 @@ export default function App() {
   };
 
   // Checkout / Place Order
-  const handlePlaceOrder = (orderDetails: {
+  const handlePlaceOrder = async (orderDetails: {
     items: { product: Product; quantity: number }[];
     total: number;
     paymentMethod: "cod" | "upi";
     address: string;
   }) => {
+    // Validate order volume does not exceed available stock
+    for (const item of orderDetails.items) {
+      if (
+        item.product.availableStockKg !== undefined &&
+        item.quantity > item.product.availableStockKg
+      ) {
+        dispatchOrderNotification({
+          orderId: "STOCK",
+          status: "cancelled",
+          title: "Order Volume Exceeded",
+          message: `${item.product.name} exceeds available stock (${item.product.availableStockKg} ${item.product.unit || "kg"}). Please adjust cart.`,
+        });
+        return;
+      }
+    }
+    // 1. Send live order to backend
+    const res = await customerApi.createOrder(orderDetails);
+    const orderId = res.orderId || `FF${Math.floor(10000 + Math.random() * 90000)}`;
+
     const newOrder: CustomerOrder = {
-      id: `FF${Math.floor(10000 + Math.random() * 90000)}`,
+      id: orderId,
       date: "Just now",
       status: "placed",
       items: orderDetails.items,
       total: orderDetails.total,
       paymentMethod: orderDetails.paymentMethod,
       deliveryAddress: orderDetails.address,
-      riderName: "Suresh M.",
-      riderPhone: "+91 98877 66554",
+      riderName: "Ramesh K.",
+      riderPhone: "+91 91234 56789",
       estimatedArrival: "Arriving in 25 mins",
     };
 
     setOrders((prev) => [newOrder, ...prev]);
     setCart({}); // clear cart
     setActiveNavigation("Orders"); // navigate to orders screen
+
+    // 2. Dispatch Order Placed Notification (In-App Snackbar if active, Mobile notification if backgrounded)
+    await dispatchOrderNotification({
+      orderId,
+      status: "placed",
+      title: "Order Placed Successfully! 🎉",
+      message: `Order #${orderId} confirmed · Kozhikode Central Hub is preparing your fresh cuts.`,
+    });
+
+    // 3. Schedule realistic order status milestone updates
+    // Milestone 1: Confirmed & Preparing (after 8s)
+    setTimeout(async () => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? { ...o, status: "preparing", estimatedArrival: "Packing at Central Hub" }
+            : o,
+        ),
+      );
+      await dispatchOrderNotification({
+        orderId,
+        status: "preparing",
+        title: "Order Being Packed 🥩",
+        message: `Order #${orderId} is being cut, vacuum-sealed & packed in cold chain.`,
+      });
+    }, 8000);
+
+    // Milestone 2: Out for Delivery (after 22s)
+    setTimeout(async () => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? { ...o, status: "out_for_delivery", estimatedArrival: "Arriving in 14 mins" }
+            : o,
+        ),
+      );
+      await dispatchOrderNotification({
+        orderId,
+        status: "out_for_delivery",
+        title: "Out for Delivery 🛵",
+        message: `Rider Ramesh K. has picked up your cold-chain box! Arriving in ~14 mins.`,
+      });
+    }, 22000);
+
+    // Milestone 3: Delivered (after 45s)
+    setTimeout(async () => {
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? { ...o, status: "delivered", estimatedArrival: "Delivered at doorstep" }
+            : o,
+        ),
+      );
+      await dispatchOrderNotification({
+        orderId,
+        status: "delivered",
+        title: "Order Delivered! 🐟",
+        message: `Order #${orderId} delivered at ${orderDetails.address}. Freshness guaranteed!`,
+      });
+    }, 45000);
+
+    // 4. Refresh live orders from backend
+    try {
+      const liveOrders = await customerApi.getMyOrders();
+      if (liveOrders.length > 0) {
+        setOrders(liveOrders);
+      }
+    } catch {
+      // ignore
+    }
   };
 
   // Reorder
@@ -200,6 +544,8 @@ export default function App() {
                 initialCategory={listingCategory}
                 initialSearch={listingSearch}
                 favorites={favorites}
+                categories={categoriesList}
+                products={products}
                 onBack={() => setIsListingOpen(false)}
                 onSelectProduct={handleOpenProduct}
                 onAddProduct={(id) => handleAddToCart(id, 1)}
@@ -212,18 +558,24 @@ export default function App() {
                     searchValue={searchValue}
                     selectedCategory={selectedCategory}
                     favorites={favorites}
+                    categories={categoriesList}
+                    products={products}
+                    address={customerAddress}
                     onSearchChange={setSearchValue}
                     onSelectCategory={setSelectedCategory}
                     onAddProduct={(id) => handleAddToCart(id, 1)}
                     onToggleFavorite={toggleFavorite}
                     onSelectProduct={handleOpenProduct}
                     onNavigateToListing={handleNavigateToListing}
+                    onPressProfile={() => setActiveNavigation("Profile")}
                   />
                 )}
 
                 {activeNavigation === "Cart" && (
                   <CartView
                     cart={cart}
+                    products={products}
+                    deliveryAddress={customerAddress}
                     onUpdateQuantity={handleUpdateQuantity}
                     onRemoveItem={handleRemoveFromCart}
                     onExploreProducts={() => {
@@ -255,7 +607,6 @@ export default function App() {
                       onLogout={() =>
                         setUser({
                           name: "Guest",
-                          email: "",
                           phone: "",
                           isLoggedIn: false,
                         })
@@ -286,9 +637,13 @@ export default function App() {
         {/* Product Detail Popup Modal */}
         <ProductDetailModal
           product={selectedProduct}
+          products={products}
           visible={isProductModalOpen}
           isFavorite={
-            selectedProduct ? favorites.includes(selectedProduct.id) : false
+            selectedProduct
+              ? favorites.includes(selectedProduct.id) ||
+                Boolean(selectedProduct.slug && favorites.includes(selectedProduct.slug))
+              : false
           }
           onClose={() => setIsProductModalOpen(false)}
           onAddToCart={handleAddToCart}
@@ -301,6 +656,14 @@ export default function App() {
           visible={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
           onSuccess={(updatedUser) => setUser(updatedUser)}
+        />
+
+        {/* Global In-App Snackbar Notification */}
+        <SnackbarNotification
+          onNavigateToOrders={() => {
+            setIsListingOpen(false);
+            setActiveNavigation("Orders");
+          }}
         />
 
         {/* Splash Screen with freshgologo.png and white bg */}

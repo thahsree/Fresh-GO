@@ -21,21 +21,20 @@ export function ProductCard({
   onPress,
 }: ProductCardProps) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button">
-      <SharedProductCard
-        product={product}
-        isFavorite={isFavorite}
-        onAdd={onAdd}
-        onToggleFavorite={onToggleFavorite}
-        favoriteIcon={
-          <Heart
-            size={12}
-            color={isFavorite ? colors.accent : colors.primaryDark}
-            fill={isFavorite ? colors.accent : "transparent"}
-          />
-        }
-        addIcon={<Plus size={16} color="#FFFFFF" strokeWidth={3} />}
-      />
-    </Pressable>
+    <SharedProductCard
+      product={product}
+      isFavorite={isFavorite}
+      onAdd={onAdd}
+      onToggleFavorite={onToggleFavorite}
+      onPress={onPress}
+      favoriteIcon={
+        <Heart
+          size={12}
+          color={isFavorite ? colors.accent : colors.primaryDark}
+          fill={isFavorite ? colors.accent : "transparent"}
+        />
+      }
+      addIcon={<Plus size={16} color="#FFFFFF" strokeWidth={3} />}
+    />
   );
 }
