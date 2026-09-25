@@ -59,9 +59,9 @@ import {
         const port = configService.get<number>("REDIS_PORT", 6379);
         const password =
           configService.get<string>("REDIS_PASSWORD") || undefined;
+        const rawTls = configService.get<string | boolean>("REDIS_TLS", false);
         const useTls =
-          configService.get<boolean>("REDIS_TLS", false) ||
-          host.includes("upstash.io");
+          rawTls === true || rawTls === "true" || host.includes("upstash.io");
 
         return {
           connection: {

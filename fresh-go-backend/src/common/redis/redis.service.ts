@@ -29,9 +29,9 @@ export class RedisService implements OnModuleDestroy {
       const host = this.configService.get<string>("REDIS_HOST", "localhost");
       const port = this.configService.get<number>("REDIS_PORT", 6379);
       const password = this.configService.get<string>("REDIS_PASSWORD", "");
+      const rawTls = this.configService.get<string | boolean>("REDIS_TLS", false);
       const useTls =
-        this.configService.get<boolean>("REDIS_TLS", false) ||
-        host.includes("upstash.io");
+        rawTls === true || rawTls === "true" || host.includes("upstash.io");
 
       this.logger.log(
         `Initializing Redis client at ${host}:${port} (TLS: ${useTls})`,
