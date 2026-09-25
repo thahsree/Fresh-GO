@@ -14,6 +14,7 @@ import { WalletService } from "../wallet/wallet.service";
 import { CartService } from "../cart/cart.service";
 import { TrackingService } from "../tracking/tracking.service";
 import { JobsService } from "../jobs/jobs.service";
+import { PushNotificationService } from "../notifications/push.service";
 import { CreateOrderDto, UpdateOrderStatusDto } from "./dto/order.dto";
 import {
   OrderStatus,
@@ -57,6 +58,7 @@ export class OrdersService {
     private readonly cartService: CartService,
     private readonly trackingService: TrackingService,
     private readonly jobsService: JobsService,
+    private readonly pushService: PushNotificationService,
   ) {}
 
   async getCustomerOrders(userId: string) {
@@ -244,6 +246,12 @@ export class OrdersService {
 
       const orderNumber = `FF${Date.now().toString().slice(-5)}`;
 
+      const effectivePaymentMethod =
+        dto.paymentMethod === PaymentMethod.RAZORPAY &&
+        process.env.ONLINE_PAYMENTS_ENABLED !== "true"
+          ? PaymentMethod.COD
+          : dto.paymentMethod || PaymentMethod.COD;
+
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
@@ -251,7 +259,7 @@ export class OrdersService {
           customerId: userId,
           zoneId: zone.id,
           status:
-            dto.paymentMethod === PaymentMethod.COD
+            effectivePaymentMethod === PaymentMethod.COD
               ? OrderStatus.CONFIRMED
               : OrderStatus.PLACED,
           subtotal: finalPricing.subtotal,
@@ -260,15 +268,15 @@ export class OrdersService {
           discountAmount: finalPricing.discountAmount,
           couponId,
           totalAmount: finalPricing.totalAmount,
-          paymentMethod: dto.paymentMethod,
+          paymentMethod: effectivePaymentMethod,
           paymentStatus:
-            dto.paymentMethod === PaymentMethod.WALLET
+            effectivePaymentMethod === PaymentMethod.WALLET
               ? PaymentStatus.PAID
               : PaymentStatus.PENDING,
           deliveryAddressSnapshotJson: JSON.stringify(address),
           notes: dto.notes,
           confirmedAt:
-            dto.paymentMethod === PaymentMethod.COD ? new Date() : null,
+            effectivePaymentMethod === PaymentMethod.COD ? new Date() : null,
           items: {
             create: pricingItems.map((it) => ({
               productId: it.productId,
@@ -322,6 +330,14 @@ export class OrdersService {
       orderNumber: order.orderNumber,
       note: "New order waiting for fulfillment",
     });
+
+    // Send push notification confirmation to customer
+    this.pushService.sendToUser(
+      userId,
+      "Order Confirmed! 🛒",
+      `Your FreshGo order #${order.orderNumber} (Rs ${order.totalAmount}) has been placed successfully.`,
+      { orderId: order.id, orderNumber: order.orderNumber, type: "ORDER_PLACED" },
+    );
 
     return order;
   }
@@ -442,6 +458,38 @@ export class OrdersService {
       orderNumber: order.orderNumber,
       note: dto.note,
     });
+
+    // Real-time Push Notification to Customer Phone
+    const statusMessages: Record<string, { title: string; body: string }> = {
+      [OrderStatus.CUTTING_PREPARING]: {
+        title: "Preparing Your Order 🔪",
+        body: `Order #${order.orderNumber} is being cleaned, cut, and packed.`,
+      },
+      [OrderStatus.PACKED]: {
+        title: "Order Packed & Ready 📦",
+        body: `Order #${order.orderNumber} is packed and ready for dispatch.`,
+      },
+      [OrderStatus.OUT_FOR_DELIVERY]: {
+        title: "Out for Delivery! 🛵",
+        body: `Your rider is on the way with order #${order.orderNumber}.`,
+      },
+      [OrderStatus.DELIVERED]: {
+        title: "Delivered! 🎉",
+        body: `Order #${order.orderNumber} has been delivered. Enjoy your fresh food!`,
+      },
+      [OrderStatus.CANCELLED]: {
+        title: "Order Cancelled",
+        body: `Order #${order.orderNumber} was cancelled.`,
+      },
+    };
+
+    const pushMsg = statusMessages[nextStatus];
+    if (pushMsg && order.customerId) {
+      this.pushService.sendToUser(order.customerId, pushMsg.title, pushMsg.body, {
+        orderId: order.id,
+        status: nextStatus,
+      });
+    }
 
     return updatedOrder;
   }

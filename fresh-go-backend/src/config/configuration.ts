@@ -36,6 +36,17 @@ export default () => ({
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
     bucket: process.env.S3_BUCKET_NAME || "freshgo-assets",
     publicDomain: process.env.S3_PUBLIC_DOMAIN || "https://assets.freshgo.in",
+    cloudinary: {
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+      apiKey: process.env.CLOUDINARY_API_KEY || "",
+      apiSecret: process.env.CLOUDINARY_API_SECRET || "",
+    },
+  },
+  cors: {
+    origin: process.env.CORS_ORIGIN || "",
+  },
+  payments: {
+    onlineEnabled: process.env.ONLINE_PAYMENTS_ENABLED === "true",
   },
   limits: {
     codCashLimit: parseFloat(process.env.COD_CASH_LIMIT || "2500"),
@@ -49,3 +60,4 @@ export default () => ({
     ),
   },
 });
+

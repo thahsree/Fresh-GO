@@ -21,6 +21,7 @@ import { customerApi } from "./lib/api";
 import {
   dispatchOrderNotification,
   requestNotificationPermission,
+  registerPushTokenWithBackend,
 } from "./lib/notifications";
 import {
   allProducts,
@@ -152,7 +153,9 @@ export default function App() {
       }
     }
 
-    requestNotificationPermission().catch(() => {});
+    requestNotificationPermission()
+      .then(() => registerPushTokenWithBackend())
+      .catch(() => {});
     syncWithBackend();
 
     return () => {

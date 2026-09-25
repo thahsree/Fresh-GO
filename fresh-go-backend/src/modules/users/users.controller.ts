@@ -44,4 +44,12 @@ export class UsersController {
   ) {
     return this.usersService.updatePartnerProfile(user.id, dto);
   }
+
+  @Post("push-token")
+  async updatePushToken(
+    @CurrentUser() user: User,
+    @Body("pushToken") pushToken: string,
+  ) {
+    return this.usersService.updatePushToken(user.id, pushToken);
+  }
 }

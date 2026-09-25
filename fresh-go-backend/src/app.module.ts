@@ -28,12 +28,32 @@ import { DeliveryModule } from "./modules/delivery/delivery.module";
 import { DispatchModule } from "./modules/dispatch/dispatch.module";
 import { RefundsModule } from "./modules/refunds/refunds.module";
 
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [configuration],
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: "short",
+        ttl: 1000,
+        limit: 20, // 20 req/s burst limit
+      },
+      {
+        name: "medium",
+        ttl: 10000,
+        limit: 80, // 80 req/10s
+      },
+      {
+        name: "long",
+        ttl: 60000,
+        limit: 300, // 300 req/min
+      },
+    ]),
     PrismaModule,
     RedisModule,
     NotificationsModule,
@@ -56,6 +76,12 @@ import { RefundsModule } from "./modules/refunds/refunds.module";
     DeliveryModule,
     DispatchModule,
     RefundsModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

@@ -5,6 +5,7 @@ import {
   Headers,
   UseGuards,
   Req,
+  BadRequestException,
 } from "@nestjs/common";
 import { PaymentsService } from "./payments.service";
 import { CreatePaymentOrderDto, VerifyPaymentDto } from "./dto/payment.dto";
@@ -24,6 +25,11 @@ export class PaymentsController {
     @CurrentUser() user: User,
     @Body() dto: CreatePaymentOrderDto,
   ) {
+    if (process.env.ONLINE_PAYMENTS_ENABLED !== "true") {
+      throw new BadRequestException(
+        "Online payments are currently disabled for this phase. All orders are processed via Cash on Delivery (COD).",
+      );
+    }
     return this.paymentsService.createOnlinePaymentOrder(dto.orderId, user.id);
   }
 
@@ -33,6 +39,11 @@ export class PaymentsController {
     @CurrentUser() user: User,
     @Body() dto: VerifyPaymentDto,
   ) {
+    if (process.env.ONLINE_PAYMENTS_ENABLED !== "true") {
+      throw new BadRequestException(
+        "Online payments are currently disabled. All orders are processed via Cash on Delivery (COD).",
+      );
+    }
     return this.paymentsService.verifyPayment(dto, user.id);
   }
 

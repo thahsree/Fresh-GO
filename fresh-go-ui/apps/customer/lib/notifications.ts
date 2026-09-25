@@ -157,6 +157,8 @@ export async function sendMobileSystemNotification(
   }
 }
 
+import { customerApi } from "./api";
+
 /**
  * Unified notification dispatcher:
  * - Always triggers in-app snackbar notifications so the user gets instant, animated visual feedback.
@@ -183,3 +185,35 @@ export async function dispatchOrderNotification(
     });
   }
 }
+
+/**
+ * Obtains the Expo Push Token (if supported) and registers it with the FreshGo backend.
+ */
+export async function registerPushTokenWithBackend(): Promise<string | null> {
+  try {
+    if (Platform.OS === "web") return null;
+
+    const nativeMod = getNativeNotifications();
+    if (!nativeMod?.getExpoPushTokenAsync) return null;
+
+    const hasPermission = await requestNotificationPermission();
+    if (!hasPermission) return null;
+
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
+
+    const tokenData = await nativeMod.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    const token = tokenData?.data;
+    if (token) {
+      await customerApi.registerPushToken(token);
+      return token;
+    }
+  } catch (err) {
+    console.log("Push token registration note:", err);
+  }
+  return null;
+}
+

@@ -362,39 +362,25 @@ export function CartView({
 
       {/* Payment Method */}
       <View style={styles.paymentSection}>
-        <Text style={styles.sectionHeader}>Select Payment Method</Text>
+        <Text style={styles.sectionHeader}>Payment Method</Text>
         <View style={styles.paymentOptions}>
-          <Pressable
+          <View
             style={[
               styles.paymentOption,
-              paymentMethod === "cod" && styles.paymentOptionSelected,
+              styles.paymentOptionSelected,
             ]}
-            onPress={() => setPaymentMethod("cod")}
           >
             <View style={styles.radio}>
-              {paymentMethod === "cod" && <View style={styles.radioDot} />}
+              <View style={styles.radioDot} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.paymentTitle}>Cash on Delivery (COD)</Text>
-              <Text style={styles.paymentSubtitle}>Pay cash or scan QR at doorstep</Text>
+              <Text style={styles.paymentSubtitle}>Pay cash or UPI directly to delivery partner upon arrival</Text>
             </View>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.paymentOption,
-              paymentMethod === "upi" && styles.paymentOptionSelected,
-            ]}
-            onPress={() => setPaymentMethod("upi")}
-          >
-            <View style={styles.radio}>
-              {paymentMethod === "upi" && <View style={styles.radioDot} />}
+            <View style={{ backgroundColor: "#EAF6ED", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+              <Text style={{ color: "#198754", fontSize: 11, fontWeight: "700" }}>ACTIVE</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.paymentTitle}>UPI / Online Payment</Text>
-              <Text style={styles.paymentSubtitle}>Google Pay, PhonePe, Paytm</Text>
-            </View>
-          </Pressable>
+          </View>
         </View>
       </View>
 

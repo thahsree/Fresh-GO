@@ -9,6 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { OrdersService } from "./orders.service";
 import { CreateOrderDto, UpdateOrderStatusDto } from "./dto/order.dto";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
@@ -33,6 +34,10 @@ export class OrdersController {
     return this.ordersService.getOrderById(id, user);
   }
 
+  @Throttle({
+    short: { limit: 2, ttl: 1000 },
+    long: { limit: 10, ttl: 60000 },
+  })
   @Post()
   @UseInterceptors(IdempotencyInterceptor)
   async createOrder(

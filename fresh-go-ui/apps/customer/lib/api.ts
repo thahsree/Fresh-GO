@@ -652,6 +652,23 @@ class CustomerApiClient {
       return { success: false, error: err.message };
     }
   }
+
+  async registerPushToken(pushToken: string): Promise<boolean> {
+    try {
+      await this.request<{ success: boolean }>(
+        "/users/push-token",
+        {
+          method: "POST",
+          body: JSON.stringify({ pushToken }),
+        },
+        true
+      );
+      return true;
+    } catch (err: any) {
+      console.log("[Customer API] Push token registration note:", err.message);
+      return false;
+    }
+  }
 }
 
 export const customerApi = new CustomerApiClient();
