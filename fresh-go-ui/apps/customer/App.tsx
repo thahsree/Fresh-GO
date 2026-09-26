@@ -17,66 +17,28 @@ import { ProductListingView } from "./components/ProductListingView";
 import { type UserProfile, ProfileView } from "./components/ProfileView";
 import { SplashScreen } from "./components/SplashScreen";
 import { SnackbarNotification } from "./components/SnackbarNotification";
+import { BackendConnectionError } from "./components/BackendConnectionError";
 import { customerApi } from "./lib/api";
 import {
   dispatchOrderNotification,
   requestNotificationPermission,
   registerPushTokenWithBackend,
 } from "./lib/notifications";
-import {
-  allProducts,
-  categories as defaultCategories,
-  freshProducts,
-  type Category,
-  type Product,
-} from "./models/catalog";
-
-const INITIAL_ORDERS: CustomerOrder[] = [
-  {
-    id: "FF10284",
-    date: "Today, 1:45 PM",
-    status: "out_for_delivery",
-    items: [{ product: freshProducts[0], quantity: 1 }],
-    total: 735,
-    paymentMethod: "cod",
-    deliveryAddress: "Palm Residency, Flat 402, 4th Cross Road",
-    riderName: "Ramesh K.",
-    riderPhone: "+91 91234 56789",
-    estimatedArrival: "Arriving in 18 mins",
-  },
-  {
-    id: "FF10280",
-    date: "18 Sep 2026, 11:20 AM",
-    status: "delivered",
-    items: [
-      { product: freshProducts[1], quantity: 1 },
-      { product: freshProducts[2], quantity: 2 },
-    ],
-    total: 1320,
-    paymentMethod: "upi",
-    deliveryAddress: "Palm Residency, Flat 402, 4th Cross Road",
-  },
-];
+import { type Category, type Product } from "./models/catalog";
 
 export default function App() {
   // Navigation: "Home" | "Cart" | "Orders" | "Profile"
   const [activeNavigation, setActiveNavigation] = useState("Home");
 
-  // Dynamic Catalog & Categories State
-  const [products, setProducts] = useState<Product[]>(allProducts);
-  const [categoriesList, setCategoriesList] = useState<Category[]>(defaultCategories);
+  // Dynamic Catalog & Categories State (Empty until loaded from backend)
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
 
   // Cart State: { [productId]: quantity }
-  const [cart, setCart] = useState<{ [productId: string]: number }>({
-    "seer-fish": 1,
-  });
+  const [cart, setCart] = useState<{ [productId: string]: number }>({});
 
   // Favorites
-  const [favorites, setFavorites] = useState<string[]>([
-    "seer-fish",
-    "tiger-prawns",
-    "frozen-tenderloin-beef",
-  ]);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   // Search & Category Filters
   const [searchValue, setSearchValue] = useState("");
@@ -95,72 +57,75 @@ export default function App() {
   const [listingCategory, setListingCategory] = useState<string | null>(null);
   const [listingSearch, setListingSearch] = useState("");
 
+  // Customer Profile
   const [user, setUser] = useState<UserProfile>({
-    name: "Thashreef R.",
-    phone: "+91 98765 43210",
-    isLoggedIn: true,
+    name: "Guest",
+    phone: "",
+    isLoggedIn: false,
   });
 
   // Orders State
-  const [orders, setOrders] = useState<CustomerOrder[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<CustomerOrder[]>([]);
 
   // Address State
   const [customerAddress, setCustomerAddress] = useState(
-    "Palm Residency, Flat 4B, 4th Cross Road",
+    "Select Delivery Address",
   );
+
+  // Backend Connection & Lifecycle
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // --------------------------------------------------------------------------
   // Backend Integration & Synchronization
   // --------------------------------------------------------------------------
-  useEffect(() => {
-    let isMounted = true;
+  const syncWithBackend = async () => {
+    try {
+      setConnectionError(null);
 
-    async function syncWithBackend() {
+      // 1. Fetch live categories & products from backend
+      const [liveCats, liveProducts] = await Promise.all([
+        customerApi.getCategories(),
+        customerApi.getProducts(),
+      ]);
+
+      setProducts(liveProducts || []);
+      setCategoriesList(liveCats || []);
+      setConnectionError(null);
+
+      // 2. Fetch authenticated customer details & live orders (non-blocking)
       try {
-        // 1. Auto-authenticate with backend customer account
         const authUser = await customerApi.ensureCustomerAuth();
-        if (authUser && isMounted) {
-          setUser(authUser);
-        }
+        if (authUser) setUser(authUser);
 
-        // 2. Fetch categories directly from backend database
-        const liveCats = await customerApi.getCategories();
-        if (liveCats && liveCats.length > 0 && isMounted) {
-          setCategoriesList(liveCats);
-        }
-
-        // 3. Fetch live products directly from backend database
-        const liveProducts = await customerApi.getProducts();
-        if (liveProducts && liveProducts.length > 0 && isMounted) {
-          setProducts(liveProducts);
-        }
-
-        // 4. Fetch live customer orders from backend database
         const liveOrders = await customerApi.getMyOrders();
-        if (liveOrders && liveOrders.length > 0 && isMounted) {
-          setOrders(liveOrders);
-        }
+        if (liveOrders) setOrders(liveOrders);
 
-        // 5. Fetch customer address from backend database
         const liveAddrs = await customerApi.getAddresses();
-        if (liveAddrs && liveAddrs.length > 0 && isMounted) {
+        if (liveAddrs && liveAddrs.length > 0) {
           const defaultAddr = liveAddrs.find((a) => a.isDefault) || liveAddrs[0];
-          const formatted = `${defaultAddr.street}, ${defaultAddr.area || defaultAddr.city}`;
-          setCustomerAddress(formatted);
+          setCustomerAddress(
+            `${defaultAddr.street}, ${defaultAddr.area || defaultAddr.city}`,
+          );
         }
-      } catch (err) {
-        console.warn("Backend synchronization notice (running in offline mode):", err);
+      } catch {
+        // Non-blocking
       }
+    } catch (err: any) {
+      console.warn("Backend synchronization error:", err?.message || err);
+      setConnectionError(
+        err?.message || "Could not connect to FreshGo server on port 4000.",
+      );
+    } finally {
+      setIsInitializing(false);
     }
+  };
 
+  useEffect(() => {
     requestNotificationPermission()
       .then(() => registerPushTokenWithBackend())
       .catch(() => {});
     syncWithBackend();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   // --------------------------------------------------------------------------
@@ -534,6 +499,35 @@ export default function App() {
     (sum, qty) => sum + qty,
     0,
   );
+
+  // 1. Initial Launch / Splash State
+  if (isInitializing) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <SplashScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  // 2. Standard Customer Error Page when backend is disconnected or unreachable
+  if (connectionError && products.length === 0) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+          <BackendConnectionError
+            errorMessage={connectionError}
+            onRetry={syncWithBackend}
+            onOpenHelp={() => setIsHelpOpen(true)}
+          />
+          {isHelpOpen && (
+            <HelpSupportView onBack={() => setIsHelpOpen(false)} />
+          )}
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>

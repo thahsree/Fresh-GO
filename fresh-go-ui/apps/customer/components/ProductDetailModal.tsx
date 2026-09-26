@@ -19,7 +19,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { allProducts, type Product } from "../models/catalog";
+import type { Product } from "../models/catalog";
 
 type ProductDetailModalProps = {
   product: Product | null;
@@ -36,7 +36,7 @@ export function ProductDetailModal({
   product,
   visible,
   isFavorite,
-  products = allProducts,
+  products = [],
   onClose,
   onAddToCart,
   onToggleFavorite,

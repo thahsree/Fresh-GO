@@ -20,7 +20,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { allProducts, type Product } from "../models/catalog";
+import type { Product } from "../models/catalog";
 import { dispatchOrderNotification } from "../lib/notifications";
 import { OrderCountdownModal } from "./OrderCountdownModal";
 
@@ -47,7 +47,7 @@ type CartViewProps = {
 
 export function CartView({
   cart,
-  products = allProducts,
+  products = [],
   deliveryAddress: initialDeliveryAddress,
   onUpdateQuantity,
   onRemoveItem,

@@ -2,17 +2,19 @@ import { colors } from "@fresh-food/design-tokens";
 import { Plus } from "lucide-react-native";
 import React, { useEffect, useRef } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import {
-  allProducts as defaultAllProducts,
-  categories as defaultCategories,
-  needs,
-  type Category,
-  type Product,
-} from "../models/catalog";
+import type { Category, Product } from "../models/catalog";
 import { CategoryRail } from "./CategoryRail";
 import { CustomerHeader } from "./CustomerHeader";
 import { ProductCard } from "./ProductCard";
 import { SectionHeader } from "./SectionHeader";
+
+const needs = [
+  "Today's Fish",
+  "Family Meat Packs",
+  "Frozen Meats",
+  "Daily Catch",
+  "Weekend Specials",
+];
 
 type HomeViewProps = {
   searchValue: string;
@@ -34,8 +36,8 @@ export function HomeView({
   searchValue,
   selectedCategory,
   favorites,
-  categories = defaultCategories,
-  products = defaultAllProducts,
+  categories = [],
+  products = [],
   address,
   onSearchChange,
   onSelectCategory,

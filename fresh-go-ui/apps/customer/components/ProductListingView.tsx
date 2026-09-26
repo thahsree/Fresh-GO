@@ -22,12 +22,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import {
-  allProducts as defaultAllProducts,
-  categories as defaultCategories,
-  type Category,
-  type Product,
-} from "../models/catalog";
+import type { Category, Product } from "../models/catalog";
 
 type SortOption =
   | "featured"
@@ -54,8 +49,8 @@ export function ProductListingView({
   initialCategory = null,
   initialSearch = "",
   favorites,
-  categories = defaultCategories,
-  products = defaultAllProducts,
+  categories = [],
+  products = [],
   onBack,
   onSelectProduct,
   onAddProduct,

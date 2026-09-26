@@ -2,8 +2,6 @@ import { NativeModules, Platform } from "react-native";
 import {
   type Category,
   type Product,
-  allProducts as fallbackProducts,
-  categories as fallbackCategories,
 } from "../models/catalog";
 import type { CustomerOrder } from "../components/OrdersView";
 import type { UserProfile } from "../components/ProfileView";
@@ -363,26 +361,22 @@ class CustomerApiClient {
   }
 
   // ----------------------------------------------------
-  // CATALOG APIS
+  // CATALOG APIS (Live Database Only)
   // ----------------------------------------------------
 
   async getCategories(): Promise<Category[]> {
-    try {
-      const backendCats = await this.get<BackendCategory[]>("/catalog/categories");
-      if (Array.isArray(backendCats) && backendCats.length > 0) {
-        return backendCats.map((cat) => ({
-          id: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-          icon: cat.icon || (cat.name === "Frozen" ? "❄️" : "🥩"),
-          tint: cat.tint || (cat.name === "Frozen" ? "#E0F2FE" : "#FBE7DF"),
-          sortOrder: cat.sortOrder,
-        }));
-      }
-    } catch (err) {
-      console.log("[Customer API] Categories note (using local fallback):", err);
+    const backendCats = await this.get<BackendCategory[]>("/catalog/categories");
+    if (Array.isArray(backendCats) && backendCats.length > 0) {
+      return backendCats.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        icon: cat.icon || (cat.name === "Frozen" ? "❄️" : "🥩"),
+        tint: cat.tint || (cat.name === "Frozen" ? "#E0F2FE" : "#FBE7DF"),
+        sortOrder: cat.sortOrder,
+      }));
     }
-    return fallbackCategories;
+    return [];
   }
 
   async getProducts(params?: {
@@ -390,21 +384,17 @@ class CustomerApiClient {
     search?: string;
     bestseller?: boolean;
   }): Promise<Product[]> {
-    try {
-      const queryParts: string[] = [];
-      if (params?.category) queryParts.push(`category=${encodeURIComponent(params.category.toLowerCase())}`);
-      if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
-      if (params?.bestseller) queryParts.push("bestseller=true");
-      const qs = queryParts.length ? `?${queryParts.join("&")}` : "";
+    const queryParts: string[] = [];
+    if (params?.category) queryParts.push(`category=${encodeURIComponent(params.category.toLowerCase())}`);
+    if (params?.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+    if (params?.bestseller) queryParts.push("bestseller=true");
+    const qs = queryParts.length ? `?${queryParts.join("&")}` : "";
 
-      const raw = await this.get<BackendProduct[]>(`/catalog/products${qs}`);
-      if (Array.isArray(raw) && raw.length > 0) {
-        return raw.map(this.transformProduct);
-      }
-    } catch (err) {
-      console.log("[Customer API] Products note (using local fallback):", err);
+    const raw = await this.get<BackendProduct[]>(`/catalog/products${qs}`);
+    if (Array.isArray(raw)) {
+      return raw.map(this.transformProduct);
     }
-    return fallbackProducts;
+    return [];
   }
 
   transformProduct(bp: BackendProduct): Product {
