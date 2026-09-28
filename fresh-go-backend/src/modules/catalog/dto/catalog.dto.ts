@@ -70,6 +70,14 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsBoolean()
+  isTodaysOffer?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  originalPrice?: number;
+
+  @IsOptional()
+  @IsBoolean()
   isDailyCatch?: boolean;
 
   @IsOptional()
@@ -154,6 +162,14 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsBoolean()
+  isTodaysOffer?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  originalPrice?: number;
+
+  @IsOptional()
+  @IsBoolean()
   isDailyCatch?: boolean;
 
   @IsOptional()
@@ -163,4 +179,58 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   tag?: string;
+}
+
+export class CreateFeaturedSectionDto {
+  @IsNotEmpty()
+  @IsString()
+  title: string;
+
+  @IsOptional()
+  @IsString()
+  subtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  productIds?: string[];
+}
+
+export class UpdateFeaturedSectionDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  subtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsNumber()
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  productIds?: string[];
 }

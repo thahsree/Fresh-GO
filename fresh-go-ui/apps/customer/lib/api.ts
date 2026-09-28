@@ -1,3 +1,4 @@
+import Constants from "expo-constants";
 import { NativeModules, Platform } from "react-native";
 import {
   type Category,
@@ -8,38 +9,97 @@ import type { UserProfile } from "../components/ProfileView";
 
 declare const process: any;
 
-function resolveApiBase(): string {
+/**
+ * Resolves the API Base URL dynamically.
+ * Works seamlessly across:
+ * 1. Web browser: uses window.location.origin to route through Metro's proxy, or localhost:4000
+ * 2. Expo Tunnel (exp.direct, ngrok, loca.lt): uses HTTPS and strips internal ports (:80, :8081)
+ *    so React Native can make secure requests through the tunnel without cleartext HTTP blocks
+ * 3. Local LAN / Wi-Fi / Emulator: uses Metro's host with port 8081 which proxies /api/ to 4000
+ */
+export function getApiBase(): string {
+  // 1. Explicit environment variable (inlined by Expo CLI)
   if (typeof process !== "undefined" && process?.env?.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+    const envUrl = process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "");
+    if (envUrl.length > 0) return envUrl;
   }
 
+  // 2. Web browser: route via current window origin to leverage Metro's proxy
   if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.location?.origin) {
+      return `${window.location.origin}/api/v1`;
+    }
     return "http://localhost:4000/api/v1";
   }
 
-  try {
-    const scriptURL = NativeModules?.SourceCode?.scriptURL;
-    if (typeof scriptURL === "string") {
-      const parts = scriptURL.split("://");
-      if (parts.length > 1) {
-        const rawProtocol = parts[0] || "http";
-        // Always use valid http or https protocol (never 'exp' or 'exps' which cancel fetch in React Native)
-        const protocol = rawProtocol.startsWith("https") || rawProtocol === "exps" ? "https" : "http";
-        const hostPort = parts[1].split("/")[0];
-        if (hostPort) {
-          // Metro proxy forwards /api/ directly to NestJS backend on port 4000
-          return `${protocol}://${hostPort}/api/v1`;
+  // 3. Extract candidate hosts from Expo Constants & React Native SourceCode
+  const candidates: Array<string | undefined | null> = [
+    NativeModules?.SourceCode?.scriptURL,
+    Constants?.experienceUrl,
+    Constants?.linkingUri,
+    Constants?.expoConfig?.hostUri,
+    (Constants as any)?.expoGoConfig?.debuggerHost,
+    (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost,
+    (Constants as any)?.manifest?.debuggerHost,
+  ];
+
+  // First pass: ALWAYS PRIORITIZE PUBLIC TUNNEL HOSTS (exp.direct, ngrok, loca.lt)
+  // When running with --tunnel, mobile devices (e.g. on 4G/5G or external networks)
+  // MUST use the public HTTPS tunnel, never a private LAN IP (10.x.x.x) which is unreachable!
+  for (const raw of candidates) {
+    if (!raw || typeof raw !== "string") continue;
+    try {
+      const clean = raw.split("?")[0].replace(/^exp[s]?:\/\//, "http://");
+      const withoutProto = clean.includes("://") ? clean.split("://")[1] : clean;
+      const hostPart = withoutProto.split("/")[0].trim();
+      if (!hostPart) continue;
+
+      const [hostname] = hostPart.split(":");
+      const isTunnel =
+        hostname.includes("exp.direct") ||
+        hostname.includes("ngrok") ||
+        hostname.includes("loca.lt") ||
+        hostname.includes("tunnel");
+
+      if (isTunnel) {
+        if (hostname.includes("_") && Platform.OS === "android") {
+          console.warn(
+            `[Customer API] Tunnel domain "${hostname}" contains an underscore ('_'). Android OS blocks hostnames with underscores with 'java.io.IOException: Android internal error'. Restart 'npm run dev:customer:tunnel' in your terminal to get a clean tunnel domain.`,
+          );
         }
+        // Public tunnels ALWAYS terminate SSL at 443 with HTTPS.
+        console.log(`[Customer API] Prioritized Public Tunnel: https://${hostname}/api/v1`);
+        return `https://${hostname}/api/v1`;
       }
+    } catch {
+      // Continue to next candidate
     }
-  } catch {
-    // ignore
   }
 
-  return "http://10.104.176.61:4000/api/v1";
+  // Second pass: Local LAN Wi-Fi hosts (for --host lan mode)
+  for (const raw of candidates) {
+    if (!raw || typeof raw !== "string") continue;
+    try {
+      const clean = raw.split("?")[0].replace(/^exp[s]?:\/\//, "http://");
+      const withoutProto = clean.includes("://") ? clean.split("://")[1] : clean;
+      const hostPart = withoutProto.split("/")[0].trim();
+      if (!hostPart) continue;
+
+      const [hostname, port] = hostPart.split(":");
+      if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+        const targetPort = port || "8081";
+        return `http://${hostname}:${targetPort}/api/v1`;
+      }
+    } catch {
+      // Continue to next candidate
+    }
+  }
+
+  // 4. Default LAN dev machine fallback
+  return "http://10.104.176.61:8081/api/v1";
 }
 
-export const API_BASE = resolveApiBase();
+export const API_BASE = getApiBase();
 
 const TOKEN_KEY = "freshgo_customer_token";
 const USER_KEY = "freshgo_customer_user";
@@ -86,6 +146,8 @@ export type BackendProduct = {
   netWeightDescription?: string | null;
   isActive: boolean;
   isBestSeller?: boolean;
+  isTodaysOffer?: boolean;
+  originalPrice?: number | null;
   isDailyCatch?: boolean;
   isFlashFrozen?: boolean;
   image?: string;
@@ -110,6 +172,19 @@ export type BackendAddress = {
   latitude: number;
   longitude: number;
   isDefault: boolean;
+};
+
+export type BackendHub = {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  deliveryRadiusKm: number;
+  isActive: boolean;
+  contactPhone?: string | null;
 };
 
 export type BackendOrderItem = {
@@ -197,67 +272,66 @@ class CustomerApiClient {
   }
 
   /**
-   * Automatically authenticate with backend customer account (Thashreef R. / +919876543210)
-   * or restore existing session.
+   * Restore real customer session from stored JWT accessToken if present.
+   * Validates token against backend /auth/me.
    */
-  async ensureCustomerAuth(): Promise<UserProfile | null> {
-    if (this.user && this.token) return this.user;
-    if (this.authPromise) return this.authPromise;
-
-    this.authPromise = (async () => {
-      try {
-        const phone = "+919876543210";
-        const otp = "123456";
-
-        // Step 1: Send OTP
-        await this.post("/auth/otp/send", { phone }, false);
-
-        // Step 2: Verify OTP
-        const res = await this.post<{
-          accessToken: string;
-          user: {
-            id: string;
-            phone: string;
-            name: string;
-            email?: string;
-          };
-        }>("/auth/otp/verify", { phone, otp }, false);
-
-        if (res.accessToken && res.user) {
-          const profile: UserProfile = {
-            name: res.user.name || "Thashreef R.",
-            phone: res.user.phone,
-            email: res.user.email || "thashreef@freshgo.in",
-            isLoggedIn: true,
-          };
-          this.setSession(res.accessToken, profile);
-          return profile;
-        }
-      } catch (err) {
-        console.log("[Customer API] Backend auth note (using local profile):", err);
-      } finally {
-        this.authPromise = null;
-      }
+  async restoreSession(): Promise<UserProfile | null> {
+    const token = this.getToken();
+    if (!token) {
+      this.user = null;
       return null;
-    })();
+    }
 
-    return this.authPromise;
+    try {
+      const res = await this.get<{
+        user: {
+          id: string;
+          phone: string;
+          name: string;
+          email?: string;
+          role: string;
+        };
+      }>("/auth/me", true);
+
+      if (res?.user) {
+        const profile: UserProfile = {
+          name: res.user.name || "Customer",
+          phone: res.user.phone,
+          email: res.user.email || "",
+          isLoggedIn: true,
+        };
+        this.user = profile;
+        if (typeof window !== "undefined" && window.localStorage) {
+          try {
+            localStorage.setItem(USER_KEY, JSON.stringify(profile));
+          } catch {}
+        }
+        return profile;
+      }
+    } catch (err: any) {
+      console.log("[Customer API] Session expired or invalid, resetting to guest:", err.message);
+      this.clearSession();
+    }
+    return null;
   }
 
-  async sendOtp(rawPhone: string): Promise<{ success: boolean; message: string; devOtp?: string }> {
+  async sendOtp(rawPhone: string): Promise<{ success: boolean; message: string; devOtp?: string; isMock?: boolean }> {
     const digits = rawPhone.replace(/\D/g, "");
-    const phone = digits.length === 10 ? `+91${digits}` : rawPhone.startsWith("+") ? rawPhone : `+${digits}`;
-    try {
-      const res = await this.post<{ message: string; phone: string; devOtp?: string }>(
-        "/auth/otp/send",
-        { phone },
-        false
-      );
-      return { success: true, message: res.message || "OTP sent successfully", devOtp: res.devOtp || "123456" };
-    } catch (err: any) {
-      console.log("[Customer API] sendOtp note (using local demo mode):", err.message);
-      return { success: true, message: "OTP sent (dev code: 123456)", devOtp: "123456" };
+    if (digits.length !== 10) {
+      throw new Error("Please enter a valid 10-digit mobile number");
     }
+    const phone = `+91${digits}`;
+    const res = await this.post<{ message: string; phone: string; devOtp?: string; isMock?: boolean }>(
+      "/auth/otp/send",
+      { phone },
+      false
+    );
+    return {
+      success: true,
+      message: res.message || "OTP sent successfully",
+      devOtp: res.devOtp,
+      isMock: res.isMock,
+    };
   }
 
   async verifyOtp(
@@ -266,40 +340,48 @@ class CustomerApiClient {
     name?: string
   ): Promise<{ success: boolean; user: UserProfile; error?: string }> {
     const digits = rawPhone.replace(/\D/g, "");
-    const phone = digits.length === 10 ? `+91${digits}` : rawPhone.startsWith("+") ? rawPhone : `+${digits}`;
-    try {
-      const res = await this.post<{
-        accessToken: string;
-        user: {
-          id: string;
-          phone: string;
-          name: string;
-          email?: string;
-        };
-      }>("/auth/otp/verify", { phone, otp, role: "CUSTOMER", name: name?.trim() }, false);
+    if (digits.length !== 10) {
+      throw new Error("Please enter a valid 10-digit mobile number");
+    }
+    const phone = `+91${digits}`;
+    const cleanOtp = otp.trim();
 
-      if (res.accessToken && res.user) {
-        const profile: UserProfile = {
-          name: res.user.name || name?.trim() || "Thashreef R.",
-          phone: res.user.phone || phone,
-          email: res.user.email || "",
-          isLoggedIn: true,
-        };
-        this.setSession(res.accessToken, profile);
-        return { success: true, user: profile };
-      }
-    } catch (err: any) {
-      console.log("[Customer API] verifyOtp backend fallback:", err.message);
+    if (!cleanOtp || cleanOtp.length < 4) {
+      throw new Error("Please enter the verification code");
     }
 
-    const fallbackProfile: UserProfile = {
-      name: name?.trim() || "Thashreef R.",
-      phone,
-      email: "",
+    const res = await this.post<{
+      accessToken: string;
+      user: {
+        id: string;
+        phone: string;
+        name: string;
+        email?: string;
+      };
+    }>(
+      "/auth/otp/verify",
+      {
+        phone,
+        otp: cleanOtp,
+        role: "CUSTOMER",
+        name: name?.trim() || undefined,
+      },
+      false
+    );
+
+    if (!res?.accessToken || !res?.user) {
+      throw new Error("Verification failed. Please try again.");
+    }
+
+    const profile: UserProfile = {
+      name: res.user.name || name?.trim() || "Customer",
+      phone: res.user.phone || phone,
+      email: res.user.email || "",
       isLoggedIn: true,
     };
-    this.setSession("customer-session-token", fallbackProfile);
-    return { success: true, user: fallbackProfile };
+
+    this.setSession(res.accessToken, profile);
+    return { success: true, user: profile };
   }
 
   private async request<T>(
@@ -307,9 +389,12 @@ class CustomerApiClient {
     options: RequestInit = {},
     requireAuth = true
   ): Promise<T> {
-    const url = `${API_BASE}${endpoint}`;
+    const base = getApiBase();
+    const url = `${base}${endpoint}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
+      "bypass-tunnel-reminder": "true",
       ...(options.headers as Record<string, string>),
     };
 
@@ -339,8 +424,9 @@ class CustomerApiClient {
 
       const json = await res.json();
       return (json.data !== undefined ? json.data : json) as T;
-    } catch (err) {
+    } catch (err: any) {
       clearTimeout(timeoutId);
+      console.warn(`[Customer API] Request to ${url} failed:`, err?.message || err);
       throw err;
     }
   }
@@ -358,6 +444,21 @@ class CustomerApiClient {
       },
       requireAuth
     );
+  }
+
+  async put<T>(endpoint: string, body: any, requireAuth = true): Promise<T> {
+    return this.request<T>(
+      endpoint,
+      {
+        method: "PUT",
+        body: JSON.stringify(body),
+      },
+      requireAuth
+    );
+  }
+
+  async delete<T>(endpoint: string, requireAuth = true): Promise<T> {
+    return this.request<T>(endpoint, { method: "DELETE" }, requireAuth);
   }
 
   // ----------------------------------------------------
@@ -393,6 +494,31 @@ class CustomerApiClient {
     const raw = await this.get<BackendProduct[]>(`/catalog/products${qs}`);
     if (Array.isArray(raw)) {
       return raw.map(this.transformProduct);
+    }
+    return [];
+  }
+
+  async getFeaturedSections(): Promise<
+    Array<{
+      id: string;
+      title: string;
+      subtitle?: string;
+      icon?: string;
+      slug: string;
+      sortOrder: number;
+      isActive: boolean;
+      productIds: string[];
+      products: Product[];
+    }>
+  > {
+    const raw = await this.get<any[]>("/catalog/featured-sections");
+    if (Array.isArray(raw)) {
+      return raw.map((sec) => ({
+        ...sec,
+        products: Array.isArray(sec.products)
+          ? sec.products.map(this.transformProduct)
+          : [],
+      }));
     }
     return [];
   }
@@ -461,23 +587,15 @@ class CustomerApiClient {
           : "Store between 0°C to 4°C. Consume within 24 hours."),
       rating: bp.rating || 4.8,
       reviewsCount: bp.reviewsCount || 24,
-      isBestSeller: bp.isBestSeller ?? true,
+      isBestSeller: Boolean(bp.isBestSeller),
+      isTodaysOffer: Boolean(bp.isTodaysOffer),
+      originalPrice: bp.originalPrice ? Number(bp.originalPrice) : undefined,
       availableStockKg: bp.availableStockKg,
       isInStock:
         bp.availableStockKg !== undefined
           ? bp.availableStockKg > 0
           : (bp.isInStock ?? true),
-      tag:
-        bp.tag ||
-        (isDailyCatch
-          ? "Fresh Catch"
-          : isFrozen
-          ? "Frozen"
-          : categoryName.toLowerCase().includes("meat")
-          ? "Fresh Cut"
-          : categoryName.toLowerCase().includes("veg")
-          ? "Fresh Produce"
-          : "Fresh"),
+      tag: undefined,
     };
   }
 
@@ -486,8 +604,8 @@ class CustomerApiClient {
   // ----------------------------------------------------
 
   async getAddresses(): Promise<BackendAddress[]> {
+    if (!this.getToken()) return [];
     try {
-      await this.ensureCustomerAuth();
       const addrs = await this.get<BackendAddress[]>("/users/addresses", true);
       return addrs || [];
     } catch (err) {
@@ -496,13 +614,107 @@ class CustomerApiClient {
     }
   }
 
+  async addAddress(dto: {
+    title: string;
+    street: string;
+    landmark?: string;
+    area: string;
+    city: string;
+    pincode: string;
+    latitude: number;
+    longitude: number;
+    isDefault?: boolean;
+  }): Promise<BackendAddress | null> {
+    if (!this.getToken()) return null;
+    try {
+      const res = await this.post<BackendAddress>("/users/addresses", dto, true);
+      return res;
+    } catch (err: any) {
+      console.error("[Customer API] addAddress error:", err.message);
+      throw err;
+    }
+  }
+
+  async updateAddress(
+    id: string,
+    dto: Partial<{
+      title: string;
+      street: string;
+      landmark?: string;
+      area: string;
+      city: string;
+      pincode: string;
+      latitude: number;
+      longitude: number;
+      isDefault?: boolean;
+    }>
+  ): Promise<BackendAddress | null> {
+    if (!this.getToken()) return null;
+    try {
+      const res = await this.put<BackendAddress>(`/users/addresses/${id}`, dto, true);
+      return res;
+    } catch (err: any) {
+      console.error("[Customer API] updateAddress error:", err.message);
+      throw err;
+    }
+  }
+
+  async deleteAddress(id: string): Promise<boolean> {
+    if (!this.getToken()) return false;
+    try {
+      await this.delete(`/users/addresses/${id}`, true);
+      return true;
+    } catch (err: any) {
+      console.error("[Customer API] deleteAddress error:", err.message);
+      throw err;
+    }
+  }
+
+  // ----------------------------------------------------
+  // HUBS APIS
+  // ----------------------------------------------------
+
+  async getHubs(): Promise<BackendHub[]> {
+    try {
+      const res = await this.get<any>("/hubs", false);
+      const list = Array.isArray(res) ? res : res?.data && Array.isArray(res.data) ? res.data : [];
+      return list.filter((h: any) => h.isActive !== false);
+    } catch (err: any) {
+      console.warn("[Customer API] getHubs note:", err.message);
+      return [
+        {
+          id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
+          name: "FreshGo Central Hub (Mavoor Road)",
+          code: "HUB-CLT-01",
+          address: "Mavoor Road, Kozhikode, Kerala 673004",
+          city: "Kozhikode",
+          latitude: 11.2588,
+          longitude: 75.7804,
+          deliveryRadiusKm: 10,
+          isActive: true,
+        },
+        {
+          id: "4942d016-533c-4fa7-a820-6e64c76e12c7",
+          name: "Kannur Hub",
+          code: "HUB-CLT-02",
+          address: "Kannur City, Kerala 670004",
+          city: "Kannur",
+          latitude: 11.876384,
+          longitude: 75.373797,
+          deliveryRadiusKm: 10,
+          isActive: true,
+        },
+      ];
+    }
+  }
+
   // ----------------------------------------------------
   // ORDER APIS
   // ----------------------------------------------------
 
   async getMyOrders(): Promise<CustomerOrder[]> {
+    if (!this.getToken()) return [];
     try {
-      await this.ensureCustomerAuth();
       const rawOrders = await this.get<BackendOrder[]>("/orders/my", true);
 
       if (Array.isArray(rawOrders)) {
@@ -532,7 +744,7 @@ class CustomerApiClient {
               })
             : "Today";
 
-          let addressStr = "Palm Residency, Flat 4B, 4th Cross Road";
+          let addressStr = "Delivery Address";
           if (typeof o.deliveryAddress === "string") {
             addressStr = o.deliveryAddress;
           } else if (o.deliveryAddress?.street) {
@@ -577,32 +789,56 @@ class CustomerApiClient {
     items: { product: Product; quantity: number }[];
     total: number;
     paymentMethod: "cod" | "upi";
-    address: string;
+    addressId?: string;
+    addressDetails?: {
+      title?: string;
+      houseBuilding: string;
+      street: string;
+      landmark?: string;
+      area: string;
+      city: string;
+      pincode?: string;
+      latitude?: number;
+      longitude?: number;
+    };
+    addressText?: string;
   }): Promise<{ success: boolean; orderId?: string; error?: string }> {
+    if (!this.getToken()) {
+      return { success: false, error: "Please log in to place your order" };
+    }
     try {
-      await this.ensureCustomerAuth();
+      let addressId = orderDetails.addressId;
 
-      // Find or get a valid address ID
-      const addresses = await this.getAddresses();
-      let addressId = addresses[0]?.id;
+      // If user provided doorstep details at checkout, save as a real address first
+      if (!addressId && orderDetails.addressDetails) {
+        const ad = orderDetails.addressDetails;
+        const newAddr = await this.addAddress({
+          title: ad.title || "Home",
+          street: `${ad.houseBuilding}, ${ad.street}`,
+          landmark: ad.landmark || undefined,
+          area: ad.area || "Local Area",
+          city: ad.city || "Kerala",
+          pincode: ad.pincode || "670001",
+          latitude: ad.latitude || 11.876384,
+          longitude: ad.longitude || 75.373797,
+          isDefault: true,
+        });
+        if (newAddr) {
+          addressId = newAddr.id;
+        }
+      }
+
+      // If still no addressId, try getting existing saved addresses
+      if (!addressId) {
+        const addresses = await this.getAddresses();
+        addressId = addresses[0]?.id;
+      }
 
       if (!addressId) {
-        // Create an address in the delivery zone
-        const newAddr = await this.post<BackendAddress>(
-          "/users/addresses",
-          {
-            title: "Home",
-            street: orderDetails.address || "Palm Residency, Flat 4B, 4th Cross Road",
-            area: "Kozhikode Central",
-            city: "Kozhikode",
-            pincode: "673004",
-            latitude: 11.2588,
-            longitude: 75.7804,
-            isDefault: true,
-          },
-          true
-        );
-        addressId = newAddr.id;
+        return {
+          success: false,
+          error: "Please enter your building name and doorstep address to proceed.",
+        };
       }
 
       // Map order items for backend DTO
@@ -659,6 +895,85 @@ class CustomerApiClient {
       return false;
     }
   }
+
+  async checkServiceability(lat: number, lng: number): Promise<ServiceabilityResult> {
+    const safeLat = Number.isFinite(lat) ? Number(lat.toFixed(6)) : 11.2588;
+    const safeLng = Number.isFinite(lng) ? Number(lng.toFixed(6)) : 75.7804;
+    try {
+      const res = await this.request<any>(
+        `/hubs/serviceability?lat=${safeLat}&lng=${safeLng}`,
+        { method: "GET" },
+        false
+      );
+      return res.data !== undefined ? res.data : res;
+    } catch (err: any) {
+      console.warn("[Customer API] Serviceability check fallback:", err.message);
+      return {
+        serviceable: true,
+        distanceKm: 2.5,
+        estimatedDeliveryMinutes: 15,
+        deliveryFee: 25,
+      };
+    }
+  }
+
+  async notifyInterest(data: {
+    phone: string;
+    email?: string;
+    latitude?: number;
+    longitude?: number;
+    areaName?: string;
+    consentGiven: boolean;
+  }): Promise<{ success: boolean; message: string }> {
+    const res = await this.request<any>(
+      "/hubs/notify-interest",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+      false
+    );
+    return res.data !== undefined ? res.data : res;
+  }
 }
 
+export type ServiceabilityResult = {
+  serviceable: boolean;
+  hub?: {
+    id: string;
+    name: string;
+    code: string;
+    address: string;
+    city: string;
+    latitude?: number;
+    longitude?: number;
+    deliveryRadiusKm: number;
+  };
+  distanceKm?: number;
+  estimatedDeliveryMinutes?: number;
+  deliveryFee?: number;
+  nearestDistanceKm?: number;
+  nearestHub?: {
+    id: string;
+    name: string;
+    city: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  message?: string;
+};
+
+export type FeaturedSectionAppItem = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon?: string;
+  slug: string;
+  sortOrder: number;
+  isActive: boolean;
+  productIds: string[];
+  products: Product[];
+};
+
 export const customerApi = new CustomerApiClient();
+export const api = customerApi;

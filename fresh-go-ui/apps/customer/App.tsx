@@ -1,11 +1,32 @@
 import { colors } from "@fresh-food/design-tokens";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { BackHandler, Platform, StyleSheet, View } from "react-native";
+import { BackHandler, LogBox, Platform, StyleSheet, View } from "react-native";
 import {
   SafeAreaProvider,
   SafeAreaView,
 } from "react-native-safe-area-context";
+
+// Suppress known React Native Web deprecation notices (React Native Web internally converts shadow* to boxShadow)
+LogBox.ignoreLogs([
+  '"shadow*" style props are deprecated. Use "boxShadow".',
+  "props.pointerEvents is deprecated. Use style.pointerEvents",
+]);
+
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  const origWarn = console.warn;
+  console.warn = (...args: any[]) => {
+    const msg = args[0];
+    if (
+      typeof msg === "string" &&
+      (msg.includes('"shadow*" style props are deprecated') ||
+        msg.includes("props.pointerEvents is deprecated"))
+    ) {
+      return;
+    }
+    origWarn.apply(console, args);
+  };
+}
 import { AuthView } from "./components/AuthView";
 import { BottomNavigation } from "./components/BottomNavigation";
 import { CartView } from "./components/CartView";
@@ -18,7 +39,15 @@ import { type UserProfile, ProfileView } from "./components/ProfileView";
 import { SplashScreen } from "./components/SplashScreen";
 import { SnackbarNotification } from "./components/SnackbarNotification";
 import { BackendConnectionError } from "./components/BackendConnectionError";
-import { customerApi } from "./lib/api";
+import { ComingSoonView } from "./components/ComingSoonView";
+import { CustomerLocationModal } from "./components/CustomerLocationModal";
+import { customerApi, ServiceabilityResult, BackendHub, BackendAddress } from "./lib/api";
+import {
+  acquireAccurateLocation,
+  reverseGeocodeLocation,
+  getStoredLocation,
+  saveStoredLocation,
+} from "./lib/location";
 import {
   dispatchOrderNotification,
   requestNotificationPermission,
@@ -33,6 +62,7 @@ export default function App() {
   // Dynamic Catalog & Categories State (Empty until loaded from backend)
   const [products, setProducts] = useState<Product[]>([]);
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [hubs, setHubs] = useState<BackendHub[]>([]);
 
   // Cart State: { [productId]: quantity }
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
@@ -67,10 +97,43 @@ export default function App() {
   // Orders State
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
 
-  // Address State
-  const [customerAddress, setCustomerAddress] = useState(
-    "Select Delivery Address",
-  );
+  // Address & Geo-Fencing (10km Radius rule)
+  const storedLoc = getStoredLocation();
+  const [customerAddress, setCustomerAddress] = useState(storedLoc?.address || "");
+  const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number }>({
+    lat: storedLoc?.lat || 11.2588,
+    lng: storedLoc?.lng || 75.7804,
+  });
+  const [customerPincode, setCustomerPincode] = useState<string>("");
+  const [serviceability, setServiceability] = useState<ServiceabilityResult | null>(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
+  const checkLocationServiceability = async (lat: number, lng: number) => {
+    const safeLat = Number.isFinite(lat) ? Number(lat.toFixed(6)) : 11.2588;
+    const safeLng = Number.isFinite(lng) ? Number(lng.toFixed(6)) : 75.7804;
+    try {
+      const res = await customerApi.checkServiceability(safeLat, safeLng);
+      setServiceability(res);
+      return res;
+    } catch (err) {
+      console.warn("Serviceability check error:", err);
+      return null;
+    }
+  };
+
+  const handleToggleLocationDemo = () => {
+    if (customerCoords.lat === 11.2588) {
+      const outOfZone = { lat: 11.8745, lng: 75.3704 };
+      setCustomerCoords(outOfZone);
+      setCustomerAddress("Kannur City");
+      checkLocationServiceability(outOfZone.lat, outOfZone.lng);
+    } else {
+      const inZone = { lat: 11.2588, lng: 75.7804 };
+      setCustomerCoords(inZone);
+      setCustomerAddress("Mavoor Road, Kozhikode");
+      checkLocationServiceability(inZone.lat, inZone.lng);
+    }
+  };
 
   // Backend Connection & Lifecycle
   const [isInitializing, setIsInitializing] = useState(true);
@@ -83,30 +146,54 @@ export default function App() {
     try {
       setConnectionError(null);
 
-      // 1. Fetch live categories & products from backend
-      const [liveCats, liveProducts] = await Promise.all([
+      // 1. Fetch live categories, products, & hubs from backend
+      const [liveCats, liveProducts, liveHubs] = await Promise.all([
         customerApi.getCategories(),
         customerApi.getProducts(),
+        customerApi.getHubs(),
       ]);
 
       setProducts(liveProducts || []);
       setCategoriesList(liveCats || []);
+      if (liveHubs && liveHubs.length > 0) {
+        setHubs(liveHubs);
+      }
       setConnectionError(null);
 
-      // 2. Fetch authenticated customer details & live orders (non-blocking)
+      // 2. Proactively get real device location first before checking serviceability
+      let activeCoords = { lat: customerCoords.lat, lng: customerCoords.lng };
       try {
-        const authUser = await customerApi.ensureCustomerAuth();
-        if (authUser) setUser(authUser);
+        const detected = await acquireAccurateLocation({ forcePrompt: false });
+        if (detected && Number.isFinite(detected.lat) && Number.isFinite(detected.lng)) {
+          activeCoords = { lat: detected.lat, lng: detected.lng };
+          setCustomerCoords(activeCoords);
 
-        const liveOrders = await customerApi.getMyOrders();
-        if (liveOrders) setOrders(liveOrders);
+          const geo = await reverseGeocodeLocation(detected.lat, detected.lng);
+          const resolvedAddress = geo.address || `${geo.area}, ${geo.city}`;
+          setCustomerAddress(resolvedAddress);
+          saveStoredLocation(detected, resolvedAddress);
+        }
+      } catch (locErr) {
+        console.warn("Initial location detection error:", locErr);
+      }
 
-        const liveAddrs = await customerApi.getAddresses();
-        if (liveAddrs && liveAddrs.length > 0) {
-          const defaultAddr = liveAddrs.find((a) => a.isDefault) || liveAddrs[0];
-          setCustomerAddress(
-            `${defaultAddr.street}, ${defaultAddr.area || defaultAddr.city}`,
-          );
+      // Check serviceability for the real detected coordinates
+      await checkLocationServiceability(activeCoords.lat, activeCoords.lng);
+
+      // 3. Restore customer session if previously authenticated (non-blocking)
+      try {
+        const authUser = await customerApi.restoreSession();
+        if (authUser) {
+          setUser(authUser);
+          const liveOrders = await customerApi.getMyOrders();
+          if (liveOrders) setOrders(liveOrders);
+          await customerApi.getAddresses();
+        } else {
+          setUser({
+            name: "Guest",
+            phone: "",
+            isLoggedIn: false,
+          });
         }
       } catch {
         // Non-blocking
@@ -375,6 +462,18 @@ export default function App() {
     total: number;
     paymentMethod: "cod" | "upi";
     address: string;
+    addressId?: string;
+    addressDetails?: {
+      title?: string;
+      houseBuilding: string;
+      street: string;
+      landmark?: string;
+      area: string;
+      city: string;
+      pincode?: string;
+      latitude?: number;
+      longitude?: number;
+    };
   }) => {
     // Validate order volume does not exceed available stock
     for (const item of orderDetails.items) {
@@ -391,8 +490,23 @@ export default function App() {
         return;
       }
     }
+    // Require login before placing order
+    if (!user.isLoggedIn) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     // 1. Send live order to backend
     const res = await customerApi.createOrder(orderDetails);
+    if (!res.success && res.error) {
+      dispatchOrderNotification({
+        orderId: "ORDER_FAILED",
+        status: "cancelled",
+        title: "Could Not Place Order",
+        message: res.error,
+      });
+      return;
+    }
     const orderId = res.orderId || `FF${Math.floor(10000 + Math.random() * 90000)}`;
 
     const newOrder: CustomerOrder = {
@@ -413,11 +527,12 @@ export default function App() {
     setActiveNavigation("Orders"); // navigate to orders screen
 
     // 2. Dispatch Order Placed Notification (In-App Snackbar if active, Mobile notification if backgrounded)
+    const hubName = serviceability?.hub?.name || "Express Hub";
     await dispatchOrderNotification({
       orderId,
       status: "placed",
       title: "Order Placed Successfully! 🎉",
-      message: `Order #${orderId} confirmed · Kozhikode Central Hub is preparing your fresh cuts.`,
+      message: `Order #${orderId} confirmed · ${hubName} is preparing your fresh cuts.`,
     });
 
     // 3. Schedule realistic order status milestone updates
@@ -550,29 +665,60 @@ export default function App() {
               />
             ) : (
               <>
-                {activeNavigation === "Home" && (
-                  <HomeView
-                    searchValue={searchValue}
-                    selectedCategory={selectedCategory}
-                    favorites={favorites}
-                    categories={categoriesList}
-                    products={products}
-                    address={customerAddress}
-                    onSearchChange={setSearchValue}
-                    onSelectCategory={setSelectedCategory}
-                    onAddProduct={(id) => handleAddToCart(id, 1)}
-                    onToggleFavorite={toggleFavorite}
-                    onSelectProduct={handleOpenProduct}
-                    onNavigateToListing={handleNavigateToListing}
-                    onPressProfile={() => setActiveNavigation("Profile")}
-                  />
-                )}
+                {activeNavigation === "Home" &&
+                  (serviceability && !serviceability.serviceable ? (
+                    <ComingSoonView
+                      serviceability={serviceability}
+                      customerCoordinates={customerCoords}
+                      onSwitchToDemoLocation={() => {
+                        const inZone = { lat: 11.2588, lng: 75.7804 };
+                        setCustomerCoords(inZone);
+                        setCustomerAddress("Mavoor Road, Kozhikode");
+                        checkLocationServiceability(inZone.lat, inZone.lng);
+                      }}
+                      onRefreshLocation={() => {
+                        checkLocationServiceability(
+                          customerCoords.lat,
+                          customerCoords.lng
+                        );
+                      }}
+                      onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+                    />
+                  ) : (
+                    <HomeView
+                      searchValue={searchValue}
+                      selectedCategory={selectedCategory}
+                      favorites={favorites}
+                      categories={categoriesList}
+                      products={products}
+                      address={
+                        customerAddress
+                          ? serviceability?.hub?.name
+                            ? `${customerAddress} (${serviceability.hub.name.split("(")[0].trim()})`
+                            : customerAddress
+                          : ""
+                      }
+                      onSearchChange={setSearchValue}
+                      onSelectCategory={setSelectedCategory}
+                      onAddProduct={(id) => handleAddToCart(id, 1)}
+                      onToggleFavorite={toggleFavorite}
+                      onSelectProduct={handleOpenProduct}
+                      onNavigateToListing={handleNavigateToListing}
+                      onPressProfile={() => setActiveNavigation("Profile")}
+                      onPressLocation={() => setIsLocationModalOpen(true)}
+                    />
+                  ))}
 
                 {activeNavigation === "Cart" && (
                   <CartView
                     cart={cart}
                     products={products}
-                    deliveryAddress={customerAddress}
+                    deliveryLocation={customerAddress}
+                    deliveryCoords={customerCoords}
+                    deliveryPincode={customerPincode}
+                    onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+                    isLoggedIn={user.isLoggedIn}
+                    onOpenAuth={() => setIsAuthModalOpen(true)}
                     onUpdateQuantity={handleUpdateQuantity}
                     onRemoveItem={handleRemoveFromCart}
                     onExploreProducts={() => {
@@ -601,18 +747,30 @@ export default function App() {
                     <ProfileView
                       user={user}
                       onOpenAuth={() => setIsAuthModalOpen(true)}
-                      onLogout={() =>
+                      onLogout={() => {
+                        customerApi.clearSession();
                         setUser({
                           name: "Guest",
                           phone: "",
                           isLoggedIn: false,
-                        })
-                      }
+                        });
+                        setOrders([]);
+                      }}
                       onNavigateToOrders={() => {
                         setIsListingOpen(false);
                         setActiveNavigation("Orders");
                       }}
                       onOpenHelp={() => setIsHelpOpen(true)}
+                      currentAddress={customerAddress}
+                      currentCoords={customerCoords}
+                      currentPincode={customerPincode}
+                      onSelectDeliveryAddress={(addr) => {
+                        setCustomerAddress(`${addr.street}, ${addr.area}`);
+                        if (addr.latitude && addr.longitude) {
+                          setCustomerCoords({ lat: addr.latitude, lng: addr.longitude });
+                          checkLocationServiceability(addr.latitude, addr.longitude);
+                        }
+                      }}
                     />
                   ))}
               </>
@@ -652,7 +810,38 @@ export default function App() {
         <AuthView
           visible={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
-          onSuccess={(updatedUser) => setUser(updatedUser)}
+          onSuccess={async (updatedUser) => {
+            setUser(updatedUser);
+            setIsAuthModalOpen(false);
+            try {
+              const liveOrders = await customerApi.getMyOrders();
+              if (liveOrders) setOrders(liveOrders);
+              await customerApi.getAddresses();
+            } catch {}
+          }}
+        />
+
+        {/* Interactive Location Picker Modal (GPS & Interactive Map) */}
+        <CustomerLocationModal
+          visible={isLocationModalOpen}
+          onClose={() => setIsLocationModalOpen(false)}
+          currentAddress={customerAddress}
+          currentCoords={customerCoords}
+          nearestHubName={serviceability?.nearestHub?.name || serviceability?.hub?.name}
+          nearestHubCoords={
+            serviceability?.hub?.latitude && serviceability?.hub?.longitude
+              ? { lat: serviceability.hub.latitude, lng: serviceability.hub.longitude }
+              : serviceability?.nearestHub?.latitude && serviceability?.nearestHub?.longitude
+              ? { lat: serviceability.nearestHub.latitude, lng: serviceability.nearestHub.longitude }
+              : undefined
+          }
+          hubs={hubs}
+          onLocationConfirm={(coords, address, pincode) => {
+            setCustomerCoords(coords);
+            setCustomerAddress(address);
+            if (pincode) setCustomerPincode(pincode);
+            checkLocationServiceability(coords.lat, coords.lng);
+          }}
         />
 
         {/* Global In-App Snackbar Notification */}
@@ -663,7 +852,7 @@ export default function App() {
           }}
         />
 
-        {/* Splash Screen with freshgologo.png and white bg */}
+        {/* Splash Screen with FreshGologonew.png and white bg */}
         <SplashScreen />
       </SafeAreaView>
     </SafeAreaProvider>

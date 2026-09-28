@@ -53,7 +53,7 @@ export const pendingRequest: DeliveryRequest = {
   customer: "Thashreef R.",
   pickup: "Fresh GO Hub",
   pickupAddress: "Mavoor Road, Kozhikode",
-  dropAddress: "Palm Residency, Flat 4B, Kottooli",
+  dropAddress: "Kottooli Delivery Point, Kozhikode",
   instructions: "Call before arriving",
   payment: "COD · Rs 890",
   distance: "3.2 km",

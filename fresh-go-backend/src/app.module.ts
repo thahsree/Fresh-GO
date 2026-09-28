@@ -27,6 +27,8 @@ import { OrdersModule } from "./modules/orders/orders.module";
 import { DeliveryModule } from "./modules/delivery/delivery.module";
 import { DispatchModule } from "./modules/dispatch/dispatch.module";
 import { RefundsModule } from "./modules/refunds/refunds.module";
+import { HubsModule } from "./modules/hubs/hubs.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
@@ -76,6 +78,8 @@ import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
     DeliveryModule,
     DispatchModule,
     RefundsModule,
+    HubsModule,
+    AnalyticsModule,
   ],
   providers: [
     {

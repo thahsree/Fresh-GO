@@ -41,6 +41,9 @@ export function useProductController() {
           image: bp.imageUrl || (bp as any).image || "",
           description: bp.description || "",
           origin: bp.origin || "",
+          isBestSeller: Boolean(bp.isBestSeller),
+          isTodaysOffer: Boolean(bp.isTodaysOffer),
+          originalPrice: bp.originalPrice !== null && bp.originalPrice !== undefined ? Number(bp.originalPrice) : undefined,
           isDailyCatch: Boolean(bp.isDailyCatch),
           isFlashFrozen: Boolean(bp.isFlashFrozen),
           tag: bp.tag || (bp.isDailyCatch ? "Fresh Catch" : bp.isFlashFrozen ? "Frozen" : "Fresh"),
@@ -122,6 +125,9 @@ export function useProductController() {
       description,
       image,
       origin: input.origin || "Local Sourcing",
+      isBestSeller: Boolean(input.isBestSeller),
+      isTodaysOffer: Boolean(input.isTodaysOffer),
+      originalPrice: input.originalPrice ? Number(input.originalPrice) : undefined,
       isDailyCatch: Boolean(input.isDailyCatch),
       isFlashFrozen: Boolean(input.isFlashFrozen),
       tag: input.tag || (input.isDailyCatch ? "Fresh Catch" : input.isFlashFrozen ? "Frozen" : "Fresh"),
@@ -153,6 +159,9 @@ export function useProductController() {
           image: input.image,
           origin: input.origin,
           isActive: input.active,
+          isBestSeller: input.isBestSeller,
+          isTodaysOffer: input.isTodaysOffer,
+          originalPrice: input.originalPrice,
           isDailyCatch: input.isDailyCatch,
           isFlashFrozen: input.isFlashFrozen,
           tag: input.tag,
@@ -192,6 +201,24 @@ export function useProductController() {
     }
   };
 
+  const toggleBestSeller = async (id: string, nextState: boolean) => {
+    const target = products.find((p) => p.id === id);
+    if (!target) return;
+    await updateProduct(id, { ...target, isBestSeller: nextState });
+  };
+
+  const toggleTodaysOffer = async (id: string, nextState: boolean, originalPrice?: number) => {
+    const target = products.find((p) => p.id === id);
+    if (!target) return;
+    await updateProduct(id, {
+      ...target,
+      isTodaysOffer: nextState,
+      originalPrice: nextState
+        ? (originalPrice || target.originalPrice || Math.round(target.price * 1.25))
+        : target.originalPrice,
+    });
+  };
+
   return {
     products,
     categories,
@@ -201,5 +228,7 @@ export function useProductController() {
     addProduct,
     updateProduct,
     deleteProduct,
+    toggleBestSeller,
+    toggleTodaysOffer,
   };
 }

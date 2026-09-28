@@ -278,15 +278,6 @@ export function ProductListingView({
                 product.availableStockKg !== undefined &&
                 product.availableStockKg > 0 &&
                 product.availableStockKg <= 5;
-              const displayTag =
-                product.tag ||
-                (product.isDailyCatch
-                  ? "Fresh Catch"
-                  : product.isFlashFrozen
-                  ? "Frozen"
-                  : product.fresh
-                  ? "Fresh"
-                  : undefined);
 
               return (
                 <Pressable
@@ -316,42 +307,6 @@ export function ProductListingView({
                       <View style={[styles.freshTag, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B" }]}>
                         <Text style={[styles.freshTagText, { color: "#B45309", fontWeight: "800" }]}>
                           ⚠️ Only {product.availableStockKg} left
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Tag badge when in stock */}
-                    {!isOutOfStock && !isLowStock && displayTag && (
-                      <View
-                        style={[
-                          styles.freshTag,
-                          displayTag === "Frozen"
-                            ? { backgroundColor: "#E0F2FE", borderColor: "#BAE6FD" }
-                            : displayTag === "Fresh Cut"
-                            ? { backgroundColor: "#FEF9C3", borderColor: "#FEF08A" }
-                            : displayTag === "Fresh Produce"
-                            ? { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" }
-                            : {},
-                        ]}
-                      >
-                        {displayTag === "Fresh Catch" && <View style={styles.freshDot} />}
-                        {displayTag === "Fresh" && <View style={[styles.freshDot, { backgroundColor: "#15803D" }]} />}
-                        {displayTag === "Frozen" && <Text style={{ fontSize: 9, marginRight: 2 }}>❄️</Text>}
-                        {displayTag === "Fresh Cut" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥩</Text>}
-                        {displayTag === "Fresh Produce" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥬</Text>}
-                        <Text
-                          style={[
-                            styles.freshTagText,
-                            displayTag === "Frozen"
-                              ? { color: "#0369A1" }
-                              : displayTag === "Fresh Cut"
-                              ? { color: "#854D0E" }
-                              : displayTag === "Fresh Produce"
-                              ? { color: "#166534" }
-                              : {},
-                          ]}
-                        >
-                          {displayTag}
                         </Text>
                       </View>
                     )}

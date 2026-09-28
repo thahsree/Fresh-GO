@@ -1,6 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
-import { CreateProductDto, UpdateProductDto } from "./dto/catalog.dto";
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  CreateFeaturedSectionDto,
+  UpdateFeaturedSectionDto,
+} from "./dto/catalog.dto";
 import { FreshnessStatus, Prisma } from "@prisma/client";
 
 @Injectable()
@@ -18,8 +23,9 @@ export class CatalogService {
     categorySlug?: string;
     search?: string;
     bestSellerOnly?: boolean;
+    todaysOfferOnly?: boolean;
   }) {
-    const { categorySlug, search, bestSellerOnly } = params || {};
+    const { categorySlug, search, bestSellerOnly, todaysOfferOnly } = params || {};
 
     const products = await this.prisma.product.findMany({
       where: {
@@ -34,6 +40,7 @@ export class CatalogService {
             }
           : {}),
         ...(bestSellerOnly ? { isBestSeller: true } : {}),
+        ...(todaysOfferOnly ? { isTodaysOffer: true } : {}),
       },
       include: {
         category: true,
@@ -110,12 +117,6 @@ export class CatalogService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
-    const finalTag =
-      dto.tag ||
-      (dto.isDailyCatch ? "Fresh Catch" : dto.isFlashFrozen ? "Frozen" : "Fresh");
-    const isCatch = finalTag === "Fresh Catch" || Boolean(dto.isDailyCatch);
-    const isFrozen = finalTag === "Frozen" || Boolean(dto.isFlashFrozen);
-
     const created = await this.prisma.product.create({
       data: {
         name: dto.name,
@@ -136,9 +137,11 @@ export class CatalogService {
             ? dto.image
             : "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop&q=80",
         isBestSeller: dto.isBestSeller || false,
-        isDailyCatch: isCatch,
-        isFlashFrozen: isFrozen,
-        tag: finalTag,
+        isTodaysOffer: dto.isTodaysOffer || false,
+        originalPrice: dto.originalPrice ?? null,
+        isDailyCatch: false,
+        isFlashFrozen: false,
+        tag: null,
         cuts: dto.cuts?.length
           ? {
               create: dto.cuts.map((c) => ({
@@ -200,22 +203,8 @@ export class CatalogService {
     if (dto.image !== undefined) updateData.image = dto.image;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
     if (dto.isBestSeller !== undefined) updateData.isBestSeller = dto.isBestSeller;
-    if (dto.tag !== undefined) {
-      updateData.tag = dto.tag;
-      if (dto.tag === "Fresh Catch") {
-        updateData.isDailyCatch = true;
-        updateData.isFlashFrozen = false;
-      } else if (dto.tag === "Frozen") {
-        updateData.isFlashFrozen = true;
-        updateData.isDailyCatch = false;
-      } else {
-        updateData.isDailyCatch = false;
-        updateData.isFlashFrozen = false;
-      }
-    } else {
-      if (dto.isDailyCatch !== undefined) updateData.isDailyCatch = dto.isDailyCatch;
-      if (dto.isFlashFrozen !== undefined) updateData.isFlashFrozen = dto.isFlashFrozen;
-    }
+    if (dto.isTodaysOffer !== undefined) updateData.isTodaysOffer = dto.isTodaysOffer;
+    if (dto.originalPrice !== undefined) updateData.originalPrice = dto.originalPrice;
 
     const updated = await this.prisma.product.update({
       where: { id },
@@ -282,5 +271,167 @@ export class CatalogService {
     await this.prisma.inventoryBatch.deleteMany({ where: { productId: id } });
     await this.prisma.productCutOption.deleteMany({ where: { productId: id } });
     return this.prisma.product.delete({ where: { id } });
+  }
+
+  async getFeaturedSections(options?: { includeInactive?: boolean }) {
+    const count = await this.prisma.featuredSection.count();
+    if (count === 0) {
+      const bestSellers = await this.prisma.product.findMany({
+        where: { isBestSeller: true, isActive: true },
+        select: { id: true },
+      });
+      const todaysOffers = await this.prisma.product.findMany({
+        where: { isTodaysOffer: true, isActive: true },
+        select: { id: true },
+      });
+
+      await this.prisma.featuredSection.create({
+        data: {
+          title: "Best Sellers",
+          subtitle: "Customer favorites & most ordered fresh selections",
+          icon: "⭐",
+          slug: "best-sellers",
+          sortOrder: 0,
+          isActive: true,
+          productIds: bestSellers.map((p) => p.id),
+        },
+      });
+
+      await this.prisma.featuredSection.create({
+        data: {
+          title: "Today's Offers",
+          subtitle: "Special daily discounts and limited-time deals",
+          icon: "🔥",
+          slug: "todays-offers",
+          sortOrder: 1,
+          isActive: true,
+          productIds: todaysOffers.map((p) => p.id),
+        },
+      });
+    }
+
+    const sections = await this.prisma.featuredSection.findMany({
+      where: options?.includeInactive ? {} : { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const allProductIds = Array.from(
+      new Set(sections.flatMap((s) => s.productIds || []))
+    );
+
+    const productMap = new Map<string, any>();
+    if (allProductIds.length > 0) {
+      const products = await this.prisma.product.findMany({
+        where: { id: { in: allProductIds } },
+        include: {
+          category: true,
+          cuts: true,
+          batches: {
+            where: { isActive: true, freshnessStatus: "FRESH" },
+            select: {
+              id: true,
+              remainingQuantityKg: true,
+            },
+          },
+        },
+      });
+
+      products.forEach((p) => {
+        const totalStock = p.batches.reduce(
+          (sum, b) => sum + b.remainingQuantityKg,
+          0
+        );
+        productMap.set(p.id, {
+          ...p,
+          availableStockKg: Math.round(totalStock * 10) / 10,
+          isInStock: totalStock > 0.5,
+        });
+      });
+    }
+
+    return sections.map((sec) => {
+      const secProducts = (sec.productIds || [])
+        .map((pid) => productMap.get(pid))
+        .filter(Boolean);
+      return {
+        ...sec,
+        products: secProducts,
+        productCount: secProducts.length,
+      };
+    });
+  }
+
+  async createFeaturedSection(dto: CreateFeaturedSectionDto) {
+    const baseSlug = dto.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const existing = await this.prisma.featuredSection.findUnique({
+      where: { slug: baseSlug },
+    });
+    const slug = existing ? `${baseSlug}-${Date.now().toString().slice(-4)}` : baseSlug;
+
+    return this.prisma.featuredSection.create({
+      data: {
+        title: dto.title,
+        subtitle: dto.subtitle,
+        icon: dto.icon || "✨",
+        slug,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+        productIds: dto.productIds || [],
+      },
+    });
+  }
+
+  async updateFeaturedSection(id: string, dto: UpdateFeaturedSectionDto) {
+    const existing = await this.prisma.featuredSection.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException(`Featured section ${id} not found`);
+
+    const updateData: Prisma.FeaturedSectionUpdateInput = {};
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.subtitle !== undefined) updateData.subtitle = dto.subtitle;
+    if (dto.icon !== undefined) updateData.icon = dto.icon;
+    if (dto.sortOrder !== undefined) updateData.sortOrder = dto.sortOrder;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+    if (dto.productIds !== undefined) {
+      updateData.productIds = dto.productIds;
+
+      // Sync product flags if this is Best Sellers or Today's Offers
+      if (existing.slug === "best-sellers" || existing.title.toLowerCase().includes("best seller")) {
+        await this.prisma.product.updateMany({
+          where: { id: { in: dto.productIds } },
+          data: { isBestSeller: true },
+        });
+        await this.prisma.product.updateMany({
+          where: { id: { notIn: dto.productIds }, isBestSeller: true },
+          data: { isBestSeller: false },
+        });
+      }
+
+      if (existing.slug === "todays-offers" || existing.title.toLowerCase().includes("today's offer")) {
+        await this.prisma.product.updateMany({
+          where: { id: { in: dto.productIds } },
+          data: { isTodaysOffer: true },
+        });
+        await this.prisma.product.updateMany({
+          where: { id: { notIn: dto.productIds }, isTodaysOffer: true },
+          data: { isTodaysOffer: false },
+        });
+      }
+    }
+
+    return this.prisma.featuredSection.update({
+      where: { id },
+      data: updateData,
+    });
+  }
+
+  async deleteFeaturedSection(id: string) {
+    const existing = await this.prisma.featuredSection.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException(`Featured section ${id} not found`);
+    return this.prisma.featuredSection.delete({ where: { id } });
   }
 }

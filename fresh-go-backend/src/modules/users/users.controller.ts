@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { UsersService } from "./users.service";
-import { CreateAddressDto, UpdatePartnerProfileDto } from "./dto/users.dto";
+import { CreateAddressDto, UpdateAddressDto, UpdatePartnerProfileDto } from "./dto/users.dto";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { User, Role } from "@prisma/client";
@@ -29,6 +29,15 @@ export class UsersController {
   @Post("addresses")
   async addAddress(@CurrentUser() user: User, @Body() dto: CreateAddressDto) {
     return this.usersService.addAddress(user.id, dto);
+  }
+
+  @Put("addresses/:id")
+  async updateAddress(
+    @CurrentUser() user: User,
+    @Param("id") id: string,
+    @Body() dto: UpdateAddressDto,
+  ) {
+    return this.usersService.updateAddress(user.id, id, dto);
   }
 
   @Delete("addresses/:id")

@@ -35,9 +35,11 @@ type AuthViewProps = {
 
 export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [phone, setPhone] = useState("9876543210");
+  const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState("");
+  const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [timer, setTimer] = useState(30);
@@ -50,6 +52,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
       setStep("phone");
       setErrorMessage("");
       setOtp("");
+      setDevOtp("");
     }
   }, [visible]);
 
@@ -67,8 +70,13 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
 
   const handleSendOtp = async () => {
     const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length < 10) {
+    if (cleanPhone.length !== 10) {
       setErrorMessage("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setErrorMessage("Please enter a valid mobile number starting with 6, 7, 8, or 9");
       return;
     }
 
@@ -76,12 +84,19 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
     setErrorMessage("");
 
     try {
-      await customerApi.sendOtp(cleanPhone);
+      const res = await customerApi.sendOtp(cleanPhone);
+      const code = res.devOtp || (res.isMock ? "123456" : "");
+      setDevOtp(code);
+      setIsMock(Boolean(res.isMock));
+      if (res.isMock && code) {
+        setOtp(code);
+      } else {
+        setOtp("");
+      }
       setStep("otp");
-      setOtp("");
       setTimer(30);
     } catch (err: any) {
-      setErrorMessage(err.message || "Failed to send OTP. Please try again.");
+      setErrorMessage(err.message || "Failed to send OTP. Please check the number.");
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +105,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
   const handleVerifyOtp = async () => {
     const cleanOtp = otp.trim();
     if (cleanOtp.length < 4) {
-      setErrorMessage("Please enter the verification code");
+      setErrorMessage("Please enter the 6-digit verification code");
       return;
     }
 
@@ -109,10 +124,10 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
         });
         onClose();
       } else {
-        setErrorMessage(res.error || "Invalid OTP. Please try 123456.");
+        setErrorMessage(res.error || "Invalid or expired verification code.");
       }
     } catch (err: any) {
-      setErrorMessage(err.message || "Verification failed. Please try again.");
+      setErrorMessage(err.message || "Invalid or expired verification code. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -120,13 +135,18 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
 
   const handleResendOtp = async () => {
     if (timer > 0) return;
+    const cleanPhone = phone.replace(/\D/g, "");
     setIsLoading(true);
     setErrorMessage("");
     try {
-      await customerApi.sendOtp(phone);
+      const res = await customerApi.sendOtp(cleanPhone);
+      const code = res.devOtp || (res.isMock ? "123456" : "");
+      setDevOtp(code);
+      setIsMock(Boolean(res.isMock));
+      if (res.isMock && code) setOtp(code);
       setTimer(30);
     } catch (err: any) {
-      setErrorMessage("Failed to resend code");
+      setErrorMessage(err.message || "Failed to resend code");
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +169,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
           <View style={styles.header}>
             <View style={styles.logoRow}>
               <Image
-                source={require("../assets/freshgologo.png")}
+                source={require("../assets/FreshGologonew.png")}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
@@ -173,10 +193,9 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
               /* STEP 1: MOBILE NUMBER */
               <View style={styles.content}>
                 <View style={styles.titleSection}>
-                  <Text style={styles.mainTitle}>Login with Mobile</Text>
+                  <Text style={styles.mainTitle}>Enter Mobile Number</Text>
                   <Text style={styles.subtitle}>
-                    Enter your mobile number to get a one-time verification code.
-                    No password or email needed.
+                    We will send a 6-digit one-time verification code to verify your account.
                   </Text>
                 </View>
 
@@ -191,14 +210,16 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                     <TextInput
                       value={phone}
                       onChangeText={(val) => {
-                        setPhone(val);
+                        const clean = val.replace(/\D/g, "").slice(0, 10);
+                        setPhone(clean);
                         if (errorMessage) setErrorMessage("");
                       }}
-                      placeholder="98765 43210"
+                      placeholder="Enter 10-digit number"
                       keyboardType="phone-pad"
-                      maxLength={12}
+                      maxLength={10}
                       style={styles.phoneInput}
                       placeholderTextColor={colors.textSoft}
+                      autoFocus
                     />
                   </View>
                 </View>
@@ -211,7 +232,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                     <TextInput
                       value={name}
                       onChangeText={setName}
-                      placeholder="e.g. Thashreef R."
+                      placeholder="e.g. Rahul Sharma"
                       style={styles.textInput}
                       placeholderTextColor={colors.textSoft}
                     />
@@ -225,32 +246,21 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   </View>
                 )}
 
-                {/* Demo number quick-fill pill */}
-                <Pressable
-                  style={styles.demoPill}
-                  onPress={() => {
-                    setPhone("9876543210");
-                    setName("Thashreef R.");
-                    setErrorMessage("");
-                  }}
-                >
-                  <Sparkles size={13} color={colors.primary} />
-                  <Text style={styles.demoPillText}>
-                    Use demo account: +91 98765 43210
-                  </Text>
-                </Pressable>
-
                 {/* Submit button */}
                 <Pressable
-                  style={[styles.primaryBtn, isLoading && styles.disabledBtn]}
+                  style={[
+                    styles.primaryBtn,
+                    (isLoading || phone.replace(/\D/g, "").length !== 10) &&
+                      styles.disabledBtn,
+                  ]}
                   onPress={handleSendOtp}
-                  disabled={isLoading}
+                  disabled={isLoading || phone.replace(/\D/g, "").length !== 10}
                   accessibilityRole="button"
                 >
                   {isLoading ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryBtnText}>Get OTP</Text>
+                    <Text style={styles.primaryBtnText}>Get OTP Code</Text>
                   )}
                 </Pressable>
 
@@ -258,7 +268,15 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                 <View style={styles.trustBadge}>
                   <ShieldCheck size={14} color={colors.primary} />
                   <Text style={styles.trustText}>
-                    100% Secure · Instant SMS OTP · No passwords required
+                    100% Secure · Instant OTP Verification · No passwords
+                  </Text>
+                </View>
+
+                {/* Dev hint badge */}
+                <View style={styles.devHintBox}>
+                  <Sparkles size={13} color="#B45309" />
+                  <Text style={styles.devHintText}>
+                    Dev Mode Active: Test OTP <Text style={styles.devHintBold}>123456</Text> will be simulated & auto-filled on the next screen.
                   </Text>
                 </View>
               </View>
@@ -279,7 +297,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                 <View style={styles.titleSection}>
                   <Text style={styles.mainTitle}>Enter Verification Code</Text>
                   <Text style={styles.subtitle}>
-                    We've sent a 6-digit verification code to{" "}
+                    We have sent a 6-digit verification code to{" "}
                     <Text style={styles.phoneHighlight}>+91 {phone}</Text>
                   </Text>
                 </View>
@@ -291,10 +309,11 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                     <TextInput
                       value={otp}
                       onChangeText={(val) => {
-                        setOtp(val);
+                        const clean = val.replace(/\D/g, "").slice(0, 6);
+                        setOtp(clean);
                         if (errorMessage) setErrorMessage("");
                       }}
-                      placeholder="123456"
+                      placeholder="• • • • • •"
                       keyboardType="number-pad"
                       maxLength={6}
                       style={styles.otpInput}
@@ -304,19 +323,50 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   </View>
                 </View>
 
-                {/* Dev hint / autofill */}
-                <Pressable
-                  style={styles.demoPill}
-                  onPress={() => {
-                    setOtp("123456");
-                    setErrorMessage("");
-                  }}
-                >
-                  <CheckCircle2 size={13} color={colors.primary} />
-                  <Text style={styles.demoPillText}>
-                    Development OTP: 123456 (Tap to auto-fill)
-                  </Text>
-                </Pressable>
+                {/* Simulated Mode Banner or Dev Pill */}
+                {isMock ? (
+                  <View style={styles.mockBanner}>
+                    <View style={styles.mockBannerTop}>
+                      <Sparkles size={15} color="#B45309" />
+                      <Text style={styles.mockBannerTitle}>Why didn't an SMS arrive on your phone?</Text>
+                    </View>
+                    <Text style={styles.mockBannerDesc}>
+                      Physical carrier SMS requires an SMS Gateway (Fast2SMS / Twilio) API key in backend .env.
+                      In this development mode, your code is simulated as <Text style={{ fontWeight: "800", color: "#92400E" }}>{devOtp || "123456"}</Text> and auto-filled below!
+                    </Text>
+                    <View style={styles.mockOtpRow}>
+                      <View>
+                        <Text style={styles.mockOtpLabel}>Development OTP</Text>
+                        <Text style={styles.mockOtpNumber}>{devOtp || "123456"}</Text>
+                      </View>
+                      <Pressable
+                        style={styles.autoFillBtn}
+                        onPress={() => {
+                          setOtp(devOtp || "123456");
+                          setErrorMessage("");
+                        }}
+                      >
+                        <CheckCircle2 size={13} color="#FFFFFF" />
+                        <Text style={styles.autoFillBtnText}>Auto-filled</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
+                  !!devOtp && (
+                    <Pressable
+                      style={styles.demoPill}
+                      onPress={() => {
+                        setOtp(devOtp);
+                        setErrorMessage("");
+                      }}
+                    >
+                      <CheckCircle2 size={13} color={colors.primary} />
+                      <Text style={styles.demoPillText}>
+                        Dev Code: {devOtp} (Tap to auto-fill)
+                      </Text>
+                    </Pressable>
+                  )
+                )}
 
                 {/* Error message */}
                 {!!errorMessage && (
@@ -327,15 +377,22 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
 
                 {/* Verify button */}
                 <Pressable
-                  style={[styles.primaryBtn, isLoading && styles.disabledBtn]}
+                  style={[
+                    styles.primaryBtn,
+                    (isLoading || otp.trim().length < 4) && styles.disabledBtn,
+                  ]}
                   onPress={handleVerifyOtp}
-                  disabled={isLoading}
+                  disabled={isLoading || otp.trim().length < 4}
                   accessibilityRole="button"
                 >
                   {isLoading ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryBtnText}>Verify & Continue</Text>
+                    <Text style={styles.primaryBtnText}>
+                      {isMock && otp === (devOtp || "123456")
+                        ? "Verify & Proceed (123456) →"
+                        : "Verify & Proceed →"}
+                    </Text>
                   )}
                 </Pressable>
 
@@ -544,6 +601,67 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontWeight: "700",
   },
+  mockBanner: {
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1.5,
+    borderColor: "#FCD34D",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    gap: 6,
+  },
+  mockBannerTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mockBannerTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#92400E",
+  },
+  mockBannerDesc: {
+    fontSize: 11,
+    color: "#78350F",
+    lineHeight: 16,
+  },
+  mockOtpRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  mockOtpLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#92400E",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  mockOtpNumber: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#92400E",
+    letterSpacing: 3,
+  },
+  autoFillBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#1F4D46",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  autoFillBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
   errorBox: {
     backgroundColor: "#FEE2E2",
     borderRadius: 10,
@@ -589,6 +707,29 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
     fontWeight: "600",
+  },
+  devHintBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FCD34D",
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  devHintText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#92400E",
+    lineHeight: 15,
+  },
+  devHintBold: {
+    fontWeight: "900",
+    color: "#78350F",
   },
   backRow: {
     flexDirection: "row",

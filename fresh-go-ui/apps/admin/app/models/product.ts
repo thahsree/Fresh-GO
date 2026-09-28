@@ -18,6 +18,9 @@ export type Product = {
   image?: string;
   description?: string;
   origin?: string;
+  isBestSeller?: boolean;
+  isTodaysOffer?: boolean;
+  originalPrice?: number;
   isDailyCatch?: boolean;
   isFlashFrozen?: boolean;
   tag?: ProductTag;

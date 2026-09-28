@@ -56,16 +56,6 @@ export function ProductCard({
     product.availableStockKg > 0 &&
     product.availableStockKg <= 5;
 
-  const displayTag =
-    product.tag ||
-    (product.isDailyCatch
-      ? "Fresh Catch"
-      : product.isFlashFrozen
-      ? "Frozen"
-      : product.fresh
-      ? "Fresh"
-      : undefined);
-
   return (
     <View style={[styles.card, style]}>
       {/* Clickable Image Container */}
@@ -101,42 +91,6 @@ export function ProductCard({
           <View style={[styles.freshBadge, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B", borderWidth: 1 }]}>
             <Text style={[styles.freshText, { color: "#B45309", fontWeight: "800" }]}>
               ⚠️ Only {product.availableStockKg} left
-            </Text>
-          </View>
-        )}
-
-        {/* Tag Pill when in stock and not low stock */}
-        {!isOutOfStock && !isLowStock && displayTag && (
-          <View
-            style={[
-              styles.freshBadge,
-              displayTag === "Frozen"
-                ? { backgroundColor: "#E0F2FE" }
-                : displayTag === "Fresh Cut"
-                ? { backgroundColor: "#FEF9C3" }
-                : displayTag === "Fresh Produce"
-                ? { backgroundColor: "#DCFCE7" }
-                : { backgroundColor: "rgba(255, 255, 255, 0.95)" },
-            ]}
-          >
-            {displayTag === "Fresh Catch" && <View style={styles.freshDot} />}
-            {displayTag === "Fresh" && <View style={[styles.freshDot, { backgroundColor: "#15803D" }]} />}
-            {displayTag === "Frozen" && <Text style={{ fontSize: 9, marginRight: 2 }}>❄️</Text>}
-            {displayTag === "Fresh Cut" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥩</Text>}
-            {displayTag === "Fresh Produce" && <Text style={{ fontSize: 9, marginRight: 2 }}>🥬</Text>}
-            <Text
-              style={[
-                styles.freshText,
-                displayTag === "Frozen"
-                  ? { color: "#0369A1" }
-                  : displayTag === "Fresh Cut"
-                  ? { color: "#854D0E" }
-                  : displayTag === "Fresh Produce"
-                  ? { color: "#166534" }
-                  : {},
-              ]}
-            >
-              {displayTag}
             </Text>
           </View>
         )}

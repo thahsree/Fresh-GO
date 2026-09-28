@@ -28,6 +28,10 @@ export default () => ({
     provider: process.env.SMS_PROVIDER || "mock",
     msg91AuthKey: process.env.MSG91_AUTH_KEY || "",
     msg91TemplateId: process.env.MSG91_OTP_TEMPLATE_ID || "",
+    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || "",
+    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",
+    twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || "",
+    fast2smsApiKey: process.env.FAST2SMS_API_KEY || "",
   },
   storage: {
     endpoint: process.env.S3_ENDPOINT || "",

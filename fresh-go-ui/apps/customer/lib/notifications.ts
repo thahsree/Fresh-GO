@@ -128,7 +128,7 @@ export async function sendMobileSystemNotification(
       ) {
         new Notification(title, {
           body,
-          icon: "/freshgologo.png",
+          icon: "/FreshGologonew.png",
         });
       }
       return;

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -24,18 +25,20 @@ export function SplashScreen({
   const containerFadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    const useNative = Platform.OS !== "web";
+
     // Animate logo entrance: fade in & slight scale up
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 600,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
         friction: 6,
         tension: 40,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
     ]).start();
 
@@ -44,7 +47,7 @@ export function SplashScreen({
       Animated.timing(containerFadeAnim, {
         toValue: 0,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }).start(() => {
         setIsVisible(false);
         onFinish?.();
@@ -75,7 +78,7 @@ export function SplashScreen({
         ]}
       >
         <Image
-          source={require("../assets/freshgologo.png")}
+          source={require("../assets/FreshGologonew.png")}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -115,8 +118,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
   },
   logo: {
-    width: 220,
-    height: 90,
+    width: 280,
+    height: 140,
     marginBottom: 16,
   },
   taglineWrapper: {

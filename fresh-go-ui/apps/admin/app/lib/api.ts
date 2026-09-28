@@ -12,6 +12,13 @@ export type AdminUser = {
   email?: string;
   name: string;
   role: string;
+  hubId?: string;
+  hub?: {
+    id: string;
+    name: string;
+    code: string;
+    city: string;
+  } | null;
 };
 
 export type Category = {
@@ -36,12 +43,94 @@ export type BackendProduct = {
   imageUrl?: string;
   isActive: boolean;
   isBestSeller?: boolean;
+  isTodaysOffer?: boolean;
+  originalPrice?: number;
   isDailyCatch?: boolean;
   isFlashFrozen?: boolean;
   tag?: string;
   availableStockKg?: number;
   isInStock?: boolean;
   batches?: any[];
+};
+
+export type FeaturedSectionItem = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon?: string;
+  slug: string;
+  sortOrder: number;
+  isActive: boolean;
+  productIds: string[];
+  products?: BackendProduct[];
+  productCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type Hub = {
+  id: string;
+  name: string;
+  code: string;
+  address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  deliveryRadiusKm: number;
+  contactPhone?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  admins?: Array<{
+    id: string;
+    name: string;
+    phone: string;
+    role: string;
+  }>;
+};
+
+export type SalesReportKPIs = {
+  grossRevenue: number;
+  deliveredRevenue: number;
+  totalOrders: number;
+  deliveredOrdersCount: number;
+  inProgressOrdersCount: number;
+  cancelledOrdersCount: number;
+  aov: number;
+  activeHubsCount: number;
+};
+
+export type HubSalesBreakdown = {
+  hubId: string;
+  hubName: string;
+  hubCode: string;
+  city: string;
+  totalOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
+  grossRevenue: number;
+  aov: number;
+};
+
+export type DailySalesTrend = {
+  date: string;
+  revenue: number;
+  orders: number;
+};
+
+export type TopSellingProduct = {
+  productName: string;
+  category: string;
+  quantitySold: number;
+  revenue: number;
+};
+
+export type SalesReportResponse = {
+  kpis: SalesReportKPIs;
+  hubBreakdown: HubSalesBreakdown[];
+  dailyTrend: DailySalesTrend[];
+  topProducts: TopSellingProduct[];
+  paymentMethods: Record<string, { count: number; total: number }>;
 };
 
 export type QueueOrder = {
@@ -151,41 +240,101 @@ class ApiClient {
   }
 
   /**
+   * Sends OTP to a phone number
+   */
+  async sendOtp(phone: string): Promise<{ message: string; devOtp?: string }> {
+    return this.post("/auth/otp/send", { phone }, false);
+  }
+
+  /**
+   * Logs in a Super Admin user and verifies SUPER_ADMIN role
+   */
+  async loginSuperAdmin(phone: string, otp: string): Promise<AdminUser> {
+    const res = await this.post<{
+      accessToken: string;
+      user: AdminUser;
+    }>("/auth/otp/verify", { phone, otp, role: "SUPER_ADMIN" }, false);
+
+    if (res.user.role !== "SUPER_ADMIN") {
+      throw new Error("Access denied: Account does not have Super Admin permissions.");
+    }
+    this.setSession(res.accessToken, res.user);
+    return res.user;
+  }
+
+  /**
+   * Logs in a Hub Admin user with ADMIN role
+   */
+  async loginHubAdmin(phone: string, otp: string): Promise<AdminUser> {
+    const res = await this.post<{
+      accessToken: string;
+      user: AdminUser;
+    }>("/auth/otp/verify", { phone, otp, role: "ADMIN" }, false);
+
+    this.setSession(res.accessToken, res.user);
+    return res.user;
+  }
+
+  /**
+   * Returns current authenticated admin user from session if valid
+   */
+  getAdminUser(): AdminUser | null {
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem(USER_KEY);
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (userStr && token) {
+        try {
+          const u = JSON.parse(userStr);
+          if (u && (u.role === "ADMIN" || u.role === "SUPER_ADMIN")) {
+            this.user = u;
+            this.token = token;
+            return u;
+          }
+        } catch {
+          this.user = null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns current authenticated super admin user from session if valid
+   */
+  getSuperAdminUser(): AdminUser | null {
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem(USER_KEY);
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (userStr && token) {
+        try {
+          const u = JSON.parse(userStr);
+          if (u && u.role === "SUPER_ADMIN") {
+            this.user = u;
+            this.token = token;
+            return u;
+          }
+        } catch {
+          this.user = null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Ensures the super admin is authenticated.
+   * Returns session user if role is SUPER_ADMIN, otherwise null.
+   */
+  async ensureSuperAdminAuth(): Promise<AdminUser | null> {
+    return this.getSuperAdminUser();
+  }
+
+  /**
    * Ensures the admin user is authenticated with the backend.
-   * If no valid token exists, automatically authenticates with the seeded admin account.
+   * Returns session user if role is ADMIN or SUPER_ADMIN, otherwise null.
    */
   async ensureAdminAuth(): Promise<AdminUser | null> {
-    if (this.user && this.token) return this.user;
-    if (this.authPromise) return this.authPromise;
-
-    this.authPromise = (async () => {
-      try {
-        // Attempt quick login using seeded default admin credentials
-        const phone = "+919999999999";
-        const otp = "123456";
-
-        // Step 1: Send OTP
-        await this.post("/auth/otp/send", { phone }, false);
-
-        // Step 2: Verify OTP
-        const res = await this.post<{
-          accessToken: string;
-          user: AdminUser;
-        }>("/auth/otp/verify", { phone, otp }, false);
-
-        if (res.accessToken && res.user) {
-          this.setSession(res.accessToken, res.user);
-          return res.user;
-        }
-      } catch (err) {
-        console.warn("Auto-admin login warning (backend may be offline):", err);
-      } finally {
-        this.authPromise = null;
-      }
-      return null;
-    })();
-
-    return this.authPromise;
+    return this.getAdminUser();
   }
 
   private async request<T>(
@@ -210,23 +359,15 @@ class ApiClient {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      // If unauthorized and requireAuth, clear expired session, re-login and retry once
-      if (
-        res.status === 401 &&
-        requireAuth &&
-        !(options.headers as any)?.["X-Freshgo-Retry"]
-      ) {
+      if (res.status === 401 && requireAuth) {
         this.clearSession();
-        await this.ensureAdminAuth();
-        const retryHeaders = {
-          ...(options.headers as Record<string, string>),
-          "X-Freshgo-Retry": "1",
-        };
-        return this.request<T>(
-          endpoint,
-          { ...options, headers: retryHeaders },
-          requireAuth
-        );
+        if (typeof window !== "undefined") {
+          if (window.location.pathname.startsWith("/super-admin")) {
+            window.location.href = "/super-admin/login";
+          } else {
+            window.location.href = "/login";
+          }
+        }
       }
 
       let errorMsg = `HTTP error ${res.status}: ${res.statusText || "Request failed"}`;
@@ -302,6 +443,9 @@ class ApiClient {
       description?: string;
       image?: string;
       origin?: string;
+      isBestSeller?: boolean;
+      isTodaysOffer?: boolean;
+      originalPrice?: number;
       isDailyCatch?: boolean;
       isFlashFrozen?: boolean;
       tag?: string;
@@ -326,6 +470,8 @@ class ApiClient {
         origin?: string;
         isActive?: boolean;
         isBestSeller?: boolean;
+        isTodaysOffer?: boolean;
+        originalPrice?: number;
         isDailyCatch?: boolean;
         isFlashFrozen?: boolean;
         tag?: string;
@@ -360,6 +506,104 @@ class ApiClient {
         productId ? `/inventory/batches?productId=${productId}` : "/inventory/batches",
         true
       ),
+  };
+
+  readonly featuredSections = {
+    getAll: (includeInactive = true) =>
+      this.get<FeaturedSectionItem[]>(
+        `/catalog/featured-sections${includeInactive ? "?all=true" : ""}`,
+        false
+      ),
+    create: (data: {
+      title: string;
+      subtitle?: string;
+      icon?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+      productIds?: string[];
+    }) => this.post<FeaturedSectionItem>("/catalog/featured-sections", data, true),
+    update: (
+      id: string,
+      data: {
+        title?: string;
+        subtitle?: string;
+        icon?: string;
+        sortOrder?: number;
+        isActive?: boolean;
+        productIds?: string[];
+      }
+    ) => this.put<FeaturedSectionItem>(`/catalog/featured-sections/${id}`, data, true),
+    delete: (id: string) =>
+      this.delete<{ id: string }>(`/catalog/featured-sections/${id}`, true),
+  };
+
+  readonly hubs = {
+    getAll: () => this.get<Hub[]>("/hubs", false),
+    getById: (id: string) => this.get<Hub>(`/hubs/${id}`, false),
+    create: (data: {
+      name: string;
+      code: string;
+      address: string;
+      city?: string;
+      latitude: number;
+      longitude: number;
+      deliveryRadiusKm?: number;
+      contactPhone?: string;
+      isActive?: boolean;
+    }) => this.post<Hub>("/hubs", data, true),
+    update: (
+      id: string,
+      data: {
+        name?: string;
+        code?: string;
+        address?: string;
+        city?: string;
+        latitude?: number;
+        longitude?: number;
+        deliveryRadiusKm?: number;
+        contactPhone?: string;
+        isActive?: boolean;
+      }
+    ) => this.put<Hub>(`/hubs/${id}`, data, true),
+    delete: (id: string) =>
+      this.delete<{ id: string; message: string }>(`/hubs/${id}`, true),
+    checkServiceability: (lat: number, lng: number) =>
+      this.get<{
+        serviceable: boolean;
+        hub?: Hub;
+        distanceKm?: number;
+        estimatedDeliveryMinutes?: number;
+        deliveryFee?: number;
+        nearestDistanceKm?: number;
+        nearestHub?: Partial<Hub>;
+        message?: string;
+      }>(`/hubs/serviceability?lat=${lat}&lng=${lng}`, false),
+    notifyInterest: (data: {
+      phone: string;
+      email?: string;
+      latitude?: number;
+      longitude?: number;
+      areaName?: string;
+      consentGiven: boolean;
+    }) => this.post<{ id: string; message: string }>("/hubs/notify-interest", data, false),
+  };
+
+  readonly analytics = {
+    getSalesReport: (filter?: {
+      startDate?: string;
+      endDate?: string;
+      hubId?: string;
+    }) => {
+      const q = new URLSearchParams();
+      if (filter?.startDate) q.set("startDate", filter.startDate);
+      if (filter?.endDate) q.set("endDate", filter.endDate);
+      if (filter?.hubId) q.set("hubId", filter.hubId);
+      const queryStr = q.toString() ? `?${q.toString()}` : "";
+      return this.get<SalesReportResponse>(
+        `/analytics/sales-report${queryStr}`,
+        true
+      );
+    },
   };
 }
 

@@ -13,6 +13,7 @@ import {
   Animated,
   Easing,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -76,7 +77,7 @@ export function OrderCountdownModal({
         toValue: 1,
         friction: 4,
         tension: 100,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }).start();
     };
 

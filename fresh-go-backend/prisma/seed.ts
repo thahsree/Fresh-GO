@@ -106,7 +106,7 @@ async function main() {
       addresses: {
         create: {
           title: "Home",
-          street: "Palm Residency, Flat 4B, 4th Cross Road",
+          street: "Doorstep Delivery Location",
           landmark: "Opposite Cyberpark Gate",
           area: "Kozhikode Central",
           city: "Kozhikode",
@@ -818,7 +818,7 @@ async function main() {
         paymentMethod: PaymentMethod.COD,
         paymentStatus: PaymentStatus.PENDING,
         deliveryAddressSnapshotJson: JSON.stringify({
-          street: "Palm Residency, Flat 4B, 4th Cross Road",
+          street: "Doorstep Delivery Location",
           area: "Kozhikode Central",
           city: "Kozhikode",
           pincode: "673004",
@@ -880,7 +880,7 @@ async function main() {
         paymentMethod: PaymentMethod.RAZORPAY,
         paymentStatus: PaymentStatus.PAID,
         deliveryAddressSnapshotJson: JSON.stringify({
-          street: "Palm Residency, Flat 4B, 4th Cross Road",
+          street: "Doorstep Delivery Location",
           area: "Kozhikode Central",
           city: "Kozhikode",
           pincode: "673004",

@@ -10,7 +10,12 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { CatalogService } from "./catalog.service";
-import { CreateProductDto, UpdateProductDto } from "./dto/catalog.dto";
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  CreateFeaturedSectionDto,
+  UpdateFeaturedSectionDto,
+} from "./dto/catalog.dto";
 import { Public } from "../../common/decorators/public.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
@@ -33,11 +38,14 @@ export class CatalogController {
     @Query("category") category?: string,
     @Query("search") search?: string,
     @Query("bestseller") bestseller?: string,
+    @Query("offer") offer?: string,
+    @Query("todaysoffer") todaysoffer?: string,
   ) {
     return this.catalogService.getProducts({
       categorySlug: category,
       search,
       bestSellerOnly: bestseller === "true",
+      todaysOfferOnly: offer === "true" || todaysoffer === "true",
     });
   }
 
@@ -69,5 +77,37 @@ export class CatalogController {
   @Delete("products/:id")
   async deleteProduct(@Param("id") id: string) {
     return this.catalogService.deleteProduct(id);
+  }
+
+  @Public()
+  @Get("featured-sections")
+  async getFeaturedSections(@Query("all") all?: string) {
+    return this.catalogService.getFeaturedSections({
+      includeInactive: all === "true",
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post("featured-sections")
+  async createFeaturedSection(@Body() dto: CreateFeaturedSectionDto) {
+    return this.catalogService.createFeaturedSection(dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Put("featured-sections/:id")
+  async updateFeaturedSection(
+    @Param("id") id: string,
+    @Body() dto: UpdateFeaturedSectionDto,
+  ) {
+    return this.catalogService.updateFeaturedSection(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Delete("featured-sections/:id")
+  async deleteFeaturedSection(@Param("id") id: string) {
+    return this.catalogService.deleteFeaturedSection(id);
   }
 }

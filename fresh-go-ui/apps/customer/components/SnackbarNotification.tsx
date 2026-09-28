@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -21,6 +22,8 @@ import {
   type OrderNotificationPayload,
   subscribeToNotifications,
 } from "../lib/notifications";
+
+const useNative = Platform.OS !== "web";
 
 type SnackbarProps = {
   onNavigateToOrders?: () => void;
@@ -44,13 +47,13 @@ export function SnackbarNotification({ onNavigateToOrders }: SnackbarProps) {
       Animated.timing(translateY, {
         toValue: -120,
         duration: 250,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
         easing: Easing.in(Easing.cubic),
       }),
       Animated.timing(opacity, {
         toValue: 0,
         duration: 220,
-        useNativeDriver: true,
+        useNativeDriver: useNative,
       }),
     ]).start(() => {
       setNotification(null);
@@ -71,14 +74,14 @@ export function SnackbarNotification({ onNavigateToOrders }: SnackbarProps) {
       Animated.parallel([
         Animated.spring(translateY, {
           toValue: 0,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
           friction: 8,
           tension: 65,
         }),
         Animated.timing(opacity, {
           toValue: 1,
           duration: 250,
-          useNativeDriver: true,
+          useNativeDriver: useNative,
         }),
         Animated.timing(progressAnim, {
           toValue: 0,
@@ -150,9 +153,9 @@ export function SnackbarNotification({ onNavigateToOrders }: SnackbarProps) {
         {
           transform: [{ translateY }],
           opacity,
+          pointerEvents: "box-none" as any,
         },
       ]}
-      pointerEvents="box-none"
     >
       <Pressable
         style={styles.container}

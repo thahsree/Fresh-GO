@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { api, AdminUser } from "./lib/api";
 import { AdminHeader } from "./components/AdminHeader";
 import { AdminNavigation, AdminSection } from "./components/AdminNavigation";
 import { DashboardView } from "./components/DashboardView";
@@ -9,9 +11,11 @@ import { InventoryView } from "./components/InventoryView";
 import { OrdersView } from "./components/OrdersView";
 import { useProductController } from "./controllers/useProductController";
 import { useDispatchController } from "./controllers/useDispatchController";
+import { useFeaturedSectionsController } from "./controllers/useFeaturedSectionsController";
 import { Product } from "./models/product";
 import { ProductFormView } from "./views/ProductFormView";
 import { ProductsView } from "./views/ProductsView";
+import { FeaturedSectionsView } from "./views/FeaturedSectionsView";
 
 type ProductDisplay =
   | { name: "list" }
@@ -19,6 +23,9 @@ type ProductDisplay =
   | { name: "edit"; product: Product };
 
 export default function AdminPage() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [productDisplay, setProductDisplay] = useState<ProductDisplay>({
     name: "list",
@@ -32,6 +39,18 @@ export default function AdminPage() {
 
   const productController = useProductController();
   const dispatchController = useDispatchController();
+  const featuredSectionsController = useFeaturedSectionsController();
+
+  // Verify Admin Session - Redirect to /login if unauthenticated
+  useEffect(() => {
+    const adminUser = api.getAdminUser();
+    if (!adminUser) {
+      router.replace("/login");
+    } else {
+      setCurrentUser(adminUser);
+      setIsAuthChecking(false);
+    }
+  }, [router]);
 
   const showToast = (
     message: string,
@@ -150,6 +169,11 @@ export default function AdminPage() {
         return;
       }
 
+      if (hash === "featured" || hash === "featured-sections") {
+        setSection("featured");
+        return;
+      }
+
       if (hash.startsWith("products")) {
         setSection("products");
         if (hash === "products/create") {
@@ -189,6 +213,37 @@ export default function AdminPage() {
       window.removeEventListener("popstate", parseLocationHash);
     };
   }, [productController.products]);
+
+  if (isAuthChecking) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#F6F2EA",
+          fontFamily: "'Manrope', sans-serif",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              width: "42px",
+              height: "42px",
+              borderRadius: "50%",
+              border: "3px solid #E4ECE9",
+              borderTopColor: "#1F4D46",
+              animation: "spin 1s linear infinite",
+              margin: "0 auto 12px",
+            }}
+          />
+          <p style={{ fontSize: "13px", color: "#5C6B66", fontWeight: 700 }}>
+            Verifying Admin Session...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
@@ -380,7 +435,7 @@ export default function AdminPage() {
             }}
             updateProduct={async (id: string, input: any) => {
               await productController.updateProduct(id, input);
-              showToast(`Updated badges for product`, "success");
+              showToast(`Updated product settings`, "success");
             }}
             onCreate={handleCreateProduct}
             onEdit={handleEditProduct}
@@ -436,6 +491,31 @@ export default function AdminPage() {
             onAssign={assign}
             orders={dispatchController.orders}
             partners={dispatchController.partners}
+          />
+        )}
+
+        {section === "featured" && (
+          <FeaturedSectionsView
+            sections={featuredSectionsController.sections}
+            allProducts={productController.products}
+            isLoading={featuredSectionsController.isLoading}
+            onRefresh={async () => {
+              await Promise.all([
+                featuredSectionsController.fetchSections(),
+                productController.refreshProducts(),
+              ]);
+            }}
+            onCreateSection={featuredSectionsController.createSection}
+            onUpdateSection={async (id, data) => {
+              await featuredSectionsController.updateSection(id, data);
+              await productController.refreshProducts();
+            }}
+            onDeleteSection={featuredSectionsController.deleteSection}
+            onToggleProduct={async (secId, prodId) => {
+              await featuredSectionsController.toggleProductInSection(secId, prodId);
+              await productController.refreshProducts();
+            }}
+            showToast={showToast}
           />
         )}
       </main>

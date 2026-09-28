@@ -14,9 +14,65 @@ export class SmsService {
   async sendOtp(phone: string, otp: string): Promise<boolean> {
     if (this.provider === "mock") {
       this.logger.log(
-        `\n=========================================\n📲 [MOCK SMS] Sending OTP ${otp} to phone: ${phone}\n=========================================`,
+        `\n=========================================\n📲 [MOCK SMS] Sending OTP ${otp} to phone: ${phone}\n(No SMS gateway configured - set SMS_PROVIDER in .env)\n=========================================`,
       );
       return true;
+    }
+
+    if (this.provider === "fast2sms") {
+      try {
+        const apiKey = this.configService.get<string>("sms.fast2smsApiKey");
+        const rawNumber = phone.replace("+91", "").replace("+", "").trim();
+        const res = await axios.post(
+          "https://www.fast2sms.com/dev/bulkV2",
+          {
+            route: "otp",
+            variables_values: otp,
+            numbers: rawNumber,
+          },
+          {
+            headers: {
+              authorization: apiKey,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        this.logger.log(`📲 [Fast2SMS] Sent OTP to ${rawNumber}: ${JSON.stringify(res.data)}`);
+        return true;
+      } catch (error: any) {
+        this.logger.error(`Failed to send Fast2SMS OTP to ${phone}: ${error?.message}`);
+        return false;
+      }
+    }
+
+    if (this.provider === "twilio") {
+      try {
+        const accountSid = this.configService.get<string>("sms.twilioAccountSid");
+        const authToken = this.configService.get<string>("sms.twilioAuthToken");
+        const fromNumber = this.configService.get<string>("sms.twilioPhoneNumber") || "";
+
+        const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+        const params = new URLSearchParams();
+        params.append("To", phone);
+        params.append("From", fromNumber);
+        params.append("Body", `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`);
+
+        const res = await axios.post(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+          params.toString(),
+          {
+            headers: {
+              Authorization: `Basic ${auth}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        this.logger.log(`📲 [Twilio] Sent OTP to ${phone}: SID ${res.data?.sid}`);
+        return true;
+      } catch (error: any) {
+        this.logger.error(`Failed to send Twilio OTP to ${phone}: ${error?.message}`);
+        return false;
+      }
     }
 
     if (this.provider === "msg91") {

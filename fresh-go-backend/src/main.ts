@@ -70,6 +70,8 @@ async function bootstrap() {
       "X-Requested-With",
       "x-client-platform",
       "x-client-version",
+      "ngrok-skip-browser-warning",
+      "bypass-tunnel-reminder",
     ],
     exposedHeaders: [
       "Idempotency-Key",

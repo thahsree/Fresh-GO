@@ -37,6 +37,8 @@ export type Product = {
   rating?: number;
   reviewsCount?: number;
   isBestSeller?: boolean;
+  isTodaysOffer?: boolean;
+  originalPrice?: number;
   availableStockKg?: number;
   isInStock?: boolean;
   tag?: string;

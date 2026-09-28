@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Pencil,
@@ -29,6 +28,7 @@ export function ProductsView({
   onEdit,
 }: ProductsViewProps) {
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -59,51 +59,30 @@ export function ProductsView({
 
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
-  const [tagFilter, setTagFilter] = useState<string>("all");
   const tableWrapRef = useRef<HTMLDivElement>(null);
 
-  const freshCatchCount = products.filter(
-    (p) => p.tag === "Fresh Catch" || (!p.tag && p.isDailyCatch)
-  ).length;
-  const freshCutCount = products.filter((p) => p.tag === "Fresh Cut").length;
-  const freshCount = products.filter(
-    (p) => p.tag === "Fresh" || (!p.tag && !p.isDailyCatch && !p.isFlashFrozen)
-  ).length;
-  const frozenCount = products.filter(
-    (p) => p.tag === "Frozen" || (!p.tag && p.isFlashFrozen)
-  ).length;
-  const freshProduceCount = products.filter(
-    (p) => p.tag === "Fresh Produce" || p.category.toLowerCase().includes("veg")
-  ).length;
+  // Derive unique categories from products
+  const uniqueCategories = Array.from(
+    new Set(products.map((p) => p.category).filter(Boolean))
+  );
 
   const visibleProducts = products.filter((product) => {
-    const matchesQuery = `${product.name} ${product.category} ${product.tag || ""}`
+    const matchesQuery = `${product.name} ${product.category} ${product.origin || ""}`
       .toLowerCase()
       .includes(query.toLowerCase());
     if (!matchesQuery) return false;
 
-    if (tagFilter === "Fresh Catch") {
-      return product.tag === "Fresh Catch" || (!product.tag && product.isDailyCatch);
+    if (categoryFilter !== "all" && product.category.toLowerCase() !== categoryFilter.toLowerCase()) {
+      return false;
     }
-    if (tagFilter === "Fresh Cut") {
-      return product.tag === "Fresh Cut";
-    }
-    if (tagFilter === "Fresh") {
-      return product.tag === "Fresh" || (!product.tag && !product.isDailyCatch && !product.isFlashFrozen);
-    }
-    if (tagFilter === "Frozen") {
-      return product.tag === "Frozen" || (!product.tag && product.isFlashFrozen);
-    }
-    if (tagFilter === "Fresh Produce") {
-      return product.tag === "Fresh Produce" || product.category.toLowerCase().includes("veg");
-    }
+
     return true;
   });
 
-  // Reset to page 1 whenever the search query or tag filter changes
+  // Reset to page 1 whenever the search query or category filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, tagFilter]);
+  }, [query, categoryFilter]);
 
   const totalItems = visibleProducts.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -135,7 +114,6 @@ export function ProductsView({
     setIsDeleting(true);
 
     try {
-      // Allow the 400ms row slide-out animation to play smoothly
       await new Promise((resolve) => setTimeout(resolve, 380));
       await deleteProduct(target.id);
     } finally {
@@ -298,7 +276,7 @@ export function ProductsView({
           <div>
             <h2>Products</h2>
             <span className="muted">
-              {query.trim() || tagFilter !== "all"
+              {query.trim() || categoryFilter !== "all"
                 ? `${visibleProducts.length} of ${products.length} products found`
                 : `${products.length} products in your catalogue`}
             </span>
@@ -310,7 +288,7 @@ export function ProductsView({
                 className="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search products"
+                placeholder="Search products..."
               />
             </label>
             <button className="primary" type="button" onClick={onCreate}>
@@ -319,7 +297,7 @@ export function ProductsView({
           </div>
         </div>
 
-        {/* Quick Sourcing / Merchandising Badges Filter Bar */}
+        {/* Category Filter Pills */}
         <div
           style={{
             display: "flex",
@@ -338,11 +316,11 @@ export function ProductsView({
               marginRight: 4,
             }}
           >
-            Filter:
+            Category:
           </span>
           <button
             type="button"
-            onClick={() => setTagFilter("all")}
+            onClick={() => setCategoryFilter("all")}
             style={{
               padding: "5px 12px",
               borderRadius: "20px",
@@ -350,145 +328,49 @@ export function ProductsView({
               fontWeight: 700,
               cursor: "pointer",
               border:
-                tagFilter === "all"
+                categoryFilter === "all"
                   ? "1px solid var(--primary)"
                   : "1px solid var(--border)",
               background:
-                tagFilter === "all" ? "var(--primary)" : "var(--surface)",
-              color: tagFilter === "all" ? "#FFFFFF" : "var(--text)",
+                categoryFilter === "all" ? "var(--primary)" : "var(--surface)",
+              color: categoryFilter === "all" ? "#FFFFFF" : "var(--text)",
               transition: "all 0.15s ease",
             }}
           >
-            All Products ({products.length})
+            All ({products.length})
           </button>
-          <button
-            type="button"
-            onClick={() => setTagFilter("Fresh Catch")}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "20px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer",
-              border:
-                tagFilter === "Fresh Catch"
-                  ? "1px solid #2E7D5B"
-                  : "1px solid var(--border)",
-              background:
-                tagFilter === "Fresh Catch" ? "#2E7D5B" : "var(--surface)",
-              color: tagFilter === "Fresh Catch" ? "#FFFFFF" : "#1B5E20",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <span>🐟</span> Fresh Catch ({freshCatchCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTagFilter("Fresh Cut")}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "20px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer",
-              border:
-                tagFilter === "Fresh Cut"
-                  ? "1px solid #854D0E"
-                  : "1px solid var(--border)",
-              background:
-                tagFilter === "Fresh Cut" ? "#854D0E" : "var(--surface)",
-              color: tagFilter === "Fresh Cut" ? "#FFFFFF" : "#713F12",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <span>🥩</span> Fresh Cut ({freshCutCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTagFilter("Fresh")}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "20px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer",
-              border:
-                tagFilter === "Fresh"
-                  ? "1px solid #166534"
-                  : "1px solid var(--border)",
-              background:
-                tagFilter === "Fresh" ? "#166534" : "var(--surface)",
-              color: tagFilter === "Fresh" ? "#FFFFFF" : "#166534",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <span>🌱</span> Fresh ({freshCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTagFilter("Frozen")}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "20px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer",
-              border:
-                tagFilter === "Frozen"
-                  ? "1px solid #0284C7"
-                  : "1px solid var(--border)",
-              background:
-                tagFilter === "Frozen" ? "#0284C7" : "var(--surface)",
-              color: tagFilter === "Frozen" ? "#FFFFFF" : "#0369A1",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <span>❄️</span> Frozen ({frozenCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTagFilter("Fresh Produce")}
-            style={{
-              padding: "5px 12px",
-              borderRadius: "20px",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer",
-              border:
-                tagFilter === "Fresh Produce"
-                  ? "1px solid #15803D"
-                  : "1px solid var(--border)",
-              background:
-                tagFilter === "Fresh Produce" ? "#15803D" : "var(--surface)",
-              color: tagFilter === "Fresh Produce" ? "#FFFFFF" : "#15803D",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              transition: "all 0.15s ease",
-            }}
-          >
-            <span>🥬</span> Fresh Produce ({freshProduceCount})
-          </button>
+          {uniqueCategories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setCategoryFilter(cat)}
+              style={{
+                padding: "5px 12px",
+                borderRadius: "20px",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+                border:
+                  categoryFilter === cat
+                    ? "1px solid var(--primary)"
+                    : "1px solid var(--border)",
+                background:
+                  categoryFilter === cat ? "var(--primary)" : "var(--surface)",
+                color: categoryFilter === cat ? "#FFFFFF" : "var(--text)",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {cat} ({products.filter((p) => p.category === cat).length})
+            </button>
+          ))}
         </div>
+
         <div className="table-wrap products-table-wrap" ref={tableWrapRef}>
           <table>
             <thead>
               <tr>
                 <th>Product</th>
                 <th>Category</th>
-                <th>Product Tag</th>
                 <th>Price</th>
                 <th>Stock</th>
                 <th>Status</th>
@@ -499,7 +381,7 @@ export function ProductsView({
               {visibleProducts.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     style={{
                       textAlign: "center",
                       padding: "36px 16px",
@@ -522,8 +404,6 @@ export function ProductsView({
                       ? "🥬"
                       : product.category.toLowerCase().includes("frozen")
                       ? "❄️"
-                      : product.category.toLowerCase().includes("offer")
-                      ? "🔥"
                       : "📦";
 
                   return (
@@ -561,122 +441,14 @@ export function ProductsView({
                             )}
                           </div>
                           <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                              <strong>{product.name}</strong>
-                              {product.isDailyCatch && (
-                                <span
-                                  style={{
-                                    fontSize: "10.5px",
-                                    padding: "2px 7px",
-                                    borderRadius: "12px",
-                                    background: "#E8F5E9",
-                                    color: "#1E5840",
-                                    border: "1px solid #A5D6A7",
-                                    fontWeight: 700,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "3px",
-                                  }}
-                                  title="Customer App: Daily Catch badge active"
-                                >
-                                  <span>🐟</span> Daily Catch
-                                </span>
-                              )}
-                              {product.isFlashFrozen && (
-                                <span
-                                  style={{
-                                    fontSize: "10.5px",
-                                    padding: "2px 7px",
-                                    borderRadius: "12px",
-                                    background: "#E0F2FE",
-                                    color: "#0369A1",
-                                    border: "1px solid #BAE6FD",
-                                    fontWeight: 700,
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "3px",
-                                  }}
-                                  title="Customer App: Flash-Frozen Meats badge active"
-                                >
-                                  <span>❄️</span> Flash-Frozen
-                                </span>
-                              )}
-                            </div>
+                            <strong>{product.name}</strong>
                             <small>per {product.unit}</small>
                           </div>
                         </div>
                       </td>
                       <td style={{ verticalAlign: "middle" }}>{product.category}</td>
-                      <td onClick={(e) => e.stopPropagation()} style={{ verticalAlign: "middle" }}>
-                        <select
-                          value={
-                            product.tag ||
-                            (product.isDailyCatch
-                              ? "Fresh Catch"
-                              : product.isFlashFrozen
-                              ? "Frozen"
-                              : "Fresh")
-                          }
-                          onChange={async (e) => {
-                            e.stopPropagation();
-                            const newTag = e.target.value;
-                            if (updateProduct) {
-                              await updateProduct(product.id, {
-                                ...product,
-                                tag: newTag,
-                                isDailyCatch: newTag === "Fresh Catch",
-                                isFlashFrozen: newTag === "Frozen",
-                              });
-                            }
-                          }}
-                          style={{
-                            padding: "5px 9px",
-                            borderRadius: "7px",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            border:
-                              (product.tag === "Fresh Catch" || product.isDailyCatch)
-                                ? "1.5px solid #2E7D5B"
-                                : (product.tag === "Frozen" || product.isFlashFrozen)
-                                ? "1.5px solid #0284C7"
-                                : product.tag === "Fresh Cut"
-                                ? "1.5px solid #854D0E"
-                                : product.tag === "Fresh Produce"
-                                ? "1.5px solid #166534"
-                                : "1.5px solid var(--border)",
-                            background:
-                              (product.tag === "Fresh Catch" || product.isDailyCatch)
-                                ? "#E8F5E9"
-                                : (product.tag === "Frozen" || product.isFlashFrozen)
-                                ? "#E0F2FE"
-                                : product.tag === "Fresh Cut"
-                                ? "#FEF9C3"
-                                : product.tag === "Fresh Produce"
-                                ? "#DCFCE7"
-                                : "var(--surface)",
-                            color:
-                              (product.tag === "Fresh Catch" || product.isDailyCatch)
-                                ? "#1E5840"
-                                : (product.tag === "Frozen" || product.isFlashFrozen)
-                                ? "#0369A1"
-                                : product.tag === "Fresh Cut"
-                                ? "#713F12"
-                                : product.tag === "Fresh Produce"
-                                ? "#14532D"
-                                : "var(--text)",
-                          }}
-                        >
-                          <option value="Fresh Catch">🐟 Fresh Catch</option>
-                          <option value="Fresh">🌱 Fresh</option>
-                          <option value="Fresh Cut">🥩 Fresh Cut</option>
-                          <option value="Frozen">❄️ Frozen</option>
-                          <option value="Fresh Produce">🥬 Fresh Produce</option>
-                        </select>
-                      </td>
-                      <td style={{ verticalAlign: "middle" }}>Rs {product.price.toLocaleString()}</td>
-                      <td style={{ verticalAlign: "middle" }}>
-                        <strong>{product.stock}</strong> {product.unit}
+                      <td style={{ verticalAlign: "middle", fontWeight: 700 }}>
+                        ₹{product.price}
                       </td>
                       <td style={{ verticalAlign: "middle" }}>
                         <span
@@ -685,18 +457,26 @@ export function ProductsView({
                               ? "success"
                               : stockState === "Low stock"
                               ? "warning"
-                              : "error"
+                              : "danger"
                           }`}
                         >
-                          {stockState}
+                          {product.stock} {product.unit}
+                        </span>
+                      </td>
+                      <td style={{ verticalAlign: "middle" }}>
+                        <span
+                          className={`badge ${
+                            product.active ? "success" : "muted"
+                          }`}
+                        >
+                          {product.active ? "Active" : "Hidden"}
                         </span>
                       </td>
                       <td
                         style={{
-                          verticalAlign: "middle",
                           textAlign: "right",
                           paddingRight: "16px",
-                          whiteSpace: "nowrap",
+                          verticalAlign: "middle",
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -704,39 +484,32 @@ export function ProductsView({
                           style={{
                             display: "inline-flex",
                             alignItems: "center",
-                            justifyContent: "flex-end",
-                            gap: "8px",
-                            verticalAlign: "middle",
+                            gap: "6px",
                           }}
                         >
                           <button
                             type="button"
-                            className="icon-button"
+                            className="icon-action-btn edit-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               onEdit(product);
                             }}
+                            title={`Edit ${product.name}`}
                             aria-label={`Edit ${product.name}`}
-                            title="Edit product"
-                            disabled={isRowDeleting}
                           >
-                            <Pencil size={15} />
+                            <Pencil size={14} />
                           </button>
                           <button
                             type="button"
-                            className="icon-button danger"
+                            className="icon-action-btn delete-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               setProductToDelete(product);
                             }}
+                            title={`Delete ${product.name}`}
                             aria-label={`Delete ${product.name}`}
-                            title="Delete product"
-                            disabled={isRowDeleting}
-                            style={{
-                              transition: "all 0.2s ease",
-                            }}
                           >
-                            <Trash2 size={15} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>
@@ -749,89 +522,81 @@ export function ProductsView({
         </div>
 
         {/* Pagination Controls */}
-        <div className="pagination-bar">
-          <div className="pagination-info">
-            {totalItems > 0 ? (
-              <>
-                Showing <strong>{startIndex + 1}</strong>–<strong>{endIndex}</strong> of{" "}
-                <strong>{totalItems}</strong> products
-                <span style={{ color: "var(--soft)", marginLeft: 8 }}>
-                  (Page {currentPage} of {totalPages} · 25 per page)
-                </span>
-              </>
-            ) : (
-              "0 products"
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="pagination-controls">
+        {totalPages > 1 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 24px",
+              borderTop: "1px solid var(--border)",
+              flexWrap: "wrap",
+              gap: "10px",
+              fontSize: "13px",
+              color: "var(--muted)",
+            }}
+          >
+            <div>
+              Showing <strong>{startIndex + 1}</strong> &ndash;{" "}
+              <strong>{endIndex}</strong> of <strong>{totalItems}</strong> products
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <button
                 type="button"
-                className="pagination-btn"
                 onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1}
-                aria-label="Previous page"
+                disabled={currentPage <= 1}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  cursor: currentPage <= 1 ? "not-allowed" : "pointer",
+                  opacity: currentPage <= 1 ? 0.45 : 1,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
               >
-                <ChevronLeft size={15} />
-                <span>Prev</span>
+                <ChevronLeft size={14} /> Previous
               </button>
-
-              <div className="pagination-pages">
-                {getPageNumbers(currentPage, totalPages).map((p, idx) =>
-                  p === "..." ? (
-                    <span key={`ellipsis-${idx}`} className="pagination-ellipsis">
-                      …
-                    </span>
-                  ) : (
-                    <button
-                      key={`page-${p}`}
-                      type="button"
-                      className={`pagination-page-btn ${
-                        currentPage === p ? "active" : ""
-                      }`}
-                      onClick={() => goToPage(Number(p))}
-                    >
-                      {p}
-                    </button>
-                  )
-                )}
+              <div
+                style={{
+                  padding: "0 8px",
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  fontSize: "12px",
+                }}
+              >
+                Page {currentPage} of {totalPages}
               </div>
-
               <button
                 type="button"
-                className="pagination-btn"
                 onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                aria-label="Next page"
+                disabled={currentPage >= totalPages}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "6px 10px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface)",
+                  color: "var(--text)",
+                  cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
+                  opacity: currentPage >= totalPages ? 0.45 : 1,
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
               >
-                <span>Next</span>
-                <ChevronRight size={15} />
+                Next <ChevronRight size={14} />
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </section>
     </div>
   );
-}
-
-function getPageNumbers(current: number, total: number): (number | "...")[] {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-  const pages: (number | "...")[] = [1];
-  if (current > 3) {
-    pages.push("...");
-  }
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
-  if (current < total - 2) {
-    pages.push("...");
-  }
-  pages.push(total);
-  return pages;
 }

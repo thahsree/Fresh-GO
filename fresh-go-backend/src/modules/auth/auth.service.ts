@@ -27,9 +27,11 @@ export class AuthService {
   async sendOtp(dto: SendOtpDto) {
     const { phone } = dto;
     const isDev = this.configService.get<string>("nodeEnv") === "development";
+    const smsProvider = this.configService.get<string>("sms.provider", "mock");
+    const isMock = smsProvider === "mock";
 
-    // Generate 6-digit OTP (123456 in dev/mock, or cryptographically random in prod)
-    const otp = isDev
+    // Generate 6-digit OTP (123456 in dev/mock, or cryptographically random in prod or real SMS)
+    const otp = isMock && isDev
       ? "123456"
       : Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -37,7 +39,7 @@ export class AuthService {
     const redisKey = `otp:${phone}`;
     await this.redis.set(redisKey, otp, 300);
 
-    // Rate limiting: track recent sends (max 3 per 10 mins)
+    // Rate limiting: track recent sends (max 5 per 10 mins)
     const rateKey = `otp_rate:${phone}`;
     const sendCount = await this.redis.get(rateKey);
     if (sendCount && parseInt(sendCount, 10) >= 5) {
@@ -55,10 +57,13 @@ export class AuthService {
     await this.smsService.sendOtp(phone, otp);
 
     return {
-      message: "OTP sent successfully",
+      message: isMock
+        ? "Development OTP simulated (Set SMS_PROVIDER in .env for real SMS)"
+        : "OTP sent successfully via SMS",
       phone,
       expiresInSeconds: 300,
-      ...(isDev ? { devOtp: otp } : {}),
+      isMock,
+      ...(isDev || isMock ? { devOtp: otp } : {}),
     };
   }
 
@@ -80,25 +85,49 @@ export class AuthService {
 
     // Find or create User
     let user = await this.prisma.user.findUnique({
-      where: { phone },
-      include: {
-        customerProfile: true,
-        partnerProfile: true,
-        wallet: true,
-      },
-    });
+       where: { phone },
+       include: {
+         customerProfile: true,
+         partnerProfile: true,
+         wallet: true,
+         hub: true,
+       },
+     });
+
+    const isSuperAdmin = phone === "+918888888888" || role === (Role.SUPER_ADMIN as any);
+    const isHubAdmin = !isSuperAdmin && (phone === "+919999999999" || role === Role.ADMIN);
+
+    // Look up default active hub for assigning to hub admin if needed
+    let activeHub: any = null;
+    if (isHubAdmin) {
+      activeHub = await this.prisma.hub.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+    }
 
     if (!user) {
-      const assignedRole = (role as Role) || Role.CUSTOMER;
+      const assignedRole = isSuperAdmin
+        ? Role.SUPER_ADMIN
+        : isHubAdmin
+        ? Role.ADMIN
+        : (role as Role) || Role.CUSTOMER;
+
+      const hubLocationName = activeHub?.name || "Mavoor Road";
+      const defaultName = isSuperAdmin
+        ? "FreshGo Super Admin"
+        : isHubAdmin
+        ? `${hubLocationName} Hub Admin`
+        : assignedRole === Role.DELIVERY_PARTNER
+        ? "New Partner"
+        : "New Customer";
+
       user = await this.prisma.user.create({
         data: {
           phone,
-          name:
-            name ||
-            (assignedRole === Role.DELIVERY_PARTNER
-              ? "New Partner"
-              : "New Customer"),
+          name: name || defaultName,
           role: assignedRole,
+          hubId: isHubAdmin && activeHub ? activeHub.id : undefined,
           ...(assignedRole === Role.CUSTOMER
             ? {
                 customerProfile: { create: {} },
@@ -120,8 +149,54 @@ export class AuthService {
           customerProfile: true,
           partnerProfile: true,
           wallet: true,
+          hub: true,
         },
       });
+    } else {
+      // Existing user role / hub assignment updates
+      let needUpdate = false;
+      const updateData: any = {};
+
+      if (isSuperAdmin && user.role !== Role.SUPER_ADMIN) {
+        updateData.role = Role.SUPER_ADMIN;
+        if (!user.name || user.name === "FreshGo Admin") {
+          updateData.name = "FreshGo Super Admin";
+        }
+        needUpdate = true;
+      } else if (isHubAdmin) {
+        if (user.role !== Role.ADMIN) {
+          updateData.role = Role.ADMIN;
+          needUpdate = true;
+        }
+        if (activeHub) {
+          if (!user.hubId) {
+            updateData.hubId = activeHub.id;
+            needUpdate = true;
+          }
+          if (
+            !user.name ||
+            user.name === "FreshGo Admin" ||
+            user.name === "FreshGo Dispatch Admin" ||
+            user.name === "Admin"
+          ) {
+            updateData.name = `${activeHub.name} Admin`;
+            needUpdate = true;
+          }
+        }
+      }
+
+      if (needUpdate) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: updateData,
+          include: {
+            customerProfile: true,
+            partnerProfile: true,
+            wallet: true,
+            hub: true,
+          },
+        });
+      }
     }
 
     const tokens = await this.generateTokens(user.id, user.phone, user.role);
@@ -133,6 +208,17 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        hubId: user.hubId,
+        hub: user.hub
+          ? {
+              id: user.hub.id,
+              name: user.hub.name,
+              code: user.hub.code,
+              city: user.hub.city,
+              latitude: user.hub.latitude,
+              longitude: user.hub.longitude,
+            }
+          : null,
         customerProfile: user.customerProfile,
         partnerProfile: user.partnerProfile,
         walletBalance: user.wallet?.balance || 0,

@@ -15,6 +15,7 @@ enum Role {
   ADMIN
   DISPATCHER
   HUB_MANAGER
+  SUPER_ADMIN
 }
 
 enum OrderStatus {
@@ -128,6 +129,8 @@ model User {
   name         String
   role         Role      @default(CUSTOMER)
   isActive     Boolean   @default(true)
+  hubId        String?
+  hub          Hub?      @relation("HubAdmins", fields: [hubId], references: [id])
   pushToken    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -193,14 +196,20 @@ model Address {
 }
 
 model Hub {
-  id        String   @id @default(uuid())
-  name      String
-  code      String   @unique
-  address   String
-  latitude  Float
-  longitude Float
-  isActive  Boolean  @default(true)
+  id                 String   @id @default(uuid())
+  name               String
+  code               String   @unique
+  address            String
+  city               String   @default("Kozhikode")
+  latitude           Float
+  longitude          Float
+  deliveryRadiusKm   Float    @default(10.0)
+  isActive           Boolean  @default(true)
+  contactPhone       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
 
+  admins       User[]             @relation("HubAdmins")
   orders       Order[]
   batches      InventoryBatch[]
   settlements  CashSettlement[]
@@ -249,8 +258,10 @@ model Product {
   netWeightDescription   String?            // e.g. "480g - 520g cleaned per pack"
   isActive               Boolean            @default(true)
   isBestSeller           Boolean            @default(false)
+  isTodaysOffer          Boolean            @default(false)
   isDailyCatch           Boolean            @default(false)
   isFlashFrozen          Boolean            @default(false)
+  originalPrice          Float?
   tag                    String?            @default("Fresh")
   image                  String
   rating                 Float              @default(4.8)
@@ -497,4 +508,28 @@ model PartnerEarningEntry {
   type      EarningType            @default(BASE_PAY)
   amount    Float
   date      DateTime               @default(now())
+}
+
+model FeaturedSection {
+  id          String   @id @default(uuid())
+  title       String
+  subtitle    String?
+  icon        String?  @default("⭐")
+  slug        String   @unique
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  productIds  String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NotifyInterestLead {
+  id           String   @id @default(uuid())
+  phone        String?
+  email        String?
+  latitude     Float
+  longitude    Float
+  areaName     String?
+  consentGiven Boolean  @default(true)
+  createdAt    DateTime @default(now())
 }

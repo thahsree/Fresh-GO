@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { API_BASE } from "../lib/api";
+import { getApiBase } from "../lib/api";
 
 type BackendConnectionErrorProps = {
   errorMessage?: string | null;
@@ -48,7 +48,7 @@ export function BackendConnectionError({
       {/* Brand Header */}
       <View style={styles.brandRow}>
         <Image
-          source={require("../assets/freshgologo.png")}
+          source={require("../assets/FreshGologonew.png")}
           style={styles.brandLogo}
           resizeMode="contain"
         />
@@ -80,11 +80,16 @@ export function BackendConnectionError({
             <Text style={styles.infoLabel}>Server Endpoint:</Text>
           </View>
           <Text style={styles.infoEndpoint} numberOfLines={2}>
-            {API_BASE}
+            {getApiBase()}
           </Text>
           {errorMessage ? (
             <Text style={styles.errorDetail}>
               Notice: {errorMessage}
+            </Text>
+          ) : null}
+          {getApiBase().includes("_") ? (
+            <Text style={[styles.errorDetail, { color: colors.warning, marginTop: 8, fontWeight: "600" }]}>
+              ⚠️ Tunnel domain contains an underscore ('_'). Android OS rejects underscores in domain names (RFC 1035). Please restart 'npm run dev:customer:tunnel' in your terminal to get a clean tunnel domain.
             </Text>
           ) : null}
         </View>

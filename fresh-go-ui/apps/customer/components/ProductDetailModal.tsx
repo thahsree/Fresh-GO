@@ -73,16 +73,6 @@ export function ProductDetailModal({
     product.availableStockKg > 0 &&
     product.availableStockKg <= 5;
 
-  const displayTag =
-    product.tag ||
-    (product.isDailyCatch
-      ? "Fresh Catch"
-      : product.isFlashFrozen
-      ? "Frozen"
-      : product.fresh
-      ? "Fresh"
-      : undefined);
-
   const handleAdd = () => {
     if (isOutOfStock || quantity > maxStock) return;
     onAddToCart(product.id, quantity, selectedCut);
@@ -142,46 +132,13 @@ export function ProductDetailModal({
                 />
               </Pressable>
 
-              {isOutOfStock ? (
+              {isOutOfStock && (
                 <View style={[styles.freshTag, { backgroundColor: "#BE4436", borderColor: "#991B1B" }]}>
                   <Text style={[styles.freshTagText, { color: "#FFFFFF", fontWeight: "900" }]}>
                     OUT OF STOCK
                   </Text>
                 </View>
-              ) : displayTag ? (
-                <View
-                  style={[
-                    styles.freshTag,
-                    displayTag === "Frozen"
-                      ? styles.frozenTag
-                      : displayTag === "Fresh Cut"
-                      ? { backgroundColor: "#FEF9C3", borderColor: "#FEF08A" }
-                      : displayTag === "Fresh Produce"
-                      ? { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" }
-                      : {},
-                  ]}
-                >
-                  {displayTag === "Fresh Catch" && <View style={styles.freshDot} />}
-                  {displayTag === "Fresh" && <View style={[styles.freshDot, { backgroundColor: "#15803D" }]} />}
-                  {displayTag === "Frozen" && <Text style={styles.frozenTagEmoji}>❄️</Text>}
-                  {displayTag === "Fresh Cut" && <Text style={{ fontSize: 10, marginRight: 2 }}>🥩</Text>}
-                  {displayTag === "Fresh Produce" && <Text style={{ fontSize: 10, marginRight: 2 }}>🥬</Text>}
-                  <Text
-                    style={[
-                      styles.freshTagText,
-                      displayTag === "Frozen"
-                        ? styles.frozenTagText
-                        : displayTag === "Fresh Cut"
-                        ? { color: "#854D0E" }
-                        : displayTag === "Fresh Produce"
-                        ? { color: "#166534" }
-                        : {},
-                    ]}
-                  >
-                    {displayTag}
-                  </Text>
-                </View>
-              ) : null}
+              )}
             </View>
 
             {/* Product Meta */}

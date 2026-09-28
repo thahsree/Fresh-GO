@@ -1,5 +1,5 @@
 import { colors } from "@fresh-food/design-tokens";
-import { Bell, ChevronDown, Search, UserRound } from "lucide-react-native";
+import { ChevronDown, MapPin, Search, UserRound } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 type CustomerHeaderProps = {
@@ -7,29 +7,41 @@ type CustomerHeaderProps = {
   onSearchChange: (value: string) => void;
   address?: string;
   onPressProfile?: () => void;
+  onPressLocation?: () => void;
 };
 
 export function CustomerHeader({
   searchValue,
   onSearchChange,
-  address = "Palm Residency, Flat 4B",
+  address,
   onPressProfile,
+  onPressLocation,
 }: CustomerHeaderProps) {
+  const isSelected = Boolean(address && address.trim().length > 0);
+  const displayAddress = isSelected ? address : "Select Delivery Location";
+
   return (
     <>
       <View style={styles.topbar}>
-        <Pressable style={styles.location} accessibilityRole="button">
-          <View style={styles.dot} />
-          <Text style={styles.locationText} numberOfLines={1}>Deliver to · {address}</Text>
-          <ChevronDown size={13} color={colors.primaryDark} />
+        <Pressable
+          style={styles.location}
+          accessibilityRole="button"
+          onPress={onPressLocation}
+        >
+          <MapPin size={16} color={colors.primary} style={{ flexShrink: 0 }} />
+          <Text
+            style={[
+              styles.locationText,
+              !isSelected && { color: colors.primary, fontWeight: "800" },
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {displayAddress}
+          </Text>
+          <ChevronDown size={13} color={colors.primaryDark} style={{ flexShrink: 0 }} />
         </Pressable>
         <View style={styles.actions}>
-          <Pressable
-            style={styles.iconButton}
-            accessibilityLabel="Notifications"
-          >
-            <Bell size={16} color={colors.primaryDark} />
-          </Pressable>
           <Pressable
             style={styles.iconButton}
             accessibilityLabel="Profile"
@@ -56,20 +68,32 @@ export function CustomerHeader({
 
 const styles = StyleSheet.create({
   topbar: {
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  location: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
-  locationText: { color: colors.primaryDark, fontSize: 12, fontWeight: "700" },
+  location: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    maxWidth: "80%",
+    marginRight: 10,
+  },
+  locationText: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
   actions: { flexDirection: "row", gap: 8 },
   iconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -77,8 +101,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   searchBar: {
-    marginHorizontal: 18,
-    marginBottom: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
     paddingHorizontal: 16,
     height: 44,
     borderRadius: 22,

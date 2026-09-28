@@ -23,15 +23,16 @@ config.server = {
   enhanceMiddleware: (metroMiddleware) => {
     return (req, res, next) => {
       if (req.url && req.url.startsWith("/api/")) {
+        const headers = { ...req.headers };
+        headers.host = "localhost:4000";
+        delete headers.connection;
+
         const options = {
           hostname: "127.0.0.1",
           port: 4000,
           path: req.url,
           method: req.method,
-          headers: {
-            ...req.headers,
-            host: "localhost:4000",
-          },
+          headers,
         };
 
         const proxyReq = http.request(options, (proxyRes) => {
@@ -41,17 +42,23 @@ config.server = {
 
         proxyReq.on("error", (err) => {
           console.warn("[Metro API Proxy] Failed to reach backend:", err.message);
-          res.writeHead(502, { "Content-Type": "application/json" });
-          res.end(
-            JSON.stringify({
-              success: false,
-              statusCode: 502,
-              message: "Backend unreachable on port 4000",
-            }),
-          );
+          if (!res.headersSent) {
+            res.writeHead(502, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                success: false,
+                statusCode: 502,
+                message: "Backend unreachable on port 4000: " + err.message,
+              }),
+            );
+          }
         });
 
-        req.pipe(proxyReq, { end: true });
+        if (req.method === "GET" || req.method === "HEAD") {
+          proxyReq.end();
+        } else {
+          req.pipe(proxyReq, { end: true });
+        }
         return;
       }
 

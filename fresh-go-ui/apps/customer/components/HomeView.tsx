@@ -1,12 +1,13 @@
 import { colors } from "@fresh-food/design-tokens";
 import { Plus } from "lucide-react-native";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { Category, Product } from "../models/catalog";
 import { CategoryRail } from "./CategoryRail";
 import { CustomerHeader } from "./CustomerHeader";
 import { ProductCard } from "./ProductCard";
 import { SectionHeader } from "./SectionHeader";
+import { api, FeaturedSectionAppItem } from "../lib/api";
 
 const needs = [
   "Today's Fish",
@@ -30,6 +31,7 @@ type HomeViewProps = {
   onSelectProduct: (product: Product) => void;
   onNavigateToListing: (category?: string | null, search?: string) => void;
   onPressProfile?: () => void;
+  onPressLocation?: () => void;
 };
 
 export function HomeView({
@@ -46,6 +48,7 @@ export function HomeView({
   onSelectProduct,
   onNavigateToListing,
   onPressProfile,
+  onPressLocation,
 }: HomeViewProps) {
   const matchesSearch = (name: string) =>
     name.toLowerCase().includes(searchValue.toLowerCase());
@@ -105,7 +108,7 @@ export function HomeView({
   // Offers
   const visibleOfferProducts = products.filter(
     (product) =>
-      (product.category === "Offers" || product.price < 400) &&
+      (Boolean(product.isTodaysOffer) || product.category === "Offers") &&
       matchesSearch(product.name) &&
       (selectedCategory
         ? selectedCategory.toLowerCase() === "frozen"
@@ -115,6 +118,18 @@ export function HomeView({
   );
 
   const offersScrollRef = useRef<ScrollView>(null);
+  const [featuredSections, setFeaturedSections] = useState<FeaturedSectionAppItem[]>([]);
+
+  useEffect(() => {
+    api
+      .getFeaturedSections()
+      .then((sections: FeaturedSectionAppItem[]) => {
+        if (sections && sections.length > 0) {
+          setFeaturedSections(sections.filter((s: FeaturedSectionAppItem) => s.isActive));
+        }
+      })
+      .catch(() => {});
+  }, [products]);
 
   useEffect(() => {
     offersScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
@@ -130,6 +145,7 @@ export function HomeView({
         onSearchChange={onSearchChange}
         address={address}
         onPressProfile={onPressProfile}
+        onPressLocation={onPressLocation}
       />
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Fresh Catch &{"\n"}Daily Sourced.</Text>
@@ -185,7 +201,10 @@ export function HomeView({
       {visibleBestSellers.length > 0 && (
         <>
           <SectionHeader
-            title="Best sellers"
+            title={
+              featuredSections.find((s) => s.slug === "best-sellers")?.title ||
+              "Best sellers"
+            }
             action="See all"
             onAction={() => onNavigateToListing(selectedCategory)}
           />
@@ -204,7 +223,10 @@ export function HomeView({
       {visibleOfferProducts.length > 0 && (
         <>
           <SectionHeader
-            title="Today's offers"
+            title={
+              featuredSections.find((s) => s.slug === "todays-offers")?.title ||
+              "Today's offers"
+            }
             action="See all"
             onAction={() => onNavigateToListing("Offers")}
           />
@@ -226,6 +248,40 @@ export function HomeView({
           </ScrollView>
         </>
       )}
+
+      {/* 4. Custom Featured Sections (Configured by Admin under Dispatch) */}
+      {featuredSections
+        .filter(
+          (sec) =>
+            sec.slug !== "best-sellers" &&
+            sec.slug !== "todays-offers" &&
+            Array.isArray(sec.products) &&
+            sec.products.length > 0
+        )
+        .map((sec) => {
+          const secVisibleProducts = (sec.products as Product[]).filter((p) =>
+            matchesSearch(p.name)
+          );
+          if (secVisibleProducts.length === 0) return null;
+
+          return (
+            <React.Fragment key={sec.id}>
+              <SectionHeader
+                title={`${sec.icon ? sec.icon + " " : ""}${sec.title}`}
+                action="See all"
+                onAction={() => onNavigateToListing(selectedCategory)}
+              />
+              <ProductRail
+                products={secVisibleProducts}
+                favorites={favorites}
+                onAddProduct={onAddProduct}
+                onToggleFavorite={onToggleFavorite}
+                onSelectProduct={onSelectProduct}
+                resetKey={selectedCategory}
+              />
+            </React.Fragment>
+          );
+        })}
 
       {/* 4. Frozen Meats & Specials (Moved to BOTTOM of product lists!) */}
       {!selectedCategory && (
@@ -322,8 +378,8 @@ function OfferCard({
   onSelect: () => void;
   onAdd: () => void;
 }) {
-  const originalPrice = Math.round(product.price * 1.25);
-  const saving = originalPrice - product.price;
+  const originalPrice = product.originalPrice || Math.round(product.price * 1.25);
+  const saving = Math.max(0, originalPrice - product.price);
 
   return (
     <Pressable

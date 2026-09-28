@@ -20,6 +20,6 @@ export class VerifyOtpDto {
   otp: string;
 
   // Optional: User role when signing up or logging in from specific app
-  role?: "CUSTOMER" | "DELIVERY_PARTNER" | "ADMIN";
+  role?: "CUSTOMER" | "DELIVERY_PARTNER" | "ADMIN" | "SUPER_ADMIN";
   name?: string;
 }

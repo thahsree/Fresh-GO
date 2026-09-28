@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
-import { CreateAddressDto, UpdatePartnerProfileDto } from "./dto/users.dto";
+import { CreateAddressDto, UpdateAddressDto, UpdatePartnerProfileDto } from "./dto/users.dto";
 import { VehicleType } from "@prisma/client";
 
 @Injectable()
@@ -51,6 +51,36 @@ export class UsersService {
     }
 
     return address;
+  }
+
+  async updateAddress(userId: string, addressId: string, dto: UpdateAddressDto) {
+    const existing = await this.prisma.address.findFirst({
+      where: { id: addressId, userId },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Address with ID ${addressId} not found`);
+    }
+
+    if (dto.isDefault) {
+      await this.prisma.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+
+    const updated = await this.prisma.address.update({
+      where: { id: addressId },
+      data: dto,
+    });
+
+    if (dto.isDefault) {
+      await this.prisma.customerProfile.updateMany({
+        where: { userId },
+        data: { defaultAddressId: addressId },
+      });
+    }
+
+    return updated;
   }
 
   async deleteAddress(userId: string, addressId: string) {

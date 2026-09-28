@@ -49,6 +49,55 @@ export class ZonesService {
    * Calculates actual distance from center, estimated ETA, and applicable delivery fee.
    */
   async findZoneForCoordinates(latitude: number, longitude: number) {
+    // 1. Check real multi-hubs first
+    const activeHubs = await this.prisma.hub.findMany({
+      where: { isActive: true },
+    });
+
+    for (const hub of activeHubs) {
+      const radiusKm = hub.deliveryRadiusKm || 10.0;
+      const isInside = this.mapsService.isPointInZone(
+        latitude,
+        longitude,
+        hub.latitude,
+        hub.longitude,
+        radiusKm,
+      );
+
+      if (isInside) {
+        const distanceKm = this.mapsService.calculateDistanceKm(
+          latitude,
+          longitude,
+          hub.latitude,
+          hub.longitude,
+        );
+        const etaMinutes = this.mapsService.estimateDurationMinutes(distanceKm);
+
+        return {
+          serviceable: true,
+          zone: {
+            id: hub.id,
+            name: hub.name,
+            centerLat: hub.latitude,
+            centerLng: hub.longitude,
+            radiusKm,
+            polygonGeoJson: null,
+            baseDeliveryFee: 25,
+            minOrderAmount: 99,
+            freeDeliveryThreshold: 499,
+            estimatedDeliveryMinutes: 15,
+            isActive: true,
+          },
+          distanceKm,
+          etaMinutes: Math.max(15, etaMinutes),
+          baseDeliveryFee: 25,
+          minOrderAmount: 99,
+          freeDeliveryThreshold: 499,
+        };
+      }
+    }
+
+    // 2. Check legacy delivery zones table
     const activeZones = await this.findAll(true);
 
     for (const zone of activeZones) {
