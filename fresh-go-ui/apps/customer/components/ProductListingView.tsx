@@ -4,7 +4,6 @@ import {
   ArrowUpDown,
   Check,
   Filter,
-  Heart,
   Plus,
   Search,
   SlidersHorizontal,
@@ -394,21 +393,6 @@ export function ProductListingView({
                         </Text>
                       </View>
                     )}
-
-                    <Pressable
-                      style={styles.favoriteBtn}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(product.id);
-                      }}
-                      accessibilityLabel="Favorite"
-                    >
-                      <Heart
-                        size={12}
-                        color={isFav ? colors.accent : colors.primaryDark}
-                        fill={isFav ? colors.accent : "transparent"}
-                      />
-                    </Pressable>
                   </View>
 
                   {/* Body */}

@@ -322,7 +322,7 @@ export function ProfileView({
             <CreditCard size={20} color={colors.primary} />
           </View>
           <Text style={styles.quickTitle}>Payments</Text>
-          <Text style={styles.quickSub}>COD & UPI</Text>
+          <Text style={styles.quickSub}>COD Only</Text>
         </Pressable>
       </View>
 
