@@ -78,6 +78,12 @@ export class TrackingGateway
 
   handleConnection(client: Socket) {
     const user = client.data.user;
+    if (user?.sub) {
+      client.join(`user:${user.sub}`);
+      if (user.role === Role.DELIVERY_PARTNER) {
+        client.join(`partner:${user.sub}`);
+      }
+    }
     this.logger.log(
       `Client connected: ${client.id} (User: ${user?.sub}, Role: ${user?.role})`,
     );
@@ -85,6 +91,36 @@ export class TrackingGateway
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
+  }
+
+  /**
+   * Delivery partner joins hub dispatch room to receive live orders for that hub
+   */
+  @SubscribeMessage("subscribe:hub")
+  handleSubscribeHub(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { hubId: string },
+  ) {
+    const user = client.data.user;
+    const { hubId } = data;
+    if (!hubId) return;
+
+    client.join(`hub:${hubId}`);
+    client.emit("subscribed", { room: `hub:${hubId}`, hubId });
+    this.logger.log(`Partner/User ${user?.sub} joined room hub:${hubId}`);
+  }
+
+  /**
+   * Delivery partner leaves previous hub room when changing hub in settings
+   */
+  @SubscribeMessage("unsubscribe:hub")
+  handleUnsubscribeHub(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { hubId: string },
+  ) {
+    if (!data?.hubId) return;
+    client.leave(`hub:${data.hubId}`);
+    client.emit("unsubscribed", { room: `hub:${data.hubId}`, hubId: data.hubId });
   }
 
   /**

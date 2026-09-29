@@ -331,6 +331,10 @@ export class OrdersService {
       note: "New order waiting for fulfillment",
     });
 
+    if (order.hubId) {
+      this.trackingService.emitHubNewOrder(order.hubId, order);
+    }
+
     // Send push notification confirmation to customer
     this.pushService.sendToUser(
       userId,

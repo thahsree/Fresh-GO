@@ -87,7 +87,7 @@ export function getApiBase(): string {
 
       const [hostname, port] = hostPart.split(":");
       if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
-        const targetPort = port || "8081";
+        const targetPort = port === "8081" ? "4000" : port || "4000";
         return `http://${hostname}:${targetPort}/api/v1`;
       }
     } catch {
@@ -95,8 +95,8 @@ export function getApiBase(): string {
     }
   }
 
-  // 4. Default LAN dev machine fallback
-  return "http://10.104.176.61:8081/api/v1";
+  // 4. Default Production HTTPS backend (DuckDNS / Caddy)
+  return "https://fresh-go.duckdns.org/api/v1";
 }
 
 export const API_BASE = getApiBase();

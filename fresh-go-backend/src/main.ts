@@ -49,7 +49,7 @@ async function bootstrap() {
       if (
         customOrigins.includes(origin) ||
         customOrigins.includes("*") ||
-        /^https?:\/\/65\.1\.74\.238(:\d+)?$/.test(origin)
+        /^https?:\/\/(.*\.duckdns\.org|65\.1\.74\.238)(:\d+)?$/.test(origin)
       ) {
         return callback(null, true);
       }

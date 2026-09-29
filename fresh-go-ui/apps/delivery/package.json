@@ -1,7 +1,11 @@
 {
   "name": "@fresh-food/delivery",
   "private": true,
-  "scripts": { "dev": "next dev -p 3001", "build": "next build", "typecheck": "tsc --noEmit" },
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@fresh-food/design-tokens": "*",
     "@fresh-food/ui": "*",
@@ -9,7 +13,13 @@
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "socket.io-client": "^4.8.4"
   },
-  "devDependencies": { "@types/node": "latest", "@types/react": "latest", "@types/react-dom": "latest", "typescript": "latest" }
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
 }

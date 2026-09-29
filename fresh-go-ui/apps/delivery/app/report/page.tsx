@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ReportIssueView } from "../components/ReportIssueView";
 import { DeliveryNavigation } from "../components/DeliveryNavigation";
-import { initialHistory, initialTickets, IssueTicket, pendingRequest } from "../models/delivery";
+import { IssueTicket } from "../models/delivery";
 
 export default function ReportPage() {
   const router = useRouter();
-  const [tickets, setTickets] = useState<IssueTicket[]>(initialTickets);
+  const [tickets, setTickets] = useState<IssueTicket[]>([]);
 
   const handleSubmitTicket = (
     data: Omit<IssueTicket, "id" | "createdAt" | "status" | "resolutionNote">
@@ -28,8 +28,8 @@ export default function ReportPage() {
       <section className="delivery-content">
         <ReportIssueView
           onBack={() => router.push("/")}
-          activeDelivery={{ ...pendingRequest, phase: "accepted" }}
-          history={initialHistory}
+          activeDelivery={null}
+          history={[]}
           tickets={tickets}
           onSubmitTicket={handleSubmitTicket}
           onOpenDashboard={() => router.push("/")}

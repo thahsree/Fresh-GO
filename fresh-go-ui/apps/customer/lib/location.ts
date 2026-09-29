@@ -127,14 +127,17 @@ export async function reverseGeocodeLocation(
         const area = item.district || item.street || item.subregion || city;
         const street = [item.name, item.street].filter(Boolean).join(", ");
         const formatted = [street, area, city].filter(Boolean).join(", ");
-        const pincode = item.postalCode?.trim() || "";
+        const pincode = item.postalCode?.trim()?.replace(/\D/g, "") || "";
 
-        return {
-          address: formatted || `${area}, ${city}`,
-          city,
-          area: street || area,
-          pincode: pincode.length === 6 ? pincode : undefined,
-        };
+        // If native geocoder provided a clean 6-digit local postal code, return it
+        if (pincode.length === 6) {
+          return {
+            address: formatted || `${area}, ${city}`,
+            city,
+            area: street || area,
+            pincode,
+          };
+        }
       }
     } catch (err) {
       console.warn("[location] Native reverse geocode note:", err);

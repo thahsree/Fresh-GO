@@ -30,8 +30,14 @@ export class AuthService {
     const smsProvider = this.configService.get<string>("sms.provider", "mock");
     const isMock = smsProvider === "mock";
 
-    // Generate 6-digit OTP (123456 in dev/mock, or cryptographically random in prod or real SMS)
-    const otp = isMock && isDev
+    const isTestPhone =
+      phone.endsWith("9876543210") ||
+      phone.endsWith("9999988888") ||
+      phone.endsWith("8888888888") ||
+      phone.endsWith("9999999999");
+
+    // Generate 6-digit OTP (123456 in dev/mock/test phone, or cryptographically random in prod with real SMS)
+    const otp = isMock || isDev || isTestPhone
       ? "123456"
       : Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -72,9 +78,19 @@ export class AuthService {
     const redisKey = `otp:${phone}`;
     const cachedOtp = await this.redis.get(redisKey);
 
-    // Allow master OTP '123456' in dev or if matches Redis
+    // Allow master OTP '123456' in dev, if SMS provider is mock, or for designated test numbers (e.g. Google Play review)
     const isDev = this.configService.get<string>("nodeEnv") === "development";
-    const isValid = cachedOtp === otp || (isDev && otp === "123456");
+    const smsProvider = this.configService.get<string>("sms.provider", "mock");
+    const isTestPhone =
+      phone.endsWith("9876543210") ||
+      phone.endsWith("9999988888") ||
+      phone.endsWith("8888888888") ||
+      phone.endsWith("9999999999");
+    const isValid =
+      cachedOtp === otp ||
+      (isDev && otp === "123456") ||
+      (smsProvider === "mock" && otp === "123456") ||
+      (isTestPhone && otp === "123456");
 
     if (!isValid) {
       throw new BadRequestException("Invalid or expired OTP");
@@ -182,6 +198,21 @@ export class AuthService {
             updateData.name = `${activeHub.name} Admin`;
             needUpdate = true;
           }
+        }
+      } else if (role === Role.DELIVERY_PARTNER) {
+        if (user.role !== Role.DELIVERY_PARTNER && !isSuperAdmin && !isHubAdmin) {
+          updateData.role = Role.DELIVERY_PARTNER;
+          needUpdate = true;
+        }
+        if (!user.partnerProfile) {
+          await this.prisma.deliveryPartnerProfile.create({
+            data: {
+              userId: user.id,
+              vehicleType: "BIKE",
+              isOnline: true,
+            },
+          });
+          needUpdate = true;
         }
       }
 

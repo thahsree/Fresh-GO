@@ -722,6 +722,11 @@ export function CustomerLocationModal({
               ? data.display_name.split(",").slice(0, 3).join(",").trim()
               : `Doorstep Pin (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
 
+          const rawPincode = (data.address?.postcode || "").replace(/\D/g, "");
+          if (rawPincode && rawPincode.length === 6) {
+            setPinPincode(rawPincode);
+          }
+
           setPinAddress(finalFormatted);
           setIsReverseGeocoding(false);
           return;
@@ -741,6 +746,13 @@ export function CustomerLocationModal({
             setIsReverseGeocoding(false);
             if (status === "OK" && results?.[0]) {
               setPinAddress(results[0].formatted_address);
+              const postComp = results[0].address_components?.find((c: any) =>
+                c.types?.includes("postal_code")
+              );
+              if (postComp?.long_name) {
+                const cleanPin = postComp.long_name.replace(/\D/g, "");
+                if (cleanPin.length === 6) setPinPincode(cleanPin);
+              }
             }
           }
         );
@@ -753,13 +765,17 @@ export function CustomerLocationModal({
     // 3. Nominatim fallback
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
       );
       const data = await res.json();
       if (data?.display_name) {
         const parts = data.display_name.split(",");
         const clean = parts.slice(0, 4).join(",").trim();
         setPinAddress(clean);
+        const nomPin = (data.address?.postcode || "").replace(/\D/g, "");
+        if (nomPin && nomPin.length === 6) {
+          setPinPincode(nomPin);
+        }
       }
     } catch {
       // keep coordinate text

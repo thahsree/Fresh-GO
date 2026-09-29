@@ -104,6 +104,50 @@ export class DeliveryService {
   }
 
   /**
+   * Available orders for delivery from a specific hub or in the system
+   */
+  async getAvailableOrders(partnerUserId: string, hubId?: string) {
+    const partner = await this.prisma.deliveryPartnerProfile.findUnique({
+      where: { userId: partnerUserId },
+    });
+    if (!partner)
+      throw new NotFoundException("Delivery partner profile not found");
+
+    const whereClause: any = {
+      status: {
+        in: [
+          OrderStatus.CONFIRMED,
+          OrderStatus.CUTTING_PREPARING,
+          OrderStatus.PACKED,
+          OrderStatus.DISPATCH_READY,
+        ],
+      },
+      OR: [
+        { deliveryPartnerId: null },
+        { deliveryPartnerId: partner.id },
+      ],
+    };
+
+    if (hubId) {
+      whereClause.hubId = hubId;
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where: whereClause,
+      include: {
+        customer: { select: { name: true, phone: true } },
+        items: { include: { product: true } },
+        hub: true,
+        zone: true,
+      },
+      orderBy: { placedAt: "desc" },
+      take: 20,
+    });
+
+    return orders;
+  }
+
+  /**
    * Partner accepts an offered order
    * Strictly enforces ₹2,500 COD threshold cap!
    */
@@ -131,10 +175,13 @@ export class DeliveryService {
     });
     if (!order) throw new NotFoundException("Order not found");
 
-    if (
-      order.status !== OrderStatus.DISPATCH_READY &&
-      order.status !== OrderStatus.ASSIGNED
-    ) {
+    const acceptableStatuses: OrderStatus[] = [
+      OrderStatus.DISPATCH_READY,
+      OrderStatus.ASSIGNED,
+      OrderStatus.PACKED,
+      OrderStatus.CONFIRMED,
+    ];
+    if (!acceptableStatuses.includes(order.status)) {
       throw new BadRequestException(
         "Order is no longer available for delivery",
       );
@@ -143,9 +190,9 @@ export class DeliveryService {
     // Cancel 45-second dispatch timeout job in BullMQ
     await this.jobsService.cancelDispatchTimeout(orderId, partner.id);
 
-    return this.prisma.$transaction(async (tx) => {
+    const trip = await this.prisma.$transaction(async (tx) => {
       // Create DeliveryTrip
-      const trip = await tx.deliveryTrip.create({
+      const newTrip = await tx.deliveryTrip.create({
         data: {
           orderId,
           partnerId: partner.id,
@@ -173,8 +220,17 @@ export class DeliveryService {
         },
       });
 
-      return trip;
+      return newTrip;
     });
+
+    // Broadcast status change via Socket.io
+    this.trackingService.emitOrderStatusUpdate(orderId, {
+      status: OrderStatus.ASSIGNED,
+      orderNumber: order.orderNumber,
+      note: `Delivery partner accepted order`,
+    });
+
+    return trip;
   }
 
   /**
@@ -200,7 +256,7 @@ export class DeliveryService {
     const { phase, distanceKm = trip.distanceKm || 3.5 } = dto;
     const orderId = trip.orderId;
 
-    return this.prisma.$transaction(async (tx) => {
+    const finalTrip = await this.prisma.$transaction(async (tx) => {
       let orderNextStatus = trip.order.status;
 
       if (phase === DeliveryPhase.AT_PICKUP) {
@@ -291,6 +347,19 @@ export class DeliveryService {
 
       return updatedTrip;
     });
+
+    let nextOrderStatusName = trip.order.status;
+    if (phase === DeliveryPhase.AT_PICKUP) nextOrderStatusName = OrderStatus.ARRIVED_AT_HUB;
+    else if (phase === DeliveryPhase.ON_THE_WAY) nextOrderStatusName = OrderStatus.OUT_FOR_DELIVERY;
+    else if (phase === DeliveryPhase.DELIVERED) nextOrderStatusName = OrderStatus.DELIVERED;
+
+    this.trackingService.emitOrderStatusUpdate(orderId, {
+      status: nextOrderStatusName,
+      orderNumber: trip.order.orderNumber,
+      note: `Rider updated delivery phase to ${phase}`,
+    });
+
+    return finalTrip;
   }
 
   /**

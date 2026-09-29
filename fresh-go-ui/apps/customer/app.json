@@ -13,12 +13,16 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.freshgo.customerapp",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Allow FreshGo to access your location to pinpoint your delivery address."
       }
     },
     "android": {
-      "package": "com.freshgo.customer",
+      "package": "com.freshgo.customerapp",
+      "versionCode": 2,
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

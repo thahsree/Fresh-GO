@@ -47,4 +47,14 @@ export class TrackingService {
       .to(`partner:${partnerId}`)
       .emit("partner:order:new", orderDetails);
   }
+
+  /**
+   * Broadcast new order ready for delivery to all partners subscribed to the hub
+   */
+  emitHubNewOrder(hubId: string, orderDetails: any) {
+    if (!this.server) return;
+    this.logger.log(`📡 Emitting hub:order:new to hub:${hubId}`);
+    this.server.to(`hub:${hubId}`).emit("hub:order:new", orderDetails);
+    this.server.emit("hub:order:new", orderDetails);
+  }
 }

@@ -5,6 +5,7 @@ import {
   Put,
   Body,
   Param,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { DeliveryService } from "./delivery.service";
@@ -28,6 +29,15 @@ export class DeliveryController {
   @Get("dashboard")
   async getDashboard(@CurrentUser() user: User) {
     return this.deliveryService.getPartnerDashboard(user.id);
+  }
+
+  @Roles(Role.DELIVERY_PARTNER)
+  @Get("available-orders")
+  async getAvailableOrders(
+    @CurrentUser() user: User,
+    @Query("hubId") hubId?: string,
+  ) {
+    return this.deliveryService.getAvailableOrders(user.id, hubId);
   }
 
   @Roles(Role.DELIVERY_PARTNER)
