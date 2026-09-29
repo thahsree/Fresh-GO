@@ -11,6 +11,12 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1ee809c0-0054-4b5c-8770-5dc8aafb4f05"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.freshgo.customerapp",
@@ -21,7 +27,7 @@
     },
     "android": {
       "package": "com.freshgo.customerapp",
-      "versionCode": 2,
+      "versionCode": 3,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
