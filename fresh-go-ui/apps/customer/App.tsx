@@ -755,6 +755,10 @@ export default function App() {
                       setIsListingOpen(false);
                       setActiveNavigation("Home");
                     }}
+                    onDeleteOrder={async (orderId) => {
+                      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+                      await customerApi.deleteOrder(orderId);
+                    }}
                   />
                 )}
 

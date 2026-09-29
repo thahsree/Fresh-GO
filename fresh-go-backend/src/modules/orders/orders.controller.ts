@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Headers,
@@ -56,5 +57,10 @@ export class OrdersController {
     @Body() dto: UpdateOrderStatusDto,
   ) {
     return this.ordersService.updateOrderStatus(id, dto, user);
+  }
+
+  @Delete(":id")
+  async deleteOrder(@CurrentUser() user: User, @Param("id") id: string) {
+    return this.ordersService.deleteOrder(id, user);
   }
 }

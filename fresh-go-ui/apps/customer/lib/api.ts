@@ -798,8 +798,19 @@ class CustomerApiClient {
         return rawOrders.map((o) => {
           const orderNum = o.orderNumber || o.id.slice(0, 8).toUpperCase();
           let uiStatus: CustomerOrder["status"] = "placed";
+
+          // If order is older than 2 hours and was left uncompleted,
+          // treat it as delivered so stale/stuck orders from prior sessions never remain in active orders.
+          const isStale = o.placedAt
+            ? Date.now() - new Date(o.placedAt).getTime() > 2 * 60 * 60 * 1000
+            : false;
+
           if (
             o.status === "DELIVERED" ||
+            o.status === "CANCELLED" ||
+            o.status === "FAILED_DELIVERY" ||
+            o.status === "RETURNED_TO_HUB" ||
+            isStale ||
             deliveredIds.includes(orderNum) ||
             deliveredIds.includes(o.id)
           ) {
@@ -867,6 +878,16 @@ class CustomerApiClient {
       console.log("[Customer API] Orders note (using local orders):", err);
     }
     return [];
+  }
+
+  async deleteOrder(orderId: string): Promise<boolean> {
+    try {
+      await this.delete(`/orders/${orderId}`, true);
+      return true;
+    } catch (err) {
+      console.log("[Customer API] Delete order note:", err);
+      return false;
+    }
   }
 
   async createOrder(orderDetails: {

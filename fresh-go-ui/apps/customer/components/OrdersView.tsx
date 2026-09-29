@@ -8,6 +8,7 @@ import {
   Phone,
   RefreshCw,
   ShoppingBag,
+  Trash2,
   Truck,
 } from "lucide-react-native";
 import React, { useState } from "react";
@@ -38,12 +39,14 @@ type OrdersViewProps = {
   orders: CustomerOrder[];
   onReorder: (items: { product: Product; quantity: number }[]) => void;
   onExploreProducts: () => void;
+  onDeleteOrder?: (orderId: string) => void;
 };
 
 export function OrdersView({
   orders,
   onReorder,
   onExploreProducts,
+  onDeleteOrder,
 }: OrdersViewProps) {
   const [selectedTab, setSelectedTab] = useState<"active" | "past">("active");
 
@@ -145,17 +148,29 @@ export function OrdersView({
                     <Text style={styles.orderId}>Order #{order.id}</Text>
                     <Text style={styles.orderDate}>{order.date}</Text>
                   </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: statusInfo.bg },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.statusText, { color: statusInfo.color }]}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: statusInfo.bg },
+                      ]}
                     >
-                      {statusInfo.label}
-                    </Text>
+                      <Text
+                        style={[styles.statusText, { color: statusInfo.color }]}
+                      >
+                        {statusInfo.label}
+                      </Text>
+                    </View>
+                    {onDeleteOrder && (
+                      <Pressable
+                        onPress={() => onDeleteOrder(order.id)}
+                        hitSlop={8}
+                        accessibilityLabel="Remove order"
+                        style={styles.deleteOrderBtn}
+                      >
+                        <Trash2 size={15} color={colors.textSoft} />
+                      </Pressable>
+                    )}
                   </View>
                 </View>
 
@@ -428,6 +443,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
+  },
+  deleteOrderBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
   },
   statusText: {
     fontSize: 11,

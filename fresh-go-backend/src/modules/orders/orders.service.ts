@@ -520,4 +520,29 @@ export class OrdersService {
 
     return updatedOrder;
   }
+
+  async deleteOrder(idOrNumber: string, actor: User) {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        OR: [{ id: idOrNumber }, { orderNumber: idOrNumber }],
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException("Order not found");
+    }
+
+    if (order.customerId !== actor.id && actor.role !== Role.ADMIN) {
+      throw new BadRequestException("You can only delete your own orders");
+    }
+
+    await this.prisma.order.delete({
+      where: { id: order.id },
+    });
+
+    return {
+      success: true,
+      message: `Order #${order.orderNumber} deleted successfully`,
+    };
+  }
 }
