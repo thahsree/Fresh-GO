@@ -836,35 +836,19 @@ export function CartView({
           <Pressable
             style={[
               styles.paymentOption,
-              paymentMethod === "cod" && styles.paymentOptionSelected,
+              styles.paymentOptionSelected,
             ]}
             onPress={() => setPaymentMethod("cod")}
           >
             <View style={styles.radio}>
-              {paymentMethod === "cod" && <View style={styles.radioDot} />}
+              <View style={styles.radioDot} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.paymentTitle}>Cash on Delivery (COD)</Text>
-              <Text style={styles.paymentSubtitle}>Pay cash or UPI directly to delivery partner upon arrival</Text>
+              <Text style={styles.paymentTitle}>Pay on Delivery (Cash / UPI)</Text>
+              <Text style={styles.paymentSubtitle}>Pay cash or scan UPI QR directly with rider at doorstep</Text>
             </View>
             <View style={{ backgroundColor: "#EAF6ED", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-              <Text style={{ color: "#198754", fontSize: 11, fontWeight: "700" }}>RECOMMENDED</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.paymentOption,
-              paymentMethod === "upi" && styles.paymentOptionSelected,
-            ]}
-            onPress={() => setPaymentMethod("upi")}
-          >
-            <View style={styles.radio}>
-              {paymentMethod === "upi" && <View style={styles.radioDot} />}
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.paymentTitle}>Online Payment (UPI / Cards)</Text>
-              <Text style={styles.paymentSubtitle}>Instant checkout via UPI, Google Pay, PhonePe or Cards</Text>
+              <Text style={{ color: "#198754", fontSize: 11, fontWeight: "700" }}>AVAILABLE</Text>
             </View>
           </Pressable>
         </View>

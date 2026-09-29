@@ -73,10 +73,23 @@ export class ZonesService {
         );
         const etaMinutes = this.mapsService.estimateDurationMinutes(distanceKm);
 
+        // Find if an active DeliveryZone covers this location
+        const activeZones = await this.findAll(true);
+        const matchingZone = activeZones.find((z) =>
+          this.mapsService.isPointInZone(
+            latitude,
+            longitude,
+            z.centerLat,
+            z.centerLng,
+            z.radiusKm,
+          ),
+        );
+
         return {
           serviceable: true,
-          zone: {
-            id: hub.id,
+          hub,
+          zone: matchingZone || {
+            id: null,
             name: hub.name,
             centerLat: hub.latitude,
             centerLng: hub.longitude,

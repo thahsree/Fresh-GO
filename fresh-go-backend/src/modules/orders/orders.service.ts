@@ -157,7 +157,8 @@ export class OrdersService {
 
       const cut =
         product.cuts.find((c) => c.id === item.cutOptionId) ||
-        product.cuts.find((c) => c.isDefault);
+        product.cuts.find((c) => c.isDefault) ||
+        product.cuts[0];
       const grossGrams = 700; // Standard 1kg whole fish equivalent ~700g net, or live weight
       const netGrams = 500;
 
@@ -252,12 +253,34 @@ export class OrdersService {
           ? PaymentMethod.COD
           : dto.paymentMethod || PaymentMethod.COD;
 
+      // Ensure valid zoneId (referencing DeliveryZone) and hubId (referencing Hub)
+      let validZoneId: string | null = null;
+      let matchedHubId: string | null = (zoneCheck as any)?.hub?.id || null;
+
+      if (zone?.id) {
+        const existingZone = await tx.deliveryZone.findUnique({
+          where: { id: zone.id },
+        });
+        if (existingZone) {
+          validZoneId = existingZone.id;
+        }
+      }
+
+      // If no hub matched yet, fall back to default active hub
+      if (!matchedHubId) {
+        const defaultHub = await tx.hub.findFirst({
+          where: { isActive: true },
+        });
+        matchedHubId = defaultHub?.id || null;
+      }
+
       const newOrder = await tx.order.create({
         data: {
           orderNumber,
           idempotencyKey: idempotencyKey || null,
           customerId: userId,
-          zoneId: zone.id,
+          hubId: matchedHubId,
+          zoneId: validZoneId,
           status:
             effectivePaymentMethod === PaymentMethod.COD
               ? OrderStatus.CONFIRMED
@@ -280,8 +303,8 @@ export class OrdersService {
           items: {
             create: pricingItems.map((it) => ({
               productId: it.productId,
-              cutOptionId: it.cutOptionId,
-              batchId: allocatedBatches[it.productId],
+              cutOptionId: it.cutOptionId || null,
+              batchId: allocatedBatches[it.productId] || null,
               quantity: it.quantity,
               unitPrice: it.unitPrice,
               cuttingCharge: it.cuttingCharge,
