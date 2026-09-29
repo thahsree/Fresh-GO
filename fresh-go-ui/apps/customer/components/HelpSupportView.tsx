@@ -84,7 +84,7 @@ export function HelpSupportView({ onBack }: HelpSupportViewProps) {
   };
 
   const handleEmail = () => {
-    Linking.openURL("mailto:support@freshgo.in").catch(() => {});
+    Linking.openURL("mailto:chthashreef22@gmail.com").catch(() => {});
   };
 
   const handleWhatsApp = () => {
@@ -166,7 +166,7 @@ export function HelpSupportView({ onBack }: HelpSupportViewProps) {
             <Text style={styles.contactCardTitle}>Email</Text>
             <Text style={styles.contactCardSub}>Reply in 2 hours</Text>
             <Text style={[styles.contactAction, { color: colors.accent }]}>
-              support@freshgo.in
+              chthashreef22@gmail.com
             </Text>
           </Pressable>
         </View>

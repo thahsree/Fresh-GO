@@ -191,7 +191,7 @@ export function PrivacyPolicyModal({
                   <Text style={styles.cardBlockDesc}>
                     FreshGo Technologies Pvt. Ltd.{"\n"}
                     Mavoor Road, Kozhikode, Kerala 673004{"\n"}
-                    Email: support@freshgo.in · Phone: +91 70255 04042
+                    Email: chthashreef22@gmail.com · Phone: +91 70255 04042
                   </Text>
                 </View>
               </View>

@@ -56,7 +56,7 @@ All communications between the FreshGo mobile application and our backend server
 
 You have full control over your personal data:
 - **View & Update:** View and update your saved delivery addresses and account profile directly within the app.
-- **Account & Data Deletion:** You can delete saved addresses from your Profile at any time. To request full account and data deletion, email our Data Privacy Officer at **support@freshgo.in** or contact customer support within the app. Your data will be deleted within 30 business days.
+- **Account & Data Deletion:** You can delete saved addresses from your Profile at any time. To request full account and data deletion, email our Data Privacy Officer at **chthashreef22@gmail.com** or contact customer support within the app. Your data will be deleted within 30 business days.
 
 ---
 
@@ -69,6 +69,6 @@ FreshGo does not target or knowingly collect personal information from individua
 ## 7. Contact Us
 
 If you have questions, concerns, or requests regarding this Privacy Policy, please contact us:
-- **Email:** support@freshgo.in
+- **Email:** chthashreef22@gmail.com
 - **App:** Help & Support section within the FreshGo app
 - **Location:** Kozhikode / Kannur, Kerala, India
