@@ -144,33 +144,21 @@ export function OrdersView({
               <View key={order.id} style={styles.orderCard}>
                 {/* Top Row: ID & Status */}
                 <View style={styles.cardTop}>
-                  <View>
+                  <View style={styles.cardTopLeft}>
                     <Text style={styles.orderId}>Order #{order.id}</Text>
                     <Text style={styles.orderDate}>{order.date}</Text>
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: statusInfo.bg },
-                      ]}
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: statusInfo.bg },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.statusText, { color: statusInfo.color }]}
                     >
-                      <Text
-                        style={[styles.statusText, { color: statusInfo.color }]}
-                      >
-                        {statusInfo.label}
-                      </Text>
-                    </View>
-                    {onDeleteOrder && (
-                      <Pressable
-                        onPress={() => onDeleteOrder(order.id)}
-                        hitSlop={8}
-                        accessibilityLabel="Remove order"
-                        style={styles.deleteOrderBtn}
-                      >
-                        <Trash2 size={15} color={colors.textSoft} />
-                      </Pressable>
-                    )}
+                      {statusInfo.label}
+                    </Text>
                   </View>
                 </View>
 
@@ -298,21 +286,38 @@ export function OrdersView({
                     </Text>
                   </View>
 
-                  {isDelivered ? (
-                    <Pressable
-                      style={styles.reorderBtn}
-                      onPress={() => onReorder(order.items)}
-                      accessibilityRole="button"
-                    >
-                      <RefreshCw size={14} color="#FFFFFF" />
-                      <Text style={styles.reorderBtnText}>Reorder</Text>
-                    </Pressable>
-                  ) : (
-                    <View style={styles.liveBadge}>
-                      <View style={styles.liveDot} />
-                      <Text style={styles.liveText}>Live Tracking</Text>
-                    </View>
-                  )}
+                  <View style={styles.footerActionRow}>
+                    {onDeleteOrder && (
+                      <Pressable
+                        style={styles.deleteOrderFooterBtn}
+                        onPress={() => onDeleteOrder(order.id)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={isDelivered ? "Remove order" : "Cancel order"}
+                      >
+                        <Trash2 size={13} color={colors.textSoft} />
+                        <Text style={styles.deleteOrderFooterText}>
+                          {isDelivered ? "Remove" : "Cancel"}
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {isDelivered ? (
+                      <Pressable
+                        style={styles.reorderBtn}
+                        onPress={() => onReorder(order.items)}
+                        accessibilityRole="button"
+                      >
+                        <RefreshCw size={13} color="#FFFFFF" />
+                        <Text style={styles.reorderBtnText}>Reorder</Text>
+                      </Pressable>
+                    ) : (
+                      <View style={styles.liveBadge}>
+                        <View style={styles.liveDot} />
+                        <Text style={styles.liveText}>Live Tracking</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             );
@@ -426,8 +431,12 @@ const styles = StyleSheet.create({
   cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 14,
+  },
+  cardTopLeft: {
+    flex: 1,
+    marginRight: 10,
   },
   orderId: {
     color: colors.primaryDark,
@@ -443,13 +452,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-  },
-  deleteOrderBtn: {
-    padding: 6,
-    borderRadius: 8,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: "center",
-    justifyContent: "center",
   },
   statusText: {
     fontSize: 11,
@@ -570,6 +572,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  footerActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  deleteOrderFooterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  deleteOrderFooterText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.textMuted,
   },
   totalLabel: {
     color: colors.textSoft,

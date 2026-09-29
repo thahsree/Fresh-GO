@@ -354,44 +354,37 @@ export function CartView({
 
       {/* 1. Delivery Location Banner (GPS Coordinates & Hub Express Area) */}
       <View style={styles.locationCard}>
-        <View style={styles.locationLeft}>
-          <View style={styles.locationIconBg}>
-            <Navigation size={18} color={colors.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.locationLabelRow}>
-              <Text style={styles.locationLabel}>DELIVERY LOCATION (GPS ZONE)</Text>
-              <View style={styles.gpsLiveBadge}>
-                <View style={styles.gpsLiveDot} />
-                <Text style={styles.gpsLiveText}>10km Zone</Text>
-              </View>
-            </View>
-            <Text style={styles.locationTitle} numberOfLines={1} ellipsizeMode="tail">
-              {activeLocation}
-            </Text>
-            {deliveryCoords && (
-              <Text style={styles.coordsSubtitle}>
-                GPS: {deliveryCoords.lat.toFixed(4)}, {deliveryCoords.lng.toFixed(4)}
-              </Text>
-            )}
-          </View>
+        <View style={styles.locationIconBg}>
+          <Navigation size={18} color={colors.primary} />
         </View>
 
-        <View style={styles.locationRight}>
-          {onOpenLocationPicker && (
-            <Pressable
-              style={styles.changeLocBtn}
-              onPress={onOpenLocationPicker}
-              accessibilityRole="button"
-            >
-              <Text style={styles.changeLocBtnText}>Change</Text>
-            </Pressable>
-          )}
-          <View style={styles.etaBadge}>
-            <Clock size={11} color={colors.success} />
-            <Text style={styles.etaText}>25 mins</Text>
+        <View style={styles.locationMiddle}>
+          <View style={styles.locationLabelRow}>
+            <Text style={styles.locationLabel}>DELIVERY LOCATION</Text>
+            <View style={styles.etaBadge}>
+              <Clock size={10} color={colors.success} />
+              <Text style={styles.etaText}>25 mins</Text>
+            </View>
           </View>
+          <Text style={styles.locationTitle} numberOfLines={1} ellipsizeMode="tail">
+            {activeLocation}
+          </Text>
+          {deliveryCoords && (
+            <Text style={styles.coordsSubtitle}>
+              GPS: {deliveryCoords.lat.toFixed(4)}, {deliveryCoords.lng.toFixed(4)}
+            </Text>
+          )}
         </View>
+
+        {onOpenLocationPicker && (
+          <Pressable
+            style={styles.changeLocBtn}
+            onPress={onOpenLocationPicker}
+            accessibilityRole="button"
+          >
+            <Text style={styles.changeLocBtnText}>Change</Text>
+          </Pressable>
+        )}
       </View>
 
       {/* 2. Cart Items List */}
@@ -534,14 +527,9 @@ export function CartView({
       {/* 3. Delivery Address (Doorstep Details: Building Name, House, Street, Landmark) */}
       <View style={styles.addressSection}>
         <View style={styles.addressSectionHeader}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+          <View style={styles.addressHeaderLeft}>
             <MapPin size={18} color={colors.primary} />
-            <View>
-              <Text style={styles.sectionHeaderTitle}>Delivery Address (Doorstep)</Text>
-              <Text style={styles.sectionHeaderSub}>
-                Rider doorstep details: Building, flat & landmark
-              </Text>
-            </View>
+            <Text style={styles.sectionHeaderTitle}>Delivery Address (Doorstep)</Text>
           </View>
           {isLoggedIn && savedAddresses.length > 0 && (
             <Pressable
@@ -557,6 +545,9 @@ export function CartView({
             </Pressable>
           )}
         </View>
+        <Text style={styles.sectionHeaderSub}>
+          Rider doorstep details: Building, flat & landmark
+        </Text>
 
         {!isLoggedIn ? (
           <View style={styles.authPromptCard}>
@@ -1020,27 +1011,24 @@ const styles = StyleSheet.create({
   locationCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: "#F8FAFC",
-    padding: 14,
-    borderRadius: 16,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: "#E2E8F0",
     marginBottom: 16,
-  },
-  locationLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-    marginRight: 10,
+    gap: 10,
   },
   locationIconBg: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.primaryTint,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  locationMiddle: {
+    flex: 1,
     justifyContent: "center",
   },
   locationLabelRow: {
@@ -1055,26 +1043,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 0.5,
   },
-  gpsLiveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#E2E8F0",
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-  },
-  gpsLiveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.success,
-  },
-  gpsLiveText: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: colors.textSoft,
-  },
   locationTitle: {
     color: colors.primaryDark,
     fontSize: 13.5,
@@ -1083,37 +1051,34 @@ const styles = StyleSheet.create({
   coordsSubtitle: {
     color: colors.textMuted,
     fontSize: 10.5,
-    marginTop: 2,
-  },
-  locationRight: {
-    alignItems: "flex-end",
-    gap: 6,
+    marginTop: 1,
   },
   changeLocBtn: {
     backgroundColor: colors.surface,
-    paddingHorizontal: 11,
-    paddingVertical: 4.5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border,
+    alignSelf: "center",
   },
   changeLocBtnText: {
     color: colors.primary,
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "700",
   },
   etaBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 3,
     backgroundColor: colors.successTint,
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   etaText: {
     color: colors.success,
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: "700",
   },
 
@@ -1211,7 +1176,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 14,
+    marginBottom: 4,
+  },
+  addressHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   sectionHeaderTitle: {
     color: colors.primaryDark,
@@ -1220,12 +1190,13 @@ const styles = StyleSheet.create({
   },
   sectionHeaderSub: {
     color: colors.textSoft,
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 11.5,
+    marginBottom: 12,
+    marginTop: 2,
   },
   addressHeaderAction: {
     backgroundColor: colors.primaryTint,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: 8,
   },
