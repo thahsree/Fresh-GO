@@ -803,20 +803,23 @@ async function main() {
   if (seerProduct && snapperProduct && partnerProfile) {
     const activeOrder = await prisma.order.upsert({
       where: { orderNumber: "FF90214" },
-      update: {},
+      update: {
+        status: OrderStatus.DELIVERED,
+        deliveredAt: new Date(Date.now() - 5 * 60 * 1000),
+      },
       create: {
         orderNumber: "FF90214",
         customerId: customer.id,
         hubId: hub.id,
         zoneId: zone.id,
         deliveryPartnerId: partnerProfile.id,
-        status: OrderStatus.OUT_FOR_DELIVERY,
+        status: OrderStatus.DELIVERED,
         subtotal: 1040,
         deliveryFee: 0,
         discountAmount: 0,
         totalAmount: 1040,
         paymentMethod: PaymentMethod.COD,
-        paymentStatus: PaymentStatus.PENDING,
+        paymentStatus: PaymentStatus.PAID,
         deliveryAddressSnapshotJson: JSON.stringify({
           street: "Doorstep Delivery Location",
           area: "Kozhikode Central",
@@ -825,6 +828,7 @@ async function main() {
         }),
         placedAt: new Date(Date.now() - 35 * 60 * 1000),
         dispatchedAt: new Date(Date.now() - 12 * 60 * 1000),
+        deliveredAt: new Date(Date.now() - 5 * 60 * 1000),
         items: {
           create: [
             {

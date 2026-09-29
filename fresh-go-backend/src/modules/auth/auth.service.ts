@@ -45,19 +45,21 @@ export class AuthService {
     const redisKey = `otp:${phone}`;
     await this.redis.set(redisKey, otp, 300);
 
-    // Rate limiting: track recent sends (max 5 per 10 mins)
-    const rateKey = `otp_rate:${phone}`;
-    const sendCount = await this.redis.get(rateKey);
-    if (sendCount && parseInt(sendCount, 10) >= 5) {
-      throw new BadRequestException(
-        "Too many OTP attempts. Please wait 10 minutes.",
+    // Rate limiting: track recent sends (max 5 per 10 mins, exempt test numbers and dev)
+    if (!isTestPhone && !isDev) {
+      const rateKey = `otp_rate:${phone}`;
+      const sendCount = await this.redis.get(rateKey);
+      if (sendCount && parseInt(sendCount, 10) >= 5) {
+        throw new BadRequestException(
+          "Too many OTP attempts. Please wait 10 minutes.",
+        );
+      }
+      await this.redis.set(
+        rateKey,
+        (parseInt(sendCount || "0", 10) + 1).toString(),
+        600,
       );
     }
-    await this.redis.set(
-      rateKey,
-      (parseInt(sendCount || "0", 10) + 1).toString(),
-      600,
-    );
 
     // Dispatch SMS via provider
     await this.smsService.sendOtp(phone, otp);

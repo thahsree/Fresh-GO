@@ -264,19 +264,11 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   )}
                 </Pressable>
 
-                {/* Trust info */}
-                <View style={styles.trustBadge}>
-                  <ShieldCheck size={14} color={colors.primary} />
-                  <Text style={styles.trustText}>
-                    100% Secure · Instant OTP Verification · No passwords
-                  </Text>
-                </View>
-
                 {/* Dev hint badge */}
                 <View style={styles.devHintBox}>
                   <Sparkles size={13} color="#B45309" />
                   <Text style={styles.devHintText}>
-                    Dev Mode Active: Test OTP <Text style={styles.devHintBold}>123456</Text> will be simulated & auto-filled on the next screen.
+                    Reviewer Demo: Use test mobile <Text style={styles.devHintBold}>9876543210</Text> and OTP <Text style={styles.devHintBold}>123456</Text>.
                   </Text>
                 </View>
               </View>

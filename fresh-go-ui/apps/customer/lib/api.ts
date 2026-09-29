@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeModules, Platform } from "react-native";
 import {
   type Category,
@@ -103,6 +104,7 @@ export const API_BASE = getApiBase();
 
 const TOKEN_KEY = "freshgo_customer_token";
 const USER_KEY = "freshgo_customer_user";
+const DELIVERED_ORDERS_KEY = "freshgo_delivered_orders";
 
 export type BackendCategory = {
   id: string;
@@ -220,17 +222,28 @@ export type BackendOrder = {
 class CustomerApiClient {
   private token: string | null = null;
   private user: UserProfile | null = null;
-  private authPromise: Promise<UserProfile | null> | null = null;
+  private isStorageInitialized = false;
 
   constructor() {
-    if (typeof window !== "undefined" && window.localStorage) {
-      try {
-        this.token = localStorage.getItem(TOKEN_KEY);
-        const stored = localStorage.getItem(USER_KEY);
-        if (stored) this.user = JSON.parse(stored);
-      } catch {
-        // ignore
+    this.initStorage();
+  }
+
+  private async initStorage() {
+    try {
+      const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+      const storedUser = await AsyncStorage.getItem(USER_KEY);
+      if (storedToken) this.token = storedToken;
+      if (storedUser) this.user = JSON.parse(storedUser);
+      this.isStorageInitialized = true;
+    } catch {
+      if (typeof window !== "undefined" && window.localStorage) {
+        try {
+          this.token = localStorage.getItem(TOKEN_KEY);
+          const stored = localStorage.getItem(USER_KEY);
+          if (stored) this.user = JSON.parse(stored);
+        } catch {}
       }
+      this.isStorageInitialized = true;
     }
   }
 
@@ -241,29 +254,33 @@ class CustomerApiClient {
     return this.token;
   }
 
-  setSession(token: string, user: UserProfile) {
+  async setSession(token: string, user: UserProfile) {
     this.token = token;
     this.user = user;
+    try {
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
+    } catch {}
     if (typeof window !== "undefined" && window.localStorage) {
       try {
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(USER_KEY, JSON.stringify(user));
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
   }
 
-  clearSession() {
+  async clearSession() {
     this.token = null;
     this.user = null;
+    try {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      await AsyncStorage.removeItem(USER_KEY);
+    } catch {}
     if (typeof window !== "undefined" && window.localStorage) {
       try {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
   }
 
@@ -271,16 +288,69 @@ class CustomerApiClient {
     return this.user;
   }
 
+  async markOrderDelivered(orderId: string): Promise<void> {
+    try {
+      const stored = await AsyncStorage.getItem(DELIVERED_ORDERS_KEY);
+      const list: string[] = stored ? JSON.parse(stored) : [];
+      if (!list.includes(orderId)) {
+        list.push(orderId);
+        await AsyncStorage.setItem(DELIVERED_ORDERS_KEY, JSON.stringify(list));
+      }
+    } catch {}
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const stored = localStorage.getItem(DELIVERED_ORDERS_KEY);
+        const list: string[] = stored ? JSON.parse(stored) : [];
+        if (!list.includes(orderId)) {
+          list.push(orderId);
+          localStorage.setItem(DELIVERED_ORDERS_KEY, JSON.stringify(list));
+        }
+      } catch {}
+    }
+  }
+
+  async getDeliveredOrderIds(): Promise<string[]> {
+    try {
+      const stored = await AsyncStorage.getItem(DELIVERED_ORDERS_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    if (typeof window !== "undefined" && window.localStorage) {
+      try {
+        const stored = localStorage.getItem(DELIVERED_ORDERS_KEY);
+        if (stored) return JSON.parse(stored);
+      } catch {}
+    }
+    return [];
+  }
+
   /**
    * Restore real customer session from stored JWT accessToken if present.
-   * Validates token against backend /auth/me.
+   * Persists across device app closures and restarts.
    */
   async restoreSession(): Promise<UserProfile | null> {
-    const token = this.getToken();
+    if (!this.token) {
+      try {
+        const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+        const storedUser = await AsyncStorage.getItem(USER_KEY);
+        if (storedToken) this.token = storedToken;
+        if (storedUser) this.user = JSON.parse(storedUser);
+      } catch {}
+      if (!this.token && typeof window !== "undefined" && window.localStorage) {
+        try {
+          this.token = localStorage.getItem(TOKEN_KEY);
+          const stored = localStorage.getItem(USER_KEY);
+          if (stored) this.user = JSON.parse(stored);
+        } catch {}
+      }
+    }
+
+    const token = this.token;
     if (!token) {
       this.user = null;
       return null;
     }
+
+    const cachedUser = this.user;
 
     try {
       const res = await this.get<{
@@ -295,24 +365,30 @@ class CustomerApiClient {
 
       if (res?.user) {
         const profile: UserProfile = {
-          name: res.user.name || "Customer",
+          name: res.user.name || cachedUser?.name || "Customer",
           phone: res.user.phone,
           email: res.user.email || "",
           isLoggedIn: true,
         };
-        this.user = profile;
-        if (typeof window !== "undefined" && window.localStorage) {
-          try {
-            localStorage.setItem(USER_KEY, JSON.stringify(profile));
-          } catch {}
-        }
+        await this.setSession(token, profile);
         return profile;
       }
     } catch (err: any) {
-      console.log("[Customer API] Session expired or invalid, resetting to guest:", err.message);
-      this.clearSession();
+      if (
+        err?.message?.includes("Network request failed") ||
+        err?.message?.includes("Failed to fetch") ||
+        err?.message?.includes("AbortError")
+      ) {
+        if (cachedUser && cachedUser.isLoggedIn) {
+          return cachedUser;
+        }
+      }
+      if (err?.message?.includes("401") || err?.message?.includes("Unauthorized")) {
+        console.log("[Customer API] Session expired, resetting to guest:", err.message);
+        await this.clearSession();
+      }
     }
-    return null;
+    return cachedUser && cachedUser.isLoggedIn ? cachedUser : null;
   }
 
   async sendOtp(rawPhone: string): Promise<{ success: boolean; message: string; devOtp?: string; isMock?: boolean }> {
@@ -380,7 +456,7 @@ class CustomerApiClient {
       isLoggedIn: true,
     };
 
-    this.setSession(res.accessToken, profile);
+    await this.setSession(res.accessToken, profile);
     return { success: true, user: profile };
   }
 
@@ -715,19 +791,27 @@ class CustomerApiClient {
   async getMyOrders(): Promise<CustomerOrder[]> {
     if (!this.getToken()) return [];
     try {
+      const deliveredIds = await this.getDeliveredOrderIds();
       const rawOrders = await this.get<BackendOrder[]>("/orders/my", true);
 
       if (Array.isArray(rawOrders)) {
         return rawOrders.map((o) => {
+          const orderNum = o.orderNumber || o.id.slice(0, 8).toUpperCase();
           let uiStatus: CustomerOrder["status"] = "placed";
-          if (["CUTTING_PREPARING", "PACKED", "DISPATCH_READY"].includes(o.status)) {
+          if (
+            o.status === "DELIVERED" ||
+            deliveredIds.includes(orderNum) ||
+            deliveredIds.includes(o.id)
+          ) {
+            uiStatus = "delivered";
+          } else if (
+            ["CUTTING_PREPARING", "PACKED", "DISPATCH_READY"].includes(o.status)
+          ) {
             uiStatus = "preparing";
           } else if (
             ["ASSIGNED", "ARRIVED_AT_HUB", "PICKED_UP", "OUT_FOR_DELIVERY"].includes(o.status)
           ) {
             uiStatus = "out_for_delivery";
-          } else if (o.status === "DELIVERED") {
-            uiStatus = "delivered";
           }
 
           const items = (o.items || []).map((item) => ({

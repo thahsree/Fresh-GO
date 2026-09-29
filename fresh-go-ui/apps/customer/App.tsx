@@ -86,6 +86,9 @@ export default function App() {
   const [isListingOpen, setIsListingOpen] = useState(false);
   const [listingCategory, setListingCategory] = useState<string | null>(null);
   const [listingSearch, setListingSearch] = useState("");
+  const [listingNeed, setListingNeed] = useState<string | null>(null);
+  const [listingSectionId, setListingSectionId] = useState<string | null>(null);
+  const [listingSectionTitle, setListingSectionTitle] = useState<string | null>(null);
 
   // Customer Profile
   const [user, setUser] = useState<UserProfile>({
@@ -450,9 +453,15 @@ export default function App() {
   const handleNavigateToListing = (
     category?: string | null,
     search: string = "",
+    need?: string | null,
+    sectionId?: string | null,
+    sectionTitle?: string | null,
   ) => {
     setListingCategory(category ?? null);
     setListingSearch(search);
+    setListingNeed(need ?? null);
+    setListingSectionId(sectionId ?? null);
+    setListingSectionTitle(sectionTitle ?? null);
     setIsListingOpen(true);
   };
 
@@ -572,6 +581,7 @@ export default function App() {
 
     // Milestone 3: Delivered (after 45s)
     setTimeout(async () => {
+      await customerApi.markOrderDelivered(orderId);
       setOrders((prev) =>
         prev.map((o) =>
           o.id === orderId
@@ -655,10 +665,18 @@ export default function App() {
               <ProductListingView
                 initialCategory={listingCategory}
                 initialSearch={listingSearch}
+                initialNeed={listingNeed}
+                initialSectionId={listingSectionId}
+                initialSectionTitle={listingSectionTitle}
                 favorites={favorites}
                 categories={categoriesList}
                 products={products}
-                onBack={() => setIsListingOpen(false)}
+                onBack={() => {
+                  setIsListingOpen(false);
+                  setListingNeed(null);
+                  setListingSectionId(null);
+                  setListingSectionTitle(null);
+                }}
                 onSelectProduct={handleOpenProduct}
                 onAddProduct={(id) => handleAddToCart(id, 1)}
                 onToggleFavorite={toggleFavorite}

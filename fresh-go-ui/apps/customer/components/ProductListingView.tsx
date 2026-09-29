@@ -36,6 +36,9 @@ type PriceFilter = "all" | "under_300" | "300_700" | "above_700";
 type ProductListingViewProps = {
   initialCategory?: string | null;
   initialSearch?: string;
+  initialNeed?: string | null;
+  initialSectionId?: string | null;
+  initialSectionTitle?: string | null;
   favorites: string[];
   categories?: Category[];
   products?: Product[];
@@ -48,6 +51,9 @@ type ProductListingViewProps = {
 export function ProductListingView({
   initialCategory = null,
   initialSearch = "",
+  initialNeed = null,
+  initialSectionId = null,
+  initialSectionTitle = null,
   favorites,
   categories = [],
   products = [],
@@ -60,6 +66,9 @@ export function ProductListingView({
     initialCategory,
   );
   const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [selectedNeed, setSelectedNeed] = useState<string | null>(initialNeed);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(initialSectionId);
+  const [selectedSectionTitle, setSelectedSectionTitle] = useState<string | null>(initialSectionTitle);
   const [sortBy, setSortBy] = useState<SortOption>("featured");
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
   const [onlyFresh, setOnlyFresh] = useState(false);
@@ -68,6 +77,57 @@ export function ProductListingView({
   // Filter & Sort Logic
   const filteredProducts = useMemo(() => {
     let list = [...products];
+
+    // Need Filter (Shop by need)
+    if (selectedNeed) {
+      const needLower = selectedNeed.toLowerCase();
+      if (needLower.includes("fish")) {
+        list = list.filter(
+          (p) =>
+            p.category.toLowerCase() === "fish" ||
+            p.isDailyCatch ||
+            p.name.toLowerCase().includes("fish") ||
+            p.name.toLowerCase().includes("pomfret") ||
+            p.name.toLowerCase().includes("seer") ||
+            p.name.toLowerCase().includes("salmon") ||
+            p.name.toLowerCase().includes("sardine"),
+        );
+      } else if (needLower.includes("meat") || needLower.includes("family")) {
+        list = list.filter(
+          (p) =>
+            p.name.toLowerCase().includes("pack") ||
+            p.name.toLowerCase().includes("combo") ||
+            p.name.toLowerCase().includes("biryani") ||
+            p.category.toLowerCase() === "meat" ||
+            p.name.toLowerCase().includes("mutton") ||
+            p.name.toLowerCase().includes("chicken"),
+        );
+      } else if (needLower.includes("frozen")) {
+        list = list.filter(
+          (p) =>
+            p.isFlashFrozen ||
+            p.category.toLowerCase() === "frozen" ||
+            p.name.toLowerCase().includes("frozen"),
+        );
+      } else if (needLower.includes("daily catch")) {
+        list = list.filter(
+          (p) =>
+            p.isDailyCatch ||
+            p.tag?.toLowerCase().includes("daily") ||
+            p.category.toLowerCase() === "fish",
+        );
+      } else if (needLower.includes("weekend") || needLower.includes("special")) {
+        list = list.filter(
+          (p) =>
+            p.isTodaysOffer ||
+            p.isBestSeller ||
+            p.name.toLowerCase().includes("combo") ||
+            p.name.toLowerCase().includes("pack") ||
+            p.name.toLowerCase().includes("feast") ||
+            Boolean(p.tag?.toLowerCase().includes("special")),
+        );
+      }
+    }
 
     // Category Filter
     if (selectedCategory && selectedCategory !== "All") {
@@ -114,11 +174,14 @@ export function ProductListingView({
     }
 
     return list;
-  }, [products, selectedCategory, searchQuery, priceFilter, onlyFresh, sortBy]);
+  }, [products, selectedCategory, searchQuery, selectedNeed, selectedSectionId, priceFilter, onlyFresh, sortBy]);
 
   const resetFilters = () => {
     setSelectedCategory(null);
     setSearchQuery("");
+    setSelectedNeed(null);
+    setSelectedSectionId(null);
+    setSelectedSectionTitle(null);
     setPriceFilter("all");
     setOnlyFresh(false);
     setSortBy("featured");
@@ -126,6 +189,8 @@ export function ProductListingView({
 
   const hasActiveFilters =
     selectedCategory !== null ||
+    selectedNeed !== null ||
+    selectedSectionId !== null ||
     priceFilter !== "all" ||
     onlyFresh ||
     sortBy !== "featured" ||
@@ -250,6 +315,25 @@ export function ProductListingView({
           </Text>
         </Pressable>
       </View>
+
+      {/* Active Need / Section Filter Pill */}
+      {(selectedNeed || selectedSectionTitle) && (
+        <View style={styles.activeNeedRow}>
+          <Text style={styles.activeNeedText}>
+            Filtering by: <Text style={{ fontWeight: "800", color: colors.primary }}>{selectedNeed || selectedSectionTitle}</Text>
+          </Text>
+          <Pressable
+            onPress={() => {
+              setSelectedNeed(null);
+              setSelectedSectionId(null);
+              setSelectedSectionTitle(null);
+            }}
+            style={styles.clearNeedBtn}
+          >
+            <Text style={styles.clearNeedText}>✕ Clear</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Products Grid */}
       <ScrollView
@@ -908,5 +992,36 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13.5,
     fontWeight: "800",
+  },
+  activeNeedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#EAF6ED",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D1E7DD",
+  },
+  activeNeedText: {
+    fontSize: 12,
+    color: colors.primaryDark,
+    fontWeight: "500",
+  },
+  clearNeedBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#D1E7DD",
+  },
+  clearNeedText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
   },
 });

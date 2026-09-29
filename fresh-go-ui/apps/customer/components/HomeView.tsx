@@ -29,7 +29,13 @@ type HomeViewProps = {
   onAddProduct: (productId: string) => void;
   onToggleFavorite: (productId: string) => void;
   onSelectProduct: (product: Product) => void;
-  onNavigateToListing: (category?: string | null, search?: string) => void;
+  onNavigateToListing: (
+    category?: string | null,
+    search?: string,
+    need?: string | null,
+    sectionId?: string | null,
+    sectionTitle?: string | null,
+  ) => void;
   onPressProfile?: () => void;
   onPressLocation?: () => void;
 };
@@ -143,6 +149,9 @@ export function HomeView({
       <CustomerHeader
         searchValue={searchValue}
         onSearchChange={onSearchChange}
+        products={products}
+        onSubmitSearch={(q) => onNavigateToListing(null, q)}
+        onSelectProduct={onSelectProduct}
         address={address}
         onPressProfile={onPressProfile}
         onPressLocation={onPressLocation}
@@ -269,7 +278,7 @@ export function HomeView({
               <SectionHeader
                 title={`${sec.icon ? sec.icon + " " : ""}${sec.title}`}
                 action="See all"
-                onAction={() => onNavigateToListing(selectedCategory)}
+                onAction={() => onNavigateToListing(null, "", null, sec.id, sec.title)}
               />
               <ProductRail
                 products={secVisibleProducts}
@@ -314,6 +323,7 @@ export function HomeView({
             onPress={() =>
               onNavigateToListing(
                 need.includes("Frozen") ? "Frozen" : null,
+                "",
                 need,
               )
             }
