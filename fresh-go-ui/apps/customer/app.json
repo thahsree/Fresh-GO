@@ -19,15 +19,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.freshgo.customerapp",
+      "bundleIdentifier": "com.freshgofreshandmeat.app",
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Allow FreshGo to access your location to pinpoint your delivery address."
       }
     },
     "android": {
-      "package": "com.freshgo.customerapp",
-      "versionCode": 3,
+      "package": "com.freshgofreshandmeat.app",
+      "versionCode": 1,
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
