@@ -109,16 +109,27 @@ const USER_KEY = "freshgo_delivery_user";
 const HUB_KEY = "freshgo_delivery_hub";
 
 export function getApiBaseUrl(): string {
+  // 1. Explicit env var (inlined by Next.js if NEXT_PUBLIC_API_URL is configured)
   if (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "");
+    const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    if (envUrl.length > 0) return envUrl;
   }
+
+  // 2. Browser runtime host inspection
   if (typeof window !== "undefined" && window.location) {
     const host = window.location.hostname;
-    if (host && host !== "localhost" && host !== "127.0.0.1") {
+    // Local development only
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:4000/api/v1";
+    }
+    // Local LAN testing from another device on the same network
+    if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
       return `http://${host}:4000/api/v1`;
     }
   }
-  return "http://localhost:4000/api/v1";
+
+  // 3. Default to production backend for all deployed environments (Vercel, AWS, etc.)
+  return "https://fresh-go.duckdns.org/api/v1";
 }
 
 export function getSocketUrl(): string {

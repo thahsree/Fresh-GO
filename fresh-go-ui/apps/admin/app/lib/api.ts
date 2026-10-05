@@ -1,7 +1,23 @@
 "use client";
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+export function getAdminApiBase(): string {
+  if (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_API_URL) {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    if (envUrl.length > 0) return envUrl;
+  }
+  if (typeof window !== "undefined" && window.location) {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:4000/api/v1";
+    }
+    if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
+      return `http://${host}:4000/api/v1`;
+    }
+  }
+  return "https://fresh-go.duckdns.org/api/v1";
+}
+
+export const API_BASE = getAdminApiBase();
 
 const TOKEN_KEY = "freshgo_admin_access_token";
 const USER_KEY = "freshgo_admin_user";

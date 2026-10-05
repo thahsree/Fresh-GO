@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Bike,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Lock,
   Phone,
@@ -19,6 +20,32 @@ import {
   EyeOff,
 } from "lucide-react";
 import { deliveryApi, DeliveryUser, DeliveryHub } from "../lib/api";
+
+// Active production hubs fallback to ensure dropdown is never empty on load or network delay
+const DEFAULT_HUBS: DeliveryHub[] = [
+  {
+    id: "617cefa1-7e0d-45f3-bcbc-8ec475c441ff",
+    name: "FreshGo Central Hub (Mavoor Road)",
+    code: "HUB-CLT-01",
+    city: "Kozhikode",
+    address: "Mavoor Road, Kozhikode, Kerala 673004",
+    latitude: 11.2588,
+    longitude: 75.7804,
+    deliveryRadiusKm: 10,
+    isActive: true,
+  },
+  {
+    id: "e47af570-4f31-445e-8e1d-39d82ddb6139",
+    name: "Kannur Hub",
+    code: "HUB-CLT-02",
+    city: "Kannur",
+    address: "Caltex, Talap, Kannur, Kerala 670004",
+    latitude: 11.914047,
+    longitude: 75.468638,
+    deliveryRadiusKm: 15,
+    isActive: true,
+  },
+];
 
 type DeliveryLoginViewProps = {
   onLoginSuccess: (user: DeliveryUser) => void;
@@ -37,12 +64,14 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
   // Application / Transfer state
   const [name, setName] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [selectedHubId, setSelectedHubId] = useState("");
+  const [availableHubs, setAvailableHubs] = useState<DeliveryHub[]>(DEFAULT_HUBS);
+  const [selectedHubId, setSelectedHubId] = useState<string>(DEFAULT_HUBS[0].id);
+  const [isHubDropdownOpen, setIsHubDropdownOpen] = useState(false);
+  const hubDropdownRef = useRef<HTMLDivElement>(null);
   const [vehicleType, setVehicleType] = useState("Bike");
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [licensePhoto, setLicensePhoto] = useState<string | null>(null);
   const [licensePhotoName, setLicensePhotoName] = useState<string | null>(null);
-  const [availableHubs, setAvailableHubs] = useState<DeliveryHub[]>([]);
 
   // Submission result state
   const [applicationSuccess, setApplicationSuccess] = useState<{
@@ -57,12 +86,31 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
       .getHubs()
       .then((hubs) => {
         if (Array.isArray(hubs) && hubs.length > 0) {
-          setAvailableHubs(hubs);
-          setSelectedHubId(hubs[0].id);
+          const activeOnly = hubs.filter((h) => h.isActive !== false);
+          const finalHubs = activeOnly.length > 0 ? activeOnly : hubs;
+          setAvailableHubs(finalHubs);
+          setSelectedHubId((prev) =>
+            prev && finalHubs.some((h) => h.id === prev) ? prev : finalHubs[0].id
+          );
         }
       })
-      .catch((err) => console.warn("Could not load hubs", err));
+      .catch((err) => {
+        console.warn("Could not load fresh hubs from server, using active default hubs:", err);
+      });
   }, []);
+
+  // Close custom dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (hubDropdownRef.current && !hubDropdownRef.current.contains(e.target as Node)) {
+        setIsHubDropdownOpen(false);
+      }
+    }
+    if (isHubDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isHubDropdownOpen]);
 
   const cleanPhone = (input: string) => {
     const digits = input.replace(/\D/g, "");
@@ -94,7 +142,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
     } catch (err: any) {
       setError(
         err?.message ||
-          "Authentication failed. Please verify your mobile number and 6-digit Partner Access ID."
+        "Authentication failed. Please verify your mobile number and 6-digit Partner Access ID."
       );
     } finally {
       setIsLoading(false);
@@ -164,6 +212,9 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
       setIsLoading(false);
     }
   };
+
+  const currentSelectedHub =
+    availableHubs.find((h) => h.id === selectedHubId) || availableHubs[0];
 
   return (
     <div style={styles.container}>
@@ -406,57 +457,206 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
               </div>
             </div>
 
-            <div style={styles.inputGroup}>
+            <div style={styles.inputGroup} ref={hubDropdownRef}>
               <label style={styles.label}>PREFERRED FULFILLMENT HUB *</label>
-              <div style={styles.iconInputWrap}>
-                <Building size={18} color="#8b968f" style={{ marginLeft: 14, flexShrink: 0 }} />
-                <select
-                  value={selectedHubId}
-                  onChange={(e) => setSelectedHubId(e.target.value)}
+              <div style={{ position: "relative", width: "100%", minWidth: 0, boxSizing: "border-box" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsHubDropdownOpen(!isHubDropdownOpen)}
+                  aria-expanded={isHubDropdownOpen}
+                  aria-haspopup="listbox"
                   style={{
-                    ...styles.input,
-                    cursor: "pointer",
-                    width: "100%",
-                    minWidth: 0,
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    boxSizing: "border-box",
+                    ...styles.hubSelectTrigger,
+                    borderColor: isHubDropdownOpen ? "#1F4D46" : "#E3DDCF",
+                    background: isHubDropdownOpen ? "#FFFFFF" : "#FCFBF9",
+                    boxShadow: isHubDropdownOpen ? "0 0 0 3px rgba(31, 77, 70, 0.12)" : "none",
                   }}
-                  required
                 >
-                  {availableHubs.map((hub) => (
-                    <option key={hub.id} value={hub.id}>
-                      {hub.name} ({hub.code}) - {hub.city}
-                    </option>
-                  ))}
-                </select>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "8px",
+                        background: "#E4ECE9",
+                        display: "grid",
+                        placeItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Building size={16} color="#1F4D46" />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", textAlign: "left", flex: 1, minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#0F2E29",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          display: "block",
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {currentSelectedHub ? currentSelectedHub.name : "Select a Fulfillment Hub"}
+                      </span>
+                      {currentSelectedHub && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#5C6B66",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            display: "block",
+                            maxWidth: "100%",
+                          }}
+                        >
+                          📍 {currentSelectedHub.city} {currentSelectedHub.code ? `· ${currentSelectedHub.code}` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <ChevronDown
+                    size={18}
+                    color="#8B968F"
+                    style={{
+                      transform: isHubDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      transition: "transform 0.2s ease",
+                      flexShrink: 0,
+                      marginLeft: "8px",
+                    }}
+                  />
+                </button>
+
+                {/* Dropdown Menu Popup - 100% contained within bounds */}
+                {isHubDropdownOpen && (
+                  <div
+                    role="listbox"
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 4px)",
+                      left: 0,
+                      right: 0,
+                      width: "100%",
+                      maxWidth: "100%",
+                      background: "#FFFFFF",
+                      border: "1.5px solid #1F4D46",
+                      borderRadius: "14px",
+                      boxShadow: "0 12px 32px rgba(15, 46, 41, 0.2)",
+                      zIndex: 999,
+                      overflow: "hidden",
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        background: "#F6F2EA",
+                        borderBottom: "1px solid #E3DDCF",
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        color: "#1F4D46",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span>Active Hubs ({availableHubs.length})</span>
+                      <span style={{ fontSize: "10px", color: "#5C6B66", fontWeight: 600 }}>Tap to select</span>
+                    </div>
+
+                    <div style={{ maxHeight: "200px", overflowY: "auto", width: "100%", boxSizing: "border-box" }}>
+                      {availableHubs.map((hub) => {
+                        const isSelected = hub.id === selectedHubId;
+                        return (
+                          <div
+                            key={hub.id}
+                            role="option"
+                            aria-selected={isSelected}
+                            onClick={() => {
+                              setSelectedHubId(hub.id);
+                              setIsHubDropdownOpen(false);
+                            }}
+                            style={{
+                              padding: "10px 14px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "10px",
+                              cursor: "pointer",
+                              background: isSelected ? "#E3F1E9" : "#FFFFFF",
+                              borderBottom: "1px solid #F0ECE4",
+                              transition: "background 0.12s ease",
+                              boxSizing: "border-box",
+                              width: "100%",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "#FAF8F4";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "#FFFFFF";
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: "13px",
+                                  fontWeight: 700,
+                                  color: isSelected ? "#0F2E29" : "#17211E",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  maxWidth: "100%",
+                                }}
+                              >
+                                {hub.name}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "11px",
+                                  color: "#5C6B66",
+                                  marginTop: "2px",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  maxWidth: "100%",
+                                }}
+                              >
+                                📍 {hub.city} {hub.code ? `(${hub.code})` : ""}{hub.address ? ` · ${hub.address}` : ""}
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 size={16} color="#2E7D5B" style={{ flexShrink: 0 }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="partner-form-grid">
               <div style={styles.inputGroup}>
                 <label style={styles.label}>VEHICLE TYPE</label>
-                <select
-                  value={vehicleType}
-                  onChange={(e) => setVehicleType(e.target.value)}
-                  style={{
-                    ...styles.input,
-                    border: "1.5px solid #e3ddcf",
-                    borderRadius: "12px",
-                    background: "#fcfbf9",
-                    padding: "10px 12px",
-                    cursor: "pointer",
-                    width: "100%",
-                    minWidth: 0,
-                    maxWidth: "100%",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  <option value="Bike">Motorcycle / Bike</option>
-                  <option value="Scooter">Scooter / EV</option>
-                </select>
+                <div style={styles.selectWrap}>
+                  <select
+                    value={vehicleType}
+                    onChange={(e) => setVehicleType(e.target.value)}
+                    style={styles.selectInput}
+                  >
+                    <option value="Bike">Motorcycle / Bike</option>
+                    <option value="Scooter">Scooter / EV</option>
+                  </select>
+                  <ChevronDown size={16} color="#8b968f" style={styles.selectChevron} />
+                </div>
               </div>
 
               <div style={styles.inputGroup}>
@@ -578,7 +778,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#FFFFFF",
     borderRadius: "20px",
     boxShadow: "0 25px 60px rgba(0, 0, 0, 0.35)",
-    overflow: "hidden",
+    overflow: "visible",
     position: "relative",
     boxSizing: "border-box",
     margin: "0 auto",
@@ -586,6 +786,8 @@ const styles: Record<string, React.CSSProperties> = {
   topAccent: {
     height: "5px",
     background: "linear-gradient(90deg, #1F4D46, #2E7D5B, #E5623E)",
+    borderTopLeftRadius: "20px",
+    borderTopRightRadius: "20px",
   },
   header: {
     display: "flex",
@@ -707,6 +909,51 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     minWidth: 0,
     boxSizing: "border-box",
+  },
+  hubSelectTrigger: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    border: "1.5px solid #E3DDCF",
+    borderRadius: "12px",
+    background: "#FCFBF9",
+    padding: "8px 12px",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+  },
+  selectWrap: {
+    position: "relative",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
+  },
+  selectInput: {
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
+    border: "1.5px solid #E3DDCF",
+    borderRadius: "12px",
+    background: "#FCFBF9",
+    padding: "11px 36px 11px 14px",
+    fontSize: "14px",
+    fontWeight: 600,
+    color: "#17211E",
+    fontFamily: "inherit",
+    boxSizing: "border-box",
+    cursor: "pointer",
+    appearance: "none",
+    WebkitAppearance: "none",
+  },
+  selectChevron: {
+    position: "absolute",
+    right: "12px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    pointerEvents: "none",
   },
   iconInputWrap: {
     display: "flex",
@@ -897,5 +1144,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "11px",
     fontWeight: 600,
     color: "#8B968F",
+    borderBottomLeftRadius: "20px",
+    borderBottomRightRadius: "20px",
   },
 };
