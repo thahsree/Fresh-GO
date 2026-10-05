@@ -19,18 +19,26 @@ declare const process: any;
  * 3. Local LAN / Wi-Fi / Emulator: uses Metro's host with port 8081 which proxies /api/ to 4000
  */
 export function getApiBase(): string {
-  // 1. Web browser: route via current window origin to leverage Metro's proxy or direct localhost
-  if (Platform.OS === "web") {
-    if (typeof window !== "undefined" && window.location?.origin) {
-      return `${window.location.origin}/api/v1`;
+  // 1. Explicit environment variable (inlined by Expo CLI / Metro bundler)
+  if (typeof process !== "undefined") {
+    const raw = process?.env?.EXPO_PUBLIC_API_URL || process?.env?.NEXT_PUBLIC_API_URL;
+    if (raw) {
+      const envUrl = raw.trim().replace(/\/+$/, "");
+      if (envUrl.length > 0) return envUrl;
     }
-    return "http://localhost:4000/api/v1";
   }
 
-  // 2. Explicit environment variable (inlined by Expo CLI)
-  if (typeof process !== "undefined" && process?.env?.EXPO_PUBLIC_API_URL) {
-    const envUrl = process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "");
-    if (envUrl.length > 0 && !envUrl.includes("duckdns.org")) return envUrl;
+  // 2. Web browser:
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && window.location) {
+      const host = window.location.hostname;
+      // In local dev with Metro proxy on localhost / 127.0.0.1
+      if (host === "localhost" || host === "127.0.0.1") {
+        return `${window.location.origin}/api/v1`;
+      }
+    }
+    // Deployed web app (e.g. Vercel) -> use live production backend
+    return "https://fresh-go.duckdns.org/api/v1";
   }
 
   // 3. Extract candidate hosts from Expo Constants & React Native SourceCode
@@ -44,9 +52,7 @@ export function getApiBase(): string {
     (Constants as any)?.manifest?.debuggerHost,
   ];
 
-  // First pass: ALWAYS PRIORITIZE PUBLIC TUNNEL HOSTS (exp.direct, ngrok, loca.lt)
-  // When running with --tunnel, mobile devices (e.g. on 4G/5G or external networks)
-  // MUST use the public HTTPS tunnel, never a private LAN IP (10.x.x.x) which is unreachable!
+  // First pass: Public tunnel hosts (for local Expo running with --tunnel)
   for (const raw of candidates) {
     if (!raw || typeof raw !== "string") continue;
     try {
@@ -63,13 +69,6 @@ export function getApiBase(): string {
         hostname.includes("tunnel");
 
       if (isTunnel) {
-        if (hostname.includes("_") && Platform.OS === "android") {
-          console.warn(
-            `[Customer API] Tunnel domain "${hostname}" contains an underscore ('_'). Android OS blocks hostnames with underscores with 'java.io.IOException: Android internal error'. Restart 'npm run dev:customer:tunnel' in your terminal to get a clean tunnel domain.`,
-          );
-        }
-        // Public tunnels ALWAYS terminate SSL at 443 with HTTPS.
-        console.log(`[Customer API] Prioritized Public Tunnel: https://${hostname}/api/v1`);
         return `https://${hostname}/api/v1`;
       }
     } catch {
@@ -77,7 +76,7 @@ export function getApiBase(): string {
     }
   }
 
-  // Second pass: Local LAN Wi-Fi hosts (for --host lan mode)
+  // Second pass: Local LAN Wi-Fi hosts (for local Expo running with --host lan)
   for (const raw of candidates) {
     if (!raw || typeof raw !== "string") continue;
     try {
@@ -87,7 +86,7 @@ export function getApiBase(): string {
       if (!hostPart) continue;
 
       const [hostname, port] = hostPart.split(":");
-      if (hostname && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      if (hostname && (hostname.startsWith("192.168.") || hostname.startsWith("10.") || hostname.startsWith("172."))) {
         const targetPort = port === "8081" ? "4000" : port || "4000";
         return `http://${hostname}:${targetPort}/api/v1`;
       }
@@ -96,8 +95,8 @@ export function getApiBase(): string {
     }
   }
 
-  // 4. Default Localhost / LAN backend
-  return "http://localhost:4000/api/v1";
+  // 4. Default Production Backend for deployed apps
+  return "https://fresh-go.duckdns.org/api/v1";
 }
 
 export const API_BASE = getApiBase();
