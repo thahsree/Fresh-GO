@@ -167,7 +167,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.card}>
+      <div style={styles.card} className="delivery-card-responsive">
         {/* Top Accent Strip */}
         <div style={styles.topAccent} />
 
@@ -359,7 +359,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
           </form>
         ) : (
           /* VIEW 3: Apply / Request Hub */
-          <form onSubmit={handleRegister} style={styles.form}>
+          <form onSubmit={handleRegister} style={styles.form} className="delivery-form-responsive">
             <div style={styles.titleWrap}>
               <h1 style={styles.title}>Join as Partner / Transfer Hub</h1>
               <p style={styles.subtitle}>
@@ -370,7 +370,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
             {/* Mandatory Hub Visit Notice */}
             <div style={styles.visitNoticeBanner}>
               <MapPin size={16} color="#BE4436" style={{ flexShrink: 0, marginTop: "2px" }} />
-              <div style={{ fontSize: "12px", color: "#0F2E29", lineHeight: 1.4 }}>
+              <div style={{ fontSize: "12px", color: "#0F2E29", lineHeight: 1.4, flex: 1, minWidth: 0, wordBreak: "break-word" }}>
                 <strong>Important:</strong> After requesting, please visit your selected Hub in person with your original Driving Licence for physical document verification.
               </div>
             </div>
@@ -378,7 +378,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
             <div style={styles.inputGroup}>
               <label style={styles.label}>FULL NAME *</label>
               <div style={styles.iconInputWrap}>
-                <User size={18} color="#8b968f" style={{ marginLeft: 14 }} />
+                <User size={18} color="#8b968f" style={{ marginLeft: 14, flexShrink: 0 }} />
                 <input
                   type="text"
                   style={styles.input}
@@ -409,11 +409,21 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
             <div style={styles.inputGroup}>
               <label style={styles.label}>PREFERRED FULFILLMENT HUB *</label>
               <div style={styles.iconInputWrap}>
-                <Building size={18} color="#8b968f" style={{ marginLeft: 14 }} />
+                <Building size={18} color="#8b968f" style={{ marginLeft: 14, flexShrink: 0 }} />
                 <select
                   value={selectedHubId}
                   onChange={(e) => setSelectedHubId(e.target.value)}
-                  style={{ ...styles.input, cursor: "pointer" }}
+                  style={{
+                    ...styles.input,
+                    cursor: "pointer",
+                    width: "100%",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    boxSizing: "border-box",
+                  }}
                   required
                 >
                   {availableHubs.map((hub) => (
@@ -425,13 +435,24 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div className="partner-form-grid">
               <div style={styles.inputGroup}>
                 <label style={styles.label}>VEHICLE TYPE</label>
                 <select
                   value={vehicleType}
                   onChange={(e) => setVehicleType(e.target.value)}
-                  style={{ ...styles.input, border: "1.5px solid #e3ddcf", borderRadius: "12px", background: "#fcfbf9", padding: "10px 12px" }}
+                  style={{
+                    ...styles.input,
+                    border: "1.5px solid #e3ddcf",
+                    borderRadius: "12px",
+                    background: "#fcfbf9",
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    width: "100%",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                    boxSizing: "border-box",
+                  }}
                 >
                   <option value="Bike">Motorcycle / Bike</option>
                   <option value="Scooter">Scooter / EV</option>
@@ -442,7 +463,17 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
                 <label style={styles.label}>VEHICLE NUMBER</label>
                 <input
                   type="text"
-                  style={{ ...styles.input, border: "1.5px solid #e3ddcf", borderRadius: "12px", background: "#fcfbf9", padding: "10px 12px" }}
+                  style={{
+                    ...styles.input,
+                    border: "1.5px solid #e3ddcf",
+                    borderRadius: "12px",
+                    background: "#fcfbf9",
+                    padding: "10px 12px",
+                    width: "100%",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                    boxSizing: "border-box",
+                  }}
                   placeholder="KL-11-AB-1234"
                   value={vehicleNumber}
                   onChange={(e) => setVehicleNumber(e.target.value)}
@@ -461,8 +492,21 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
                   style={{ display: "none" }}
                   required={!licensePhoto}
                 />
-                <Upload size={22} color="#1F4D46" />
-                <span style={{ fontSize: "13px", fontWeight: 700, color: "#1F4D46" }}>
+                <Upload size={22} color="#1F4D46" style={{ flexShrink: 0 }} />
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#1F4D46",
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "block",
+                    padding: "0 8px",
+                    boxSizing: "border-box",
+                  }}
+                >
                   {licensePhotoName ? `Selected: ${licensePhotoName}` : "Click to Upload Licence Photo"}
                 </span>
                 <span style={{ fontSize: "11px", color: "#8B968F" }}>
@@ -475,7 +519,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
                   <img
                     src={licensePhoto}
                     alt="Driving Licence Preview"
-                    style={{ maxHeight: "110px", borderRadius: "8px", objectFit: "contain" }}
+                    style={{ maxHeight: "110px", maxWidth: "100%", borderRadius: "8px", objectFit: "contain" }}
                   />
                   <div style={{ fontSize: "11px", color: "#2E7D5B", fontWeight: 700, marginTop: "4px" }}>
                     ✓ Licence photo attached for verification
@@ -493,7 +537,7 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
               }}
             >
               {isLoading ? "Submitting Application..." : "Submit Application to Hub Admin"}
-              <ChevronRight size={18} />
+              <ChevronRight size={18} style={{ flexShrink: 0 }} />
             </button>
 
             <div style={{ textAlign: "center", marginTop: "6px" }}>
@@ -522,8 +566,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     background: "radial-gradient(circle at 10% 20%, #153A34 0%, #0F2E29 90%)",
-    padding: "24px 16px",
+    padding: "20px 12px",
     fontFamily: "'Manrope', sans-serif",
+    boxSizing: "border-box",
+    width: "100%",
+    overflowX: "hidden",
   },
   card: {
     width: "100%",
@@ -533,6 +580,8 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 25px 60px rgba(0, 0, 0, 0.35)",
     overflow: "hidden",
     position: "relative",
+    boxSizing: "border-box",
+    margin: "0 auto",
   },
   topAccent: {
     height: "5px",
@@ -542,7 +591,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    padding: "28px 24px 16px",
+    padding: "28px 20px 16px",
     gap: "12px",
   },
   logoBadge: {
@@ -577,7 +626,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#F6F2EA",
     borderRadius: "12px",
     padding: "4px",
-    margin: "0 24px 18px",
+    margin: "0 20px 18px",
     border: "1px solid #E3DDCF",
   },
   tabBtn: {
@@ -590,9 +639,11 @@ const styles: Record<string, React.CSSProperties> = {
     transition: "all 0.15s ease",
   },
   form: {
-    padding: "0 24px 24px",
+    padding: "0 20px 24px",
     display: "grid",
     gap: "16px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   titleWrap: {
     marginBottom: "4px",
@@ -619,11 +670,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#BE4436",
     fontSize: "12px",
     fontWeight: 600,
-    margin: "0 24px 14px",
+    margin: "0 20px 14px",
   },
   inputGroup: {
     display: "grid",
     gap: "6px",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   label: {
     fontSize: "11px",
@@ -639,6 +693,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     overflow: "hidden",
     background: "#FCFBF9",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   idInputWrap: {
     display: "flex",
@@ -647,6 +704,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     overflow: "hidden",
     background: "#FCFBF9",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   iconInputWrap: {
     display: "flex",
@@ -655,6 +715,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     overflow: "hidden",
     background: "#FCFBF9",
+    width: "100%",
+    minWidth: 0,
+    boxSizing: "border-box",
   },
   phonePrefix: {
     padding: "0 14px",
@@ -664,9 +727,13 @@ const styles: Record<string, React.CSSProperties> = {
     borderRight: "1px solid #E3DDCF",
     background: "#F6F2EA",
     lineHeight: "44px",
+    flexShrink: 0,
   },
   input: {
     flex: 1,
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
     border: "none",
     outline: "none",
     background: "transparent",
@@ -694,6 +761,8 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 4px 14px rgba(31, 77, 70, 0.25)",
     transition: "transform 0.15s ease",
     marginTop: "4px",
+    width: "100%",
+    boxSizing: "border-box",
   },
   infoBanner: {
     display: "flex",
@@ -705,6 +774,8 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "12px",
     color: "#1F4D46",
     border: "1px solid #E3DDCF",
+    width: "100%",
+    boxSizing: "border-box",
   },
   fillBtn: {
     background: "#E4ECE9",
@@ -715,6 +786,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "11px",
     fontWeight: 700,
     cursor: "pointer",
+    flexShrink: 0,
   },
   textBtn: {
     border: "none",
@@ -732,6 +804,8 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "10px",
     background: "#FEF3C7",
     border: "1px solid #F59E0B",
+    width: "100%",
+    boxSizing: "border-box",
   },
   uploadArea: {
     display: "flex",
@@ -741,10 +815,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "6px",
     border: "2px dashed #1F4D46",
     borderRadius: "12px",
-    padding: "18px",
+    padding: "16px 12px",
     background: "#F6F2EA",
     cursor: "pointer",
     textAlign: "center",
+    width: "100%",
+    boxSizing: "border-box",
+    overflow: "hidden",
   },
   photoPreviewBox: {
     padding: "10px",
@@ -752,6 +829,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "10px",
     border: "1px solid #E3DDCF",
     textAlign: "center",
+    width: "100%",
+    boxSizing: "border-box",
+    overflow: "hidden",
   },
   successBadge: {
     width: "64px",

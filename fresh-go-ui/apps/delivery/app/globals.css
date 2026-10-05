@@ -702,3 +702,26 @@ input::-webkit-credentials-auto-fill-button {
   right: 0 !important;
 }
 
+/* Responsive Form Grid for Delivery Partner Registration / Transfer */
+.partner-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .partner-form-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+  .delivery-form-responsive {
+    padding: 0 16px 20px !important;
+  }
+  .delivery-card-responsive {
+    border-radius: 16px !important;
+  }
+}
+
+
