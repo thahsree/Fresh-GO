@@ -22,6 +22,10 @@ export class SmsService {
     if (this.provider === "fast2sms") {
       try {
         const apiKey = this.configService.get<string>("sms.fast2smsApiKey");
+        if (!apiKey) {
+          this.logger.error("Fast2SMS API Key is missing in .env! (FAST2SMS_API_KEY)");
+          return false;
+        }
         const rawNumber = phone.replace("+91", "").replace("+", "").trim();
         const res = await axios.post(
           "https://www.fast2sms.com/dev/bulkV2",
@@ -34,13 +38,18 @@ export class SmsService {
             headers: {
               authorization: apiKey,
               "Content-Type": "application/json",
+              accept: "application/json",
             },
           }
         );
-        this.logger.log(`📲 [Fast2SMS] Sent OTP to ${rawNumber}: ${JSON.stringify(res.data)}`);
+        if (res.data?.return === false) {
+          this.logger.error(`❌ [Fast2SMS] Failed for ${rawNumber}: ${JSON.stringify(res.data?.message)}`);
+          return false;
+        }
+        this.logger.log(`📲 [Fast2SMS] Sent OTP successfully to ${rawNumber}: ${JSON.stringify(res.data?.message)}`);
         return true;
       } catch (error: any) {
-        this.logger.error(`Failed to send Fast2SMS OTP to ${phone}: ${error?.message}`);
+        this.logger.error(`Failed to send Fast2SMS OTP to ${phone}: ${error?.response?.data ? JSON.stringify(error.response.data) : error?.message}`);
         return false;
       }
     }

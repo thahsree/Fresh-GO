@@ -58,8 +58,8 @@ export class AuthService {
       phone.endsWith("8888888888") ||
       phone.endsWith("9999999999");
 
-    // Generate 6-digit OTP (123456 in dev/mock/test phone, or cryptographically random in prod with real SMS)
-    const otp = isMock || isDev || isTestPhone
+    // Generate 6-digit OTP (123456 for mock mode or designated Play Store test phones; cryptographically random for real SMS)
+    const otp = isMock || isTestPhone
       ? "123456"
       : Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -67,8 +67,8 @@ export class AuthService {
     const redisKey = `otp:${phone}`;
     await this.redis.set(redisKey, otp, 300);
 
-    // Rate limiting: track recent sends (max 5 per 10 mins, exempt test numbers and dev)
-    if (!isTestPhone && !isDev) {
+    // Rate limiting: track recent sends (max 5 per 10 mins, exempt test numbers and mock mode)
+    if (!isTestPhone && !isMock) {
       const rateKey = `otp_rate:${phone}`;
       const sendCount = await this.redis.get(rateKey);
       if (sendCount && parseInt(sendCount, 10) >= 5) {
@@ -83,8 +83,10 @@ export class AuthService {
       );
     }
 
-    // Dispatch SMS via provider
-    await this.smsService.sendOtp(phone, otp);
+    // Dispatch SMS via provider (skip external gateway for test numbers to save credits and avoid failures)
+    if (!isTestPhone) {
+      await this.smsService.sendOtp(phone, otp);
+    }
 
     return {
       message: isMock
@@ -93,7 +95,7 @@ export class AuthService {
       phone,
       expiresInSeconds: 300,
       isMock,
-      ...(isDev || isMock ? { devOtp: otp } : {}),
+      ...(isMock ? { devOtp: otp } : {}),
     };
   }
 
@@ -102,9 +104,9 @@ export class AuthService {
     const redisKey = `otp:${phone}`;
     const cachedOtp = await this.redis.get(redisKey);
 
-    // Allow master OTP '123456' in dev, if SMS provider is mock, or for designated test numbers (e.g. Google Play review)
-    const isDev = this.configService.get<string>("nodeEnv") === "development";
+    // Allow master OTP '123456' only if SMS provider is mock or for designated test numbers (e.g. Google Play review)
     const smsProvider = this.configService.get<string>("sms.provider", "mock");
+    const isMock = smsProvider === "mock";
     const isTestPhone =
       phone.endsWith("9876543210") ||
       phone.endsWith("9999988888") ||
@@ -112,8 +114,7 @@ export class AuthService {
       phone.endsWith("9999999999");
     const isValid =
       cachedOtp === otp ||
-      (isDev && otp === "123456") ||
-      (smsProvider === "mock" && otp === "123456") ||
+      (isMock && otp === "123456") ||
       (isTestPhone && otp === "123456");
 
     if (!isValid) {
