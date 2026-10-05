@@ -46,4 +46,4 @@ USER nestjs
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "if [ -f dist/src/main.js ]; then node dist/src/main.js; else node dist/main.js; fi"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && if [ -f dist/src/main.js ]; then node dist/src/main.js; else node dist/main.js; fi"]
