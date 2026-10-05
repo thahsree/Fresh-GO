@@ -53,7 +53,7 @@ export default () => ({
     onlineEnabled: process.env.ONLINE_PAYMENTS_ENABLED === "true",
   },
   limits: {
-    codCashLimit: parseFloat(process.env.COD_CASH_LIMIT || "2500"),
+    codCashLimit: parseFloat(process.env.COD_CASH_LIMIT || "50000"),
     dispatchTimeoutSeconds: parseInt(
       process.env.DISPATCH_TIMEOUT_SECONDS || "45",
       10,

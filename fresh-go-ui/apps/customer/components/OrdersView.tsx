@@ -26,7 +26,7 @@ export type CustomerOrder = {
   id: string;
   date: string;
   status: "placed" | "preparing" | "out_for_delivery" | "delivered";
-  items: { product: Product; quantity: number }[];
+  items: { product: Product; quantity: number; selectedCut?: string }[];
   total: number;
   paymentMethod: "cod" | "upi";
   deliveryAddress: string;
@@ -254,7 +254,7 @@ export function OrdersView({
 
                 {/* Items in Order */}
                 <View style={styles.itemsPreview}>
-                  {order.items.map(({ product, quantity }) => (
+                  {order.items.map(({ product, quantity, selectedCut }) => (
                     <View key={product.id} style={styles.itemRow}>
                       <Image
                         source={{ uri: product.image }}
@@ -266,6 +266,7 @@ export function OrdersView({
                         </Text>
                         <Text style={styles.itemMeta}>
                           Qty: {quantity} · Rs {product.price} {product.unit}
+                          {selectedCut ? ` · Cut: ${selectedCut}` : ""}
                         </Text>
                       </View>
                       <Text style={styles.itemLineTotal}>
@@ -287,17 +288,17 @@ export function OrdersView({
                   </View>
 
                   <View style={styles.footerActionRow}>
-                    {onDeleteOrder && (
+                    {isDelivered && onDeleteOrder && (
                       <Pressable
                         style={styles.deleteOrderFooterBtn}
                         onPress={() => onDeleteOrder(order.id)}
                         hitSlop={6}
                         accessibilityRole="button"
-                        accessibilityLabel={isDelivered ? "Remove order" : "Cancel order"}
+                        accessibilityLabel="Remove order"
                       >
                         <Trash2 size={13} color={colors.textSoft} />
                         <Text style={styles.deleteOrderFooterText}>
-                          {isDelivered ? "Remove" : "Cancel"}
+                          Remove
                         </Text>
                       </Pressable>
                     )}

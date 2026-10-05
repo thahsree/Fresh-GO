@@ -104,9 +104,11 @@ export function ActiveDeliveryView({
             </span>
             <h2>{delivery.phase === "on-the-way" ? delivery.customer : delivery.pickup}</h2>
           </div>
+          {/* Earnings on active order section commented out
           <span className="earnings-chip" style={{ background: "#e4ece9", color: "#1f4d46" }}>
             Earn ₹{delivery.earnings}
           </span>
+          */}
         </div>
 
         <p className="address">{targetAddress}</p>

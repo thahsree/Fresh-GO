@@ -280,3 +280,91 @@
   font-size: 12px;
 }
 
+/* Prevent Edge/Windows browser from forming inbuilt eye or clear buttons when typing password */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: 0 !important;
+}
+
+/* Order Details Slide-Up Bottom Sheet Modal */
+@keyframes orderDrawerSlideUp {
+  0% {
+    transform: translateY(100%);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.order-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 46, 41, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  animation: modalBackdropFadeIn 0.25s ease-out;
+}
+
+.order-drawer {
+  background: #FFFFFF;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  max-height: 88vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.2);
+  animation: orderDrawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.order-drawer-header {
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #FCFAF6;
+}
+
+.order-drawer-body {
+  padding: 24px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .order-drawer-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 18px;
+  }
+}
+
+.order-clickable-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.order-clickable-row:hover {
+  background-color: #F4F9F6 !important;
+}
+
+

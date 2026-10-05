@@ -3,36 +3,33 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../lib/api";
-import { ShieldAlert, ArrowRight, Phone, KeyRound, Sparkles, Building2 } from "lucide-react";
+import { ShieldCheck, ArrowRight, Phone, Lock, Sparkles, Eye, EyeOff } from "lucide-react";
 
 export default function SuperAdminLoginPage() {
   const router = useRouter();
-  const [phone, setPhone] = useState("+918888888888");
-  const [otp, setOtp] = useState("123456");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
-    setLoading(true);
-    try {
-      await api.sendOtp(phone);
-      setStep("otp");
-    } catch (err: any) {
-      setError(err?.message || "Failed to send OTP. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setError(null);
+    const cleanNumber = phone.replace(/[\s-]/g, "");
+    if (!cleanNumber) {
+      setError("Please enter your Super Admin mobile number.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const user = await api.loginSuperAdmin(phone, otp);
+      const user = await api.loginSuperAdmin(cleanNumber, password);
       if (user) {
         router.push("/super-admin");
       }
@@ -46,12 +43,6 @@ export default function SuperAdminLoginPage() {
     }
   };
 
-  const fillDefaultCredentials = () => {
-    setPhone("+918888888888");
-    setOtp("123456");
-    setError(null);
-  };
-
   return (
     <div
       style={{
@@ -60,24 +51,24 @@ export default function SuperAdminLoginPage() {
         alignItems: "center",
         justifyContent: "center",
         background: "radial-gradient(ellipse at bottom, #11221F 0%, #061210 100%)",
-        padding: "20px",
+        padding: "24px 20px",
         fontFamily: "'Manrope', sans-serif",
       }}
     >
       <div
         style={{
           width: "100%",
-          maxWidth: "460px",
+          maxWidth: "440px",
           background: "#0D221E",
           border: "1px solid #1E463F",
           borderRadius: "20px",
           boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 30px rgba(46, 125, 91, 0.15)",
-          padding: "40px 36px",
+          padding: "38px 32px",
           position: "relative",
           overflow: "hidden",
         }}
       >
-        {/* Top Gold/Emerald Bar */}
+        {/* Accent top border strip */}
         <div
           style={{
             position: "absolute",
@@ -90,22 +81,22 @@ export default function SuperAdminLoginPage() {
         />
 
         {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+        <div style={{ textAlign: "center", marginBottom: "30px" }}>
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: "64px",
-              height: "64px",
+              width: "60px",
+              height: "60px",
               borderRadius: "16px",
               background: "rgba(229, 98, 62, 0.15)",
               border: "1px solid rgba(229, 98, 62, 0.35)",
               color: "#E5623E",
-              marginBottom: "16px",
+              marginBottom: "14px",
             }}
           >
-            <ShieldAlert size={32} />
+            <ShieldCheck size={30} />
           </div>
           <div
             style={{
@@ -118,7 +109,7 @@ export default function SuperAdminLoginPage() {
               fontWeight: 800,
               textTransform: "uppercase",
               letterSpacing: "1px",
-              marginBottom: "10px",
+              marginBottom: "8px",
             }}
           >
             RESTRICTED ACCESS · RBAC ENFORCED
@@ -126,10 +117,10 @@ export default function SuperAdminLoginPage() {
           <h1
             style={{
               fontFamily: "'Fraunces', serif",
-              fontSize: "28px",
+              fontSize: "26px",
               fontWeight: 700,
               color: "#FFFFFF",
-              marginBottom: "8px",
+              marginBottom: "6px",
               letterSpacing: "-0.5px",
             }}
           >
@@ -158,221 +149,156 @@ export default function SuperAdminLoginPage() {
           </div>
         )}
 
-        {/* Form */}
-        {step === "phone" ? (
-          <form onSubmit={handleSendOtp} style={{ display: "grid", gap: "18px" }}>
-            <div>
+        {/* Login Form */}
+        <form onSubmit={handleLogin} style={{ display: "grid", gap: "18px" }}>
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "11px",
+                fontWeight: 800,
+                color: "#B7C9C3",
+                marginBottom: "8px",
+                textTransform: "uppercase",
+                letterSpacing: "0.8px",
+              }}
+            >
+              Super Admin Mobile Number
+            </label>
+            <div style={{ position: "relative" }}>
+              <Phone
+                size={18}
+                style={{
+                  position: "absolute",
+                  left: "14px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#5C6B66",
+                }}
+              />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Enter mobile number"
+                required
+                style={{
+                  width: "100%",
+                  padding: "13px 14px 13px 44px",
+                  borderRadius: "10px",
+                  border: "1px solid #1F4D46",
+                  background: "#081715",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  fontWeight: 600,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "8px",
+              }}
+            >
               <label
                 style={{
-                  display: "block",
                   fontSize: "11px",
                   fontWeight: 800,
                   color: "#B7C9C3",
-                  marginBottom: "8px",
                   textTransform: "uppercase",
                   letterSpacing: "0.8px",
                 }}
               >
-                Super Admin Mobile Number
+                Password
               </label>
-              <div style={{ position: "relative" }}>
-                <Phone
-                  size={18}
-                  style={{
-                    position: "absolute",
-                    left: "14px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#5C6B66",
-                  }}
-                />
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+918888888888"
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "14px 14px 14px 44px",
-                    borderRadius: "10px",
-                    border: "1px solid #1F4D46",
-                    background: "#081715",
-                    color: "#FFFFFF",
-                    fontSize: "14px",
-                    fontFamily: "inherit",
-                    fontWeight: 600,
-                    outline: "none",
-                  }}
-                />
-              </div>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                width: "100%",
-                padding: "14px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #E5623E 0%, #C44522 100%)",
-                color: "#FFFFFF",
-                fontSize: "14px",
-                fontWeight: 800,
-                border: "none",
-                cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: "0 6px 18px rgba(229, 98, 62, 0.35)",
-              }}
-            >
-              {loading ? "Authenticating..." : "Request Access OTP"}
-              <ArrowRight size={16} />
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerifyOtp} style={{ display: "grid", gap: "18px" }}>
-            <div>
-              <div
+            <div style={{ position: "relative" }}>
+              <Lock
+                size={18}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "8px",
+                  position: "absolute",
+                  left: "14px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#5C6B66",
+                }}
+              />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+                style={{
+                  width: "100%",
+                  padding: "13px 44px 13px 44px",
+                  borderRadius: "10px",
+                  border: "1px solid #1F4D46",
+                  background: "#081715",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  fontFamily: "inherit",
+                  fontWeight: 600,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  color: "#8B968F",
+                  cursor: "pointer",
+                  display: "grid",
+                  placeItems: "center",
+                  padding: "4px",
                 }}
               >
-                <label
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    color: "#B7C9C3",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.8px",
-                  }}
-                >
-                  Enter Verification Code
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setStep("phone")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#F2C94C",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                >
-                  Edit Number
-                </button>
-              </div>
-              <div style={{ position: "relative" }}>
-                <KeyRound
-                  size={18}
-                  style={{
-                    position: "absolute",
-                    left: "14px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#5C6B66",
-                  }}
-                />
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="123456"
-                  maxLength={6}
-                  required
-                  style={{
-                    width: "100%",
-                    padding: "14px 14px 14px 44px",
-                    borderRadius: "10px",
-                    border: "1px solid #1F4D46",
-                    background: "#081715",
-                    color: "#FFFFFF",
-                    fontSize: "20px",
-                    fontFamily: "monospace",
-                    letterSpacing: "5px",
-                    fontWeight: 700,
-                    outline: "none",
-                  }}
-                />
-              </div>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px",
-                width: "100%",
-                padding: "14px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #2E7D5B 0%, #1F4D46 100%)",
-                color: "#FFFFFF",
-                fontSize: "14px",
-                fontWeight: 800,
-                border: "none",
-                cursor: loading ? "not-allowed" : "pointer",
-                boxShadow: "0 6px 18px rgba(46, 125, 91, 0.35)",
-              }}
-            >
-              {loading ? "Verifying Credentials..." : "Enter Super Admin Suite"}
-              <ShieldAlert size={18} />
-            </button>
-          </form>
-        )}
-
-        {/* Dev Fast-fill */}
-        <div
-          style={{
-            marginTop: "26px",
-            padding: "14px",
-            borderRadius: "10px",
-            background: "rgba(255, 255, 255, 0.04)",
-            border: "1px dashed rgba(255, 255, 255, 0.12)",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "11px",
-              color: "#8B968F",
-              marginBottom: "8px",
-              fontWeight: 600,
-            }}
-          >
-            Developer Mode Super Admin Login:
           </div>
+
           <button
-            type="button"
-            onClick={fillDefaultCredentials}
+            type="submit"
+            disabled={loading}
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: "6px",
-              padding: "7px 14px",
-              borderRadius: "6px",
-              background: "rgba(242, 201, 76, 0.12)",
-              border: "1px solid rgba(242, 201, 76, 0.25)",
-              color: "#F2C94C",
-              fontSize: "12px",
-              fontWeight: 700,
-              cursor: "pointer",
+              justifyContent: "center",
+              gap: "8px",
+              width: "100%",
+              padding: "14px",
+              borderRadius: "10px",
+              background: "linear-gradient(135deg, #E5623E 0%, #C44522 100%)",
+              color: "#FFFFFF",
+              fontSize: "14px",
+              fontWeight: 800,
+              border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              boxShadow: "0 6px 18px rgba(229, 98, 62, 0.35)",
+              marginTop: "4px",
             }}
           >
-            <Sparkles size={14} />
-            Autofill Super Admin (+918888888888)
+            {loading ? "Authenticating..." : "Sign In to Super Admin"}
+            <ArrowRight size={16} />
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );

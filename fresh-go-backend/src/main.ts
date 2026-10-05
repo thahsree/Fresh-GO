@@ -8,6 +8,7 @@ import { TransformInterceptor } from "./common/interceptors/transform.intercepto
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 
 import helmet from "helmet";
+import * as express from "express";
 
 async function bootstrap() {
   const logger = new Logger("FreshGoBootstrap");
@@ -15,6 +16,10 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>("PORT", 4000);
+
+  // Increase body parser limit to support document & licence photo uploads (up to 25MB)
+  app.use(express.json({ limit: "25mb" }));
+  app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
   // Helmet Security Headers
   app.use(
@@ -35,8 +40,8 @@ async function bootstrap() {
       // Allow requests with no origin (e.g. React Native mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      // Localhost & 127.0.0.1 for local dev across any port (Expo, Vite, Next.js)
-      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      // Localhost, 127.0.0.1 & LAN IPs for local dev across any port (Expo, Vite, Next.js)
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin)) {
         return callback(null, true);
       }
 

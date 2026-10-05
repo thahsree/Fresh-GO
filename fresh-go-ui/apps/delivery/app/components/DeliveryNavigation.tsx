@@ -5,7 +5,8 @@ type DeliveryNavigationProps = { activeTab: DeliveryTab; onTabChange: (tab: Deli
 const navigationItems = [
   { id: "dashboard", label: "Home", icon: LayoutDashboard },
   { id: "active", label: "Active", icon: MapPinned },
-  { id: "earnings", label: "Earnings", icon: WalletCards },
+  // Earnings tab commented out
+  // { id: "earnings", label: "Earnings", icon: WalletCards },
   { id: "history", label: "History", icon: Clock3 },
   { id: "settings", label: "Settings", icon: Settings2 },
 ] as const;

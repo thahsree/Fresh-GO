@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   BadgeHelp,
   Bike,
@@ -10,18 +10,26 @@ import {
   ShieldCheck,
   Star,
   Volume2,
+  AlertCircle,
+  Building,
+  CheckCircle2,
+  Send,
+  X,
 } from "lucide-react";
-import { DeliverySettings } from "../models/delivery";
-import { DeliveryHub, DeliveryUser } from "../lib/api";
+import { AlertSoundType, DeliverySettings } from "../models/delivery";
+import { AlertSoundOption, ALERT_SOUND_OPTIONS } from "../lib/sound";
+import { DeliveryHub, DeliveryUser, deliveryApi } from "../lib/api";
 
 type SettingsViewProps = {
   settings: DeliverySettings;
   onUpdateSettings: (update: Partial<DeliverySettings>) => void;
+  onTestSoundAlert?: (soundType?: AlertSoundType) => void;
+  soundOptions?: AlertSoundOption[];
   isOnline: boolean;
   onToggleOnline: () => void;
   hubs: DeliveryHub[];
   selectedHub: DeliveryHub | null;
-  onChangeHub: (hub: DeliveryHub) => void;
+  onChangeHub?: (hub: DeliveryHub) => void;
   user: DeliveryUser | null;
   onLogout: () => void;
   onOpenHelp?: () => void;
@@ -32,6 +40,8 @@ type SettingsViewProps = {
 export function SettingsView({
   settings,
   onUpdateSettings,
+  onTestSoundAlert,
+  soundOptions = ALERT_SOUND_OPTIONS,
   isOnline,
   onToggleOnline,
   hubs,
@@ -56,6 +66,12 @@ export function SettingsView({
   const rating = partnerProfile?.rating || 5.0;
   const completedCount = partnerProfile?.completedDeliveries || 0;
   const cashInHand = partnerProfile?.codCashInHand || 0;
+
+  // Hub Transfer Request States (no direct switching)
+  const [requestTargetHub, setRequestTargetHub] = useState<DeliveryHub | null>(null);
+  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
+  const [transferSubmittedHub, setTransferSubmittedHub] = useState<DeliveryHub | null>(null);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   return (
     <>
@@ -113,93 +129,368 @@ export function SettingsView({
         </div>
       </section>
 
-      {/* Fulfillment Hub Selection (Zero Dummy Data, Real Backend Hubs) */}
+      {/* Fulfillment Hub Section: Request-Only Transfers (Direct Switching Prohibited) */}
       <section className="settings-section">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "10px" }}>
           <h2>Fulfillment Hub</h2>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#1f4d46" }}>
-            Orders received from this hub
+            Assigned Hub & Transfer Requests
           </span>
         </div>
-        <div className="card setting-card" style={{ padding: "8px" }}>
-          {hubs.length === 0 ? (
-            <div style={{ padding: 14, textAlign: "center", color: "#5c6b66", fontSize: 12 }}>
-              Loading registered fulfillment hubs...
+
+        {/* Current Assigned & Approved Hub */}
+        <div
+          className="card setting-card"
+          style={{
+            padding: "16px",
+            marginBottom: "12px",
+            border: "1.5px solid #1f4d46",
+            background: "#f4f8f6",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: "10px",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "#1f4d46",
+                color: "#FFFFFF",
+                padding: "4px 10px",
+                borderRadius: "999px",
+                fontSize: "10px",
+                fontWeight: 800,
+                letterSpacing: "0.5px",
+              }}
+            >
+              <Check size={12} strokeWidth={3} />
+              CURRENT ASSIGNED HUB (APPROVED)
             </div>
-          ) : (
-            hubs.map((hub) => {
-              const isSelected = selectedHub?.id === hub.id;
-              return (
-                <div
-                  key={hub.id}
-                  onClick={() => onChangeHub(hub)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "12px 14px",
-                    borderRadius: "10px",
-                    cursor: "pointer",
-                    background: isSelected ? "#e4ece9" : "transparent",
-                    transition: "background 0.15s ease",
-                    borderBottom: "1px solid #e3ddcf",
-                  }}
-                >
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 800,
+                color: "#1f4d46",
+                background: "#e4ece9",
+                padding: "3px 8px",
+                borderRadius: "6px",
+              }}
+            >
+              {selectedHub?.code || "PRIMARY"}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: "10px",
+                background: "#1f4d46",
+                color: "#FFFFFF",
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Building size={20} />
+            </div>
+            <div>
+              <strong style={{ fontSize: "14px", color: "#0f2e29", display: "block" }}>
+                {selectedHub?.name || "Kozhikode Fulfillment Center"}
+              </strong>
+              <span style={{ fontSize: "11.5px", color: "#5c6b66", display: "block", marginTop: "3px" }}>
+                {selectedHub?.address}, {selectedHub?.city}
+              </span>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontSize: "11px",
+                  color: "#2e7d5b",
+                  fontWeight: 700,
+                  marginTop: "6px",
+                }}
+              >
+                ● You receive delivery dispatches exclusively from this hub
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Transfer Notice Banner */}
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: "10px",
+            background: "#fff9f5",
+            border: "1px solid #fbd4c8",
+            display: "flex",
+            gap: "10px",
+            alignItems: "flex-start",
+            marginBottom: "14px",
+          }}
+        >
+          <AlertCircle size={16} color="#e5623e" style={{ flexShrink: 0, marginTop: "2px" }} />
+          <div style={{ fontSize: "11.5px", color: "#6e2b18", lineHeight: 1.45 }}>
+            <strong>Hub Transfer Policy:</strong> Fulfillment hubs cannot be switched instantly by riders. To transfer to another hub, you must submit a transfer request and visit the new hub in person with your original Driving Licence for physical document verification by the Hub Admin.
+          </div>
+        </div>
+
+        {/* Transfer Submitted Success Notice */}
+        {transferSubmittedHub && (
+          <div
+            style={{
+              padding: "14px",
+              borderRadius: "12px",
+              background: "#e8f5e9",
+              border: "1.5px solid #2e7d5b",
+              marginBottom: "14px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                color: "#1f4d46",
+                fontWeight: 800,
+                fontSize: "13px",
+                marginBottom: "6px",
+              }}
+            >
+              <CheckCircle2 size={18} color="#2e7d5b" />
+              Transfer Request Submitted for {transferSubmittedHub.name}!
+            </div>
+            <p style={{ margin: "0 0 8px", fontSize: "12px", color: "#153a34", lineHeight: 1.45 }}>
+              Your request to transfer to <strong>{transferSubmittedHub.name}</strong> has been forwarded to the Hub Admin.
+            </p>
+            <div
+              style={{
+                background: "#FFFFFF",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                fontSize: "11px",
+                color: "#0f2e29",
+                border: "1px dashed #2e7d5b",
+              }}
+            >
+              📍 <strong>Mandatory In-Person Visit:</strong> Please visit{" "}
+              <strong>{transferSubmittedHub.name}</strong> ({transferSubmittedHub.address},{" "}
+              {transferSubmittedHub.city}) with your original Driving Licence for physical document verification.
+            </div>
+            <button
+              type="button"
+              onClick={() => setTransferSubmittedHub(null)}
+              style={{
+                marginTop: "10px",
+                background: "#1f4d46",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: "6px",
+                padding: "6px 14px",
+                fontSize: "11px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Understood
+            </button>
+          </div>
+        )}
+
+        {/* Other Hubs: Request Transfer Available */}
+
+
+        {/* Transfer Confirmation Modal */}
+
+      </section>
+
+      {/* Order Alerts & Sound Preferences */}
+      <section className="settings-section">
+        <h2>Order Alerts & Sound</h2>
+        <div className="card setting-card" style={{ padding: "16px" }}>
+          {/* Main Toggle */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: "50%",
+                  background: settings.soundAlerts !== false ? "#e4ece9" : "#f1f5f9",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: settings.soundAlerts !== false ? "#1f4d46" : "#64748b",
+                }}
+              >
+                <Volume2 size={20} />
+              </div>
+              <div>
+                <strong style={{ fontSize: "14px", display: "block", color: "#111827" }}>
+                  Continuous Order Ringing
+                </strong>
+                <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                  Alert sound loops continuously until order is accepted
+                </span>
+              </div>
+            </div>
+            <button
+              className={`duty-toggle-switch ${settings.soundAlerts !== false ? "on" : ""}`}
+              type="button"
+              role="switch"
+              aria-checked={settings.soundAlerts !== false}
+              aria-label="Toggle continuous order alert"
+              onClick={() =>
+                onUpdateSettings({ soundAlerts: settings.soundAlerts === false ? true : false })
+              }
+            >
+              <i />
+            </button>
+          </div>
+
+          {/* Loop Behavior Info Notice */}
+          <div
+            style={{
+              marginTop: 12,
+              padding: "10px 12px",
+              background: "#f0fdf4",
+              border: "1px dashed #2e7d5b",
+              borderRadius: "8px",
+              fontSize: "11px",
+              color: "#166534",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              lineHeight: 1.4,
+            }}
+          >
+            <span style={{ fontSize: "15px" }}>🔁</span>
+            <span>
+              <strong>Loop Mode Active:</strong> Incoming orders ring repeatedly every 3.2s with audio & vibration until you tap <strong>Accept Delivery</strong>.
+            </span>
+          </div>
+
+          {/* Sound Presets List */}
+          <div style={{ marginTop: 16 }}>
+            <span
+              style={{
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#1f2937",
+                display: "block",
+                marginBottom: 8,
+              }}
+            >
+              Select Alert Tone ({soundOptions.length} Options)
+            </span>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {soundOptions.map((opt) => {
+                const isSelected = (settings.alertSound || "chime") === opt.id;
+                return (
                   <div
+                    key={opt.id}
+                    onClick={() => {
+                      onUpdateSettings({ alertSound: opt.id });
+                      onTestSoundAlert?.(opt.id);
+                    }}
                     style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "8px",
-                      background: isSelected ? "#1f4d46" : "#f6f2ea",
-                      color: isSelected ? "#FFFFFF" : "#1f4d46",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      border: isSelected ? "2px solid #1f4d46" : "1px solid #e5e7eb",
+                      background: isSelected ? "#f4f8f6" : "#ffffff",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease-in-out",
                     }}
                   >
-                    <MapPin size={16} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <strong style={{ fontSize: 13, color: isSelected ? "#1f4d46" : "#17211e" }}>
-                        {hub.name}
-                      </strong>
-                      <span
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div
                         style={{
-                          fontSize: 9,
-                          fontWeight: 800,
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          background: isSelected ? "#1f4d46" : "#e3ddcf",
-                          color: isSelected ? "#FFFFFF" : "#5c6b66",
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          border: isSelected ? "5px solid #1f4d46" : "2px solid #9ca3af",
+                          backgroundColor: "#ffffff",
+                          boxSizing: "border-box",
+                          flexShrink: 0,
                         }}
-                      >
-                        {hub.code}
-                      </span>
+                      />
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <strong
+                            style={{
+                              fontSize: "13px",
+                              color: isSelected ? "#1f4d46" : "#1f2937",
+                            }}
+                          >
+                            {opt.title}
+                          </strong>
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              padding: "1px 6px",
+                              borderRadius: "4px",
+                              background: isSelected ? "#dcfce7" : "#f3f4f6",
+                              color: isSelected ? "#166534" : "#6b7280",
+                            }}
+                          >
+                            {opt.tag}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            color: "#6b7280",
+                            display: "block",
+                            marginTop: 2,
+                          }}
+                        >
+                          {opt.description}
+                        </span>
+                      </div>
                     </div>
-                    <span style={{ display: "block", fontSize: 11, color: "#5c6b66", marginTop: 2 }}>
-                      {hub.address}, {hub.city}
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <div
+
+                    <button
+                      type="button"
+                      title={`Preview ${opt.title}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTestSoundAlert?.(opt.id);
+                      }}
                       style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: "#1f4d46",
-                        color: "#FFFFFF",
-                        display: "grid",
-                        placeItems: "center",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        background: isSelected ? "#1f4d46" : "#f1f5f9",
+                        color: isSelected ? "#ffffff" : "#334155",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        border: "none",
+                        cursor: "pointer",
+                        flexShrink: 0,
                       }}
                     >
-                      <Check size={13} strokeWidth={3} />
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+                      <Volume2 size={13} /> Test
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </section>
 

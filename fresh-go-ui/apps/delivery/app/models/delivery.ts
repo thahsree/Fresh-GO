@@ -47,15 +47,26 @@ export type DeliveryHistoryItem = {
   status: HistoryStatus;
 };
 
+export type AlertSoundType =
+  | "chime"
+  | "urgent_pulse"
+  | "radar_ping"
+  | "bell_ring"
+  | "marimba";
+
 export type DeliverySettings = {
   vehicle: "Bike" | "Scooter";
   preferredZone: string;
   selectedHubId?: string;
+  soundAlerts?: boolean;
+  alertSound?: AlertSoundType;
 };
 
 export const defaultSettings: DeliverySettings = {
   vehicle: "Bike",
   preferredZone: "Kozhikode Central",
+  soundAlerts: true,
+  alertSound: "chime",
 };
 
 export type HelpCategory = "all" | "orders" | "earnings" | "account" | "safety";
@@ -87,7 +98,7 @@ export const helpFaqs: HelpFaqItem[] = [
     id: "faq-3",
     category: "earnings",
     question: "How and when are Cash on Delivery (COD) amounts reconciled?",
-    answer: "COD cash collected is automatically reconciled with your daily balance. If your COD cash exceeds Rs 2,500, please deposit it at your fulfillment hub before accepting subsequent orders.",
+    answer: "COD cash collected is automatically reconciled with your daily balance. If your COD cash exceeds Rs 50,000, please deposit it at your fulfillment hub before accepting subsequent orders.",
     tags: ["cod", "cash", "deposit", "settlement"],
   },
   {

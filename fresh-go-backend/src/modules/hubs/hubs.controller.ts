@@ -71,6 +71,17 @@ export class HubsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
+  @Post(":id/admin-password")
+  async setAdminPassword(
+    @Param("id") hubId: string,
+    @Body("password") password?: string,
+    @Body("adminPhone") adminPhone?: string,
+  ) {
+    return this.hubsService.setHubAdminPassword(hubId, password, adminPhone);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.SUPER_ADMIN)
   @Delete(":id")
   async deleteHub(@Param("id") id: string) {
     return this.hubsService.deleteHub(id);

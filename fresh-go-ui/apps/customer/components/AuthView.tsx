@@ -84,15 +84,10 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
     setErrorMessage("");
 
     try {
-      const res = await customerApi.sendOtp(cleanPhone);
-      const code = res.devOtp || (res.isMock ? "123456" : "");
-      setDevOtp(code);
-      setIsMock(Boolean(res.isMock));
-      if (res.isMock && code) {
-        setOtp(code);
-      } else {
-        setOtp("");
-      }
+      await customerApi.sendOtp(cleanPhone);
+      setDevOtp("");
+      setIsMock(false);
+      setOtp("");
       setStep("otp");
       setTimer(30);
     } catch (err: any) {
@@ -139,11 +134,10 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
     setIsLoading(true);
     setErrorMessage("");
     try {
-      const res = await customerApi.sendOtp(cleanPhone);
-      const code = res.devOtp || (res.isMock ? "123456" : "");
-      setDevOtp(code);
-      setIsMock(Boolean(res.isMock));
-      if (res.isMock && code) setOtp(code);
+      await customerApi.sendOtp(cleanPhone);
+      setDevOtp("");
+      setIsMock(false);
+      setOtp("");
       setTimer(30);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to resend code");
@@ -263,14 +257,6 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                     <Text style={styles.primaryBtnText}>Get OTP Code</Text>
                   )}
                 </Pressable>
-
-                {/* Dev hint badge */}
-                <View style={styles.devHintBox}>
-                  <Sparkles size={13} color="#B45309" />
-                  <Text style={styles.devHintText}>
-                    Reviewer Demo: Use test mobile <Text style={styles.devHintBold}>9876543210</Text> and OTP <Text style={styles.devHintBold}>123456</Text>.
-                  </Text>
-                </View>
               </View>
             ) : (
               /* STEP 2: OTP VERIFICATION */
@@ -315,51 +301,6 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   </View>
                 </View>
 
-                {/* Simulated Mode Banner or Dev Pill */}
-                {isMock ? (
-                  <View style={styles.mockBanner}>
-                    <View style={styles.mockBannerTop}>
-                      <Sparkles size={15} color="#B45309" />
-                      <Text style={styles.mockBannerTitle}>Why didn't an SMS arrive on your phone?</Text>
-                    </View>
-                    <Text style={styles.mockBannerDesc}>
-                      Physical carrier SMS requires an SMS Gateway (Fast2SMS / Twilio) API key in backend .env.
-                      In this development mode, your code is simulated as <Text style={{ fontWeight: "800", color: "#92400E" }}>{devOtp || "123456"}</Text> and auto-filled below!
-                    </Text>
-                    <View style={styles.mockOtpRow}>
-                      <View>
-                        <Text style={styles.mockOtpLabel}>Development OTP</Text>
-                        <Text style={styles.mockOtpNumber}>{devOtp || "123456"}</Text>
-                      </View>
-                      <Pressable
-                        style={styles.autoFillBtn}
-                        onPress={() => {
-                          setOtp(devOtp || "123456");
-                          setErrorMessage("");
-                        }}
-                      >
-                        <CheckCircle2 size={13} color="#FFFFFF" />
-                        <Text style={styles.autoFillBtnText}>Auto-filled</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ) : (
-                  !!devOtp && (
-                    <Pressable
-                      style={styles.demoPill}
-                      onPress={() => {
-                        setOtp(devOtp);
-                        setErrorMessage("");
-                      }}
-                    >
-                      <CheckCircle2 size={13} color={colors.primary} />
-                      <Text style={styles.demoPillText}>
-                        Dev Code: {devOtp} (Tap to auto-fill)
-                      </Text>
-                    </Pressable>
-                  )
-                )}
-
                 {/* Error message */}
                 {!!errorMessage && (
                   <View style={styles.errorBox}>
@@ -380,11 +321,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   {isLoading ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryBtnText}>
-                      {isMock && otp === (devOtp || "123456")
-                        ? "Verify & Proceed (123456) →"
-                        : "Verify & Proceed →"}
-                    </Text>
+                    <Text style={styles.primaryBtnText}>Verify & Proceed →</Text>
                   )}
                 </Pressable>
 

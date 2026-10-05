@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import {
   CreateHubDto,
@@ -316,5 +317,67 @@ export class HubsService {
         consentGiven: dto.consentGiven ?? true,
       },
     });
+  }
+
+  /**
+   * Superadmin generates or sets password for Hub Admin
+   */
+  async setHubAdminPassword(
+    hubId: string,
+    passwordInput?: string,
+    adminPhone?: string,
+  ) {
+    const hub = await this.prisma.hub.findUnique({
+      where: { id: hubId },
+      include: { admins: true },
+    });
+    if (!hub) throw new NotFoundException(`Hub with ID ${hubId} not found`);
+
+    const rawPassword =
+      passwordInput && passwordInput.trim().length > 0
+        ? passwordInput.trim()
+        : `Hub@${hub.code.replace(/[^A-Za-z0-9]/g, "")}2026`;
+
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const targetPhone =
+      adminPhone?.trim() ||
+      hub.admins[0]?.phone ||
+      hub.contactPhone ||
+      "+919999999999";
+
+    // Update or create hub admin user with password
+    await this.prisma.user.upsert({
+      where: { phone: targetPhone },
+      update: {
+        password: hashedPassword,
+        hubId: hub.id,
+        role: Role.ADMIN,
+      },
+      create: {
+        phone: targetPhone,
+        name: `${hub.name} Admin`,
+        role: Role.ADMIN,
+        hubId: hub.id,
+        password: hashedPassword,
+      },
+    });
+
+    // Update hub contactPhone and record generated password
+    await this.prisma.hub.update({
+      where: { id: hub.id },
+      data: {
+        contactPhone: targetPhone,
+        adminPasswordRaw: rawPassword,
+      },
+    });
+
+    return {
+      success: true,
+      hubId: hub.id,
+      hubName: hub.name,
+      hubNumber: targetPhone,
+      hubCode: hub.code,
+      password: rawPassword,
+    };
   }
 }

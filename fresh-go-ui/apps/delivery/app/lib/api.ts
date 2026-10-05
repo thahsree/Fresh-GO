@@ -25,6 +25,8 @@ export type DeliveryUser = {
     rating: number;
     completedDeliveries: number;
     codCashInHand: number;
+    hubId?: string;
+    hub?: DeliveryHub | null;
   } | null;
 };
 
@@ -181,8 +183,9 @@ class DeliveryApiClient {
       try {
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(USER_KEY, JSON.stringify(user));
-        if (user.hub && !this.selectedHub) {
-          this.saveSelectedHub(user.hub);
+        const partnerHub = user.hub || user.partnerProfile?.hub;
+        if (partnerHub) {
+          this.saveSelectedHub(partnerHub);
         }
       } catch {
         // ignore
@@ -204,10 +207,12 @@ class DeliveryApiClient {
   clearSession() {
     this.token = null;
     this.user = null;
+    this.selectedHub = null;
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
+        localStorage.removeItem(HUB_KEY);
       } catch {
         // ignore
       }
@@ -239,40 +244,42 @@ class DeliveryApiClient {
       throw new Error(errorMsg);
     }
 
-    return res.json();
+    const json = await res.json().catch(() => ({}));
+    return (json && json.data !== undefined) ? json.data : json;
   }
 
-  // --- Auth Endpoints ---
-  async sendOtp(phone: string) {
-    return this.request<{
-      message: string;
-      devOtp?: string;
-      isMock?: boolean;
-    }>("/auth/otp/send", {
+  async loginPartner(phone: string, partnerId: string): Promise<{ accessToken: string; user: DeliveryUser }> {
+    const raw = await this.request<any>("/auth/delivery/login", {
       method: "POST",
-      body: JSON.stringify({ phone }),
-    });
-  }
-
-  async verifyOtp(phone: string, otp: string, name?: string) {
-    const res = await this.request<{
-      accessToken: string;
-      refreshToken: string;
-      user: DeliveryUser;
-    }>("/auth/otp/verify", {
-      method: "POST",
-      body: JSON.stringify({
-        phone,
-        otp,
-        role: "DELIVERY_PARTNER",
-        name: name || "Delivery Partner",
-      }),
+      body: JSON.stringify({ phone, partnerId }),
     });
 
-    if (res.accessToken && res.user) {
+    const res = raw?.data || raw;
+    if (res?.accessToken && res?.user) {
       this.saveSession(res.accessToken, res.user);
     }
     return res;
+  }
+
+  async registerPartner(payload: {
+    phone: string;
+    name?: string;
+    hubId: string;
+    vehicleType?: string;
+    vehicleNumber?: string;
+    licenseNumber?: string;
+    licensePhoto?: string;
+  }) {
+    return this.request<{
+      message: string;
+      partnerId: string;
+      kycStatus: string;
+      hub: { id: string; name: string; code: string; address?: string };
+      instructions: string;
+    }>("/auth/delivery/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   }
 
   async getMe() {
@@ -301,8 +308,18 @@ class DeliveryApiClient {
     return this.request<BackendOrder[]>(`/delivery/available-orders${query}`);
   }
 
-  async acceptOrder(orderId: string): Promise<ActiveTrip> {
-    return this.request<ActiveTrip>(`/delivery/orders/${orderId}/accept`, {
+  async acceptOrder(orderId: string | any): Promise<ActiveTrip> {
+    let cleanId = "";
+    if (typeof orderId === "string") {
+      cleanId = orderId.trim();
+    } else if (orderId && typeof orderId === "object") {
+      cleanId = orderId.id || orderId.orderId || orderId.orderNumber || "";
+    }
+    const finalId =
+      cleanId && cleanId !== "[object Object]"
+        ? encodeURIComponent(cleanId)
+        : "current";
+    return this.request<ActiveTrip>(`/delivery/orders/${finalId}/accept`, {
       method: "POST",
     });
   }

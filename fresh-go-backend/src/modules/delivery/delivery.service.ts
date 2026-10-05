@@ -19,7 +19,11 @@ import {
   PaymentStatus,
   EarningType,
   IssueStatus,
+  User,
+  Role,
 } from "@prisma/client";
+
+const COD_CASH_LIMIT = parseFloat(process.env.COD_CASH_LIMIT || "50000");
 
 @Injectable()
 export class DeliveryService {
@@ -94,7 +98,7 @@ export class DeliveryService {
         rating: profile.rating,
         completedDeliveries: profile.completedDeliveries,
         codCashInHand: profile.codCashInHand,
-        codLimitExceeded: profile.codCashInHand >= 2500,
+        codLimitExceeded: profile.codCashInHand >= COD_CASH_LIMIT,
         preferredZone: profile.preferredZone?.name,
       },
       activeTrip,
@@ -109,34 +113,42 @@ export class DeliveryService {
   async getAvailableOrders(partnerUserId: string, hubId?: string) {
     const partner = await this.prisma.deliveryPartnerProfile.findUnique({
       where: { userId: partnerUserId },
+      include: { hub: true },
     });
     if (!partner)
       throw new NotFoundException("Delivery partner profile not found");
 
+    // Partner is strictly bound to their assigned hub.
+    // If partner is assigned to a hub, use that hub. Otherwise, fall back to query hubId if provided.
+    const effectiveHubId = partner.hubId || hubId;
+
     const whereClause: any = {
       status: {
         in: [
+          OrderStatus.PLACED,
           OrderStatus.CONFIRMED,
           OrderStatus.CUTTING_PREPARING,
           OrderStatus.PACKED,
           OrderStatus.DISPATCH_READY,
+          OrderStatus.ASSIGNED,
         ],
       },
       OR: [
-        { deliveryPartnerId: null },
+        // 1. Orders explicitly assigned to this partner (regardless of status)
         { deliveryPartnerId: partner.id },
+        // 2. Unassigned orders strictly belonging to this partner's hub
+        {
+          deliveryPartnerId: null,
+          ...(effectiveHubId ? { hubId: effectiveHubId } : {}),
+        },
       ],
     };
-
-    if (hubId) {
-      whereClause.hubId = hubId;
-    }
 
     const orders = await this.prisma.order.findMany({
       where: whereClause,
       include: {
         customer: { select: { name: true, phone: true } },
-        items: { include: { product: true } },
+        items: { include: { product: true, cutOption: true } },
         hub: true,
         zone: true,
       },
@@ -149,7 +161,7 @@ export class DeliveryService {
 
   /**
    * Partner accepts an offered order
-   * Strictly enforces ₹2,500 COD threshold cap!
+   * Strictly enforces COD threshold cap!
    */
   async acceptDeliveryOrder(partnerUserId: string, orderId: string) {
     const partner = await this.prisma.deliveryPartnerProfile.findUnique({
@@ -164,23 +176,83 @@ export class DeliveryService {
     }
 
     // STRICT COD LIMIT ENFORCEMENT
-    if (partner.codCashInHand >= 2500) {
+    if (partner.codCashInHand >= COD_CASH_LIMIT) {
+      const formattedLimit = `₹${COD_CASH_LIMIT.toLocaleString("en-IN")}`;
       throw new BadRequestException(
-        `COD limit exceeded! You have ₹${partner.codCashInHand} in hand. Cash-in-hand limit is ₹2,500. Please deposit cash at the hub before taking new orders.`,
+        `COD limit exceeded! You have ₹${partner.codCashInHand} in hand. Cash-in-hand limit is ${formattedLimit}. Please deposit cash at the hub before taking new orders.`,
       );
     }
-
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-    if (!order) throw new NotFoundException("Order not found");
 
     const acceptableStatuses: OrderStatus[] = [
       OrderStatus.DISPATCH_READY,
       OrderStatus.ASSIGNED,
       OrderStatus.PACKED,
+      OrderStatus.CUTTING_PREPARING,
       OrderStatus.CONFIRMED,
+      OrderStatus.PLACED,
     ];
+
+    const cleanId = orderId ? orderId.replace(/^#/, "").trim() : "";
+    const isMalformed =
+      !cleanId ||
+      cleanId === "[object Object]" ||
+      cleanId === "undefined" ||
+      cleanId === "null" ||
+      cleanId === "current";
+
+    let order: any = null;
+
+    if (!isMalformed) {
+      order = await this.prisma.order.findFirst({
+        where: {
+          OR: [
+            { id: orderId },
+            { id: cleanId },
+            { orderNumber: orderId },
+            { orderNumber: cleanId },
+            { orderNumber: { equals: cleanId, mode: "insensitive" } },
+          ],
+        },
+      });
+    }
+
+    // Fallback: If orderId was malformed (e.g. [object Object] from client) or "current" or not found by ID:
+    if (!order) {
+      // 1. Try finding order explicitly assigned to this partner
+      order = await this.prisma.order.findFirst({
+        where: {
+          deliveryPartnerId: partner.id,
+          status: { in: acceptableStatuses },
+        },
+        orderBy: { placedAt: "desc" },
+      });
+
+      // 2. If none assigned, find newest available unassigned order in partner's hub
+      if (!order && partner.hubId) {
+        order = await this.prisma.order.findFirst({
+          where: {
+            hubId: partner.hubId,
+            deliveryPartnerId: null,
+            status: { in: acceptableStatuses },
+          },
+          orderBy: { placedAt: "desc" },
+        });
+      }
+
+      // 3. Fallback: newest unassigned order anywhere
+      if (!order) {
+        order = await this.prisma.order.findFirst({
+          where: {
+            deliveryPartnerId: null,
+            status: { in: acceptableStatuses },
+          },
+          orderBy: { placedAt: "desc" },
+        });
+      }
+    }
+
+    if (!order) throw new NotFoundException("Order not found or no longer available");
+
     if (!acceptableStatuses.includes(order.status)) {
       throw new BadRequestException(
         "Order is no longer available for delivery",
@@ -188,13 +260,13 @@ export class DeliveryService {
     }
 
     // Cancel 45-second dispatch timeout job in BullMQ
-    await this.jobsService.cancelDispatchTimeout(orderId, partner.id);
+    await this.jobsService.cancelDispatchTimeout(order.id, partner.id);
 
     const trip = await this.prisma.$transaction(async (tx) => {
       // Create DeliveryTrip
       const newTrip = await tx.deliveryTrip.create({
         data: {
-          orderId,
+          orderId: order.id,
           partnerId: partner.id,
           phase: DeliveryPhase.ACCEPTED,
         },
@@ -202,7 +274,7 @@ export class DeliveryService {
 
       // Update Order
       await tx.order.update({
-        where: { id: orderId },
+        where: { id: order.id },
         data: {
           deliveryPartnerId: partner.id,
           status: OrderStatus.ASSIGNED,
@@ -212,7 +284,7 @@ export class DeliveryService {
       // Log status event
       await tx.orderStatusEvent.create({
         data: {
-          orderId,
+          orderId: order.id,
           fromStatus: order.status,
           toStatus: OrderStatus.ASSIGNED,
           actorId: partnerUserId,
@@ -224,7 +296,7 @@ export class DeliveryService {
     });
 
     // Broadcast status change via Socket.io
-    this.trackingService.emitOrderStatusUpdate(orderId, {
+    this.trackingService.emitOrderStatusUpdate(order.id, {
       status: OrderStatus.ASSIGNED,
       orderNumber: order.orderNumber,
       note: `Delivery partner accepted order`,
@@ -453,5 +525,100 @@ export class DeliveryService {
     }
 
     return ticket;
+  }
+
+  /**
+   * Get delivery partners filtered by Hub Admin's hub or super admin filter
+   */
+  async getDeliveryPartners(adminUser: User, queryHubId?: string) {
+    const where: any = {};
+    if (adminUser.role === Role.ADMIN) {
+      if (adminUser.hubId) {
+        where.hubId = adminUser.hubId;
+      }
+    } else if (queryHubId) {
+      where.hubId = queryHubId;
+    }
+
+    return this.prisma.deliveryPartnerProfile.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            isActive: true,
+          },
+        },
+        hub: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            contactPhone: true,
+          },
+        },
+      },
+      orderBy: [{ kycStatus: "asc" }, { rating: "desc" }],
+    });
+  }
+
+  /**
+   * Approve or reject delivery partner application and ensure 6-digit partnerId exists
+   */
+  async updatePartnerKycStatus(
+    partnerProfileId: string,
+    status: "VERIFIED" | "REJECTED" | "PENDING",
+  ) {
+    const profile = await this.prisma.deliveryPartnerProfile.findUnique({
+      where: { id: partnerProfileId },
+      include: { user: true, hub: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("Delivery partner not found");
+    }
+
+    // Ensure 6-digit partnerId exists when approving
+    let partnerId = profile.partnerId;
+    if (!partnerId) {
+      partnerId = Math.floor(100000 + Math.random() * 900000).toString();
+      while (
+        await this.prisma.deliveryPartnerProfile.findUnique({
+          where: { partnerId },
+        })
+      ) {
+        partnerId = Math.floor(100000 + Math.random() * 900000).toString();
+      }
+    }
+
+    return this.prisma.deliveryPartnerProfile.update({
+      where: { id: partnerProfileId },
+      data: {
+        kycStatus: status as any,
+        partnerId: partnerId || undefined,
+        isOnline: status === "VERIFIED" ? profile.isOnline : false,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            isActive: true,
+          },
+        },
+        hub: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            contactPhone: true,
+          },
+        },
+      },
+    });
   }
 }

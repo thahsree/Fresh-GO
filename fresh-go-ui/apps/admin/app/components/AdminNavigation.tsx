@@ -6,6 +6,7 @@ export const navItems = [
   ["products", "▦", "Products"],
   ["inventory", "▥", "Inventory"],
   ["dispatch", "⇢", "Dispatch"],
+  ["delivery-partners", "🚲", "Delivery Partners"],
   ["featured", "★", "Featured Sections"],
 ] as const;
 

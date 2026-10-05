@@ -19,18 +19,18 @@ declare const process: any;
  * 3. Local LAN / Wi-Fi / Emulator: uses Metro's host with port 8081 which proxies /api/ to 4000
  */
 export function getApiBase(): string {
-  // 1. Explicit environment variable (inlined by Expo CLI)
-  if (typeof process !== "undefined" && process?.env?.EXPO_PUBLIC_API_URL) {
-    const envUrl = process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "");
-    if (envUrl.length > 0) return envUrl;
-  }
-
-  // 2. Web browser: route via current window origin to leverage Metro's proxy
+  // 1. Web browser: route via current window origin to leverage Metro's proxy or direct localhost
   if (Platform.OS === "web") {
     if (typeof window !== "undefined" && window.location?.origin) {
       return `${window.location.origin}/api/v1`;
     }
     return "http://localhost:4000/api/v1";
+  }
+
+  // 2. Explicit environment variable (inlined by Expo CLI)
+  if (typeof process !== "undefined" && process?.env?.EXPO_PUBLIC_API_URL) {
+    const envUrl = process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "");
+    if (envUrl.length > 0 && !envUrl.includes("duckdns.org")) return envUrl;
   }
 
   // 3. Extract candidate hosts from Expo Constants & React Native SourceCode
@@ -96,8 +96,8 @@ export function getApiBase(): string {
     }
   }
 
-  // 4. Default Production HTTPS backend (DuckDNS / Caddy)
-  return "https://fresh-go.duckdns.org/api/v1";
+  // 4. Default Localhost / LAN backend
+  return "http://localhost:4000/api/v1";
 }
 
 export const API_BASE = getApiBase();
@@ -196,6 +196,7 @@ export type BackendOrderItem = {
   unitPrice: number;
   totalPrice: number;
   cutOption?: { id: string; name: string } | null;
+  cutName?: string | null;
   product: BackendProduct;
 };
 
@@ -494,8 +495,17 @@ class CustomerApiClient {
       clearTimeout(timeoutId);
 
       if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status}: ${errText || res.statusText}`);
+        let msg = res.statusText || "Request failed";
+        try {
+          const errJson = await res.json();
+          if (errJson?.message) {
+            msg = Array.isArray(errJson.message) ? errJson.message.join(", ") : errJson.message;
+          }
+        } catch {
+          const errText = await res.text().catch(() => "");
+          if (errText) msg = errText;
+        }
+        throw new Error(msg);
       }
 
       const json = await res.json();
@@ -828,6 +838,7 @@ class CustomerApiClient {
           const items = (o.items || []).map((item) => ({
             product: this.transformProduct(item.product),
             quantity: item.quantity,
+            selectedCut: item.cutName || (item as any).cutOption?.name,
           }));
 
           const dateStr = o.placedAt
@@ -891,9 +902,10 @@ class CustomerApiClient {
   }
 
   async createOrder(orderDetails: {
-    items: { product: Product; quantity: number }[];
+    items: { product: Product; quantity: number; selectedCut?: string }[];
     total: number;
     paymentMethod: "cod" | "upi";
+    hubId?: string;
     addressId?: string;
     addressDetails?: {
       title?: string;
@@ -922,10 +934,10 @@ class CustomerApiClient {
           street: `${ad.houseBuilding}, ${ad.street}`,
           landmark: ad.landmark || undefined,
           area: ad.area || "Local Area",
-          city: ad.city || "Kerala",
-          pincode: ad.pincode || "670001",
-          latitude: ad.latitude || 11.876384,
-          longitude: ad.longitude || 75.373797,
+          city: ad.city || "Kozhikode",
+          pincode: ad.pincode || "673004",
+          latitude: ad.latitude || 11.2588,
+          longitude: ad.longitude || 75.7804,
           isDefault: true,
         });
         if (newAddr) {
@@ -946,15 +958,20 @@ class CustomerApiClient {
         };
       }
 
-      // Map order items for backend DTO
+      // Map order items for backend DTO including cut preparations
       const orderItems = orderDetails.items.map((item) => ({
         productId: item.product.id,
         quantity: item.quantity,
-        cutOptionId: item.product.cutOptions?.[0]?.id,
+        cutOptionId:
+          item.product.cutOptions?.find(
+            (c) => c.name?.toLowerCase() === item.selectedCut?.toLowerCase()
+          )?.id || item.product.cutOptions?.[0]?.id,
+        cutName: item.selectedCut || item.product.cuts?.[0] || "Standard Cut",
       }));
 
       const payload = {
         addressId,
+        hubId: orderDetails.hubId,
         paymentMethod: orderDetails.paymentMethod === "upi" ? "RAZORPAY" : "COD",
         items: orderItems,
         notes: "Placed from Customer Mobile App",

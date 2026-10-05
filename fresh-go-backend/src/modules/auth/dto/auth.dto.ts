@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, Matches } from "class-validator";
+import { IsNotEmpty, IsString, Matches, IsOptional } from "class-validator";
 
 export class SendOtpDto {
   @IsNotEmpty()
@@ -22,4 +22,64 @@ export class VerifyOtpDto {
   // Optional: User role when signing up or logging in from specific app
   role?: "CUSTOMER" | "DELIVERY_PARTNER" | "ADMIN" | "SUPER_ADMIN";
   name?: string;
+}
+
+export class SuperAdminLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  phone: string;
+
+  @IsNotEmpty()
+  @IsString()
+  password: string;
+}
+
+export class HubAdminLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  hubIdentifier: string; // Hub Phone / Contact Number or Hub Code
+
+  @IsNotEmpty()
+  @IsString()
+  password: string;
+}
+
+export class DeliveryLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  phone: string;
+
+  @IsNotEmpty()
+  @IsString()
+  partnerId: string; // 6-digit Unique Partner ID issued by Hub Admin
+}
+
+export class DeliveryRegisterDto {
+  @IsNotEmpty()
+  @IsString()
+  phone: string;
+
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
+  @IsString()
+  hubId: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleType?: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  licenseNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  licensePhoto?: string;
 }

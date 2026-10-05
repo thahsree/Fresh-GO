@@ -76,4 +76,22 @@ export class DeliveryController {
   ) {
     return this.deliveryService.recordCashSettlement(dto, user.id);
   }
+
+  @Roles(Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN)
+  @Get("partners")
+  async getPartners(
+    @CurrentUser() user: User,
+    @Query("hubId") hubId?: string,
+  ) {
+    return this.deliveryService.getDeliveryPartners(user, hubId);
+  }
+
+  @Roles(Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN)
+  @Put("partners/:id/status")
+  async updatePartnerStatus(
+    @Param("id") partnerProfileId: string,
+    @Body("status") status: "VERIFIED" | "REJECTED" | "PENDING",
+  ) {
+    return this.deliveryService.updatePartnerKycStatus(partnerProfileId, status);
+  }
 }

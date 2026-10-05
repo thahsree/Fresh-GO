@@ -20,6 +20,10 @@ export class OrderItemDto {
   @IsString()
   cutOptionId?: string;
 
+  @IsOptional()
+  @IsString()
+  cutName?: string;
+
   @IsNotEmpty()
   @IsNumber()
   @Min(1)
@@ -30,6 +34,10 @@ export class CreateOrderDto {
   @IsNotEmpty()
   @IsString()
   addressId: string;
+
+  @IsOptional()
+  @IsString()
+  hubId?: string;
 
   @IsNotEmpty()
   @IsEnum(PaymentMethod)

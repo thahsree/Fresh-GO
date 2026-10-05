@@ -24,6 +24,7 @@ export class RedisService implements OnModuleDestroy {
         lazyConnect: true,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
+        retryStrategy: (times) => Math.min(times * 2000, 30000),
       });
     } else {
       const host = this.configService.get<string>("REDIS_HOST", "localhost");
@@ -44,11 +45,18 @@ export class RedisService implements OnModuleDestroy {
         lazyConnect: true,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
+        retryStrategy: (times) => Math.min(times * 2000, 30000),
       });
     }
 
     this.client.on("connect", () => {
       this.logger.log("✅ Redis client connected successfully");
+    });
+
+    this.client.on("error", (err) => {
+      this.logger.warn(
+        `Redis connection error (running in degraded offline cache mode): ${err.message}`,
+      );
     });
 
     this.client.connect().catch((err) => {

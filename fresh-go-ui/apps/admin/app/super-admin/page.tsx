@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, AdminUser } from "../lib/api";
 import { HubsManagementView } from "./components/HubsManagementView";
 import { SalesReportView } from "./components/SalesReportView";
+import { DeliveryPartnersView } from "../components/DeliveryPartnersView";
 import {
   ShieldAlert,
   BarChart3,
@@ -13,13 +14,14 @@ import {
   CheckCircle,
   AlertCircle,
   Info,
+  Bike,
 } from "lucide-react";
 
 export default function SuperAdminDashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"hubs" | "reports">("hubs");
+  const [activeTab, setActiveTab] = useState<"hubs" | "reports" | "delivery">("hubs");
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error" | "info" | "delete";
@@ -205,6 +207,27 @@ export default function SuperAdminDashboardPage() {
             <BarChart3 size={16} />
             Sales Reports & Analytics
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("delivery")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "8px 16px",
+              borderRadius: "8px",
+              border: "none",
+              background: activeTab === "delivery" ? "#1F4D46" : "transparent",
+              color: activeTab === "delivery" ? "#FFFFFF" : "#8B968F",
+              fontSize: "13px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <Bike size={16} />
+            Delivery Partners
+          </button>
         </div>
 
         {/* Right Side Actions */}
@@ -249,6 +272,9 @@ export default function SuperAdminDashboardPage() {
       <main style={{ padding: "32px 36px", maxWidth: "1400px", margin: "0 auto" }}>
         {activeTab === "hubs" && <HubsManagementView onToast={showToast} />}
         {activeTab === "reports" && <SalesReportView onToast={showToast} />}
+        {activeTab === "delivery" && (
+          <DeliveryPartnersView currentUser={user} onToast={showToast} />
+        )}
       </main>
 
       {/* Toast Notification Container */}

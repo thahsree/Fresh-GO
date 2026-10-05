@@ -3,17 +3,18 @@ import { DispatchService } from "./dispatch.service";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
-import { Role } from "@prisma/client";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Role, User } from "@prisma/client";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.DISPATCHER, Role.HUB_MANAGER)
+@Roles(Role.ADMIN, Role.DISPATCHER, Role.HUB_MANAGER, Role.SUPER_ADMIN)
 @Controller("dispatch")
 export class DispatchController {
   constructor(private readonly dispatchService: DispatchService) {}
 
   @Get("tower")
-  async getTower() {
-    return this.dispatchService.getDispatchTower();
+  async getTower(@CurrentUser() user: User) {
+    return this.dispatchService.getDispatchTower(user);
   }
 
   @Post("orders/:orderId/assign")

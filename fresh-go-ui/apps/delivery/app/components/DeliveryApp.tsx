@@ -48,6 +48,7 @@ export function DeliveryApp() {
               selectedHub={delivery.selectedHub}
               onAccept={delivery.acceptRequest}
               onDecline={delivery.declineRequest}
+              onSilenceAlert={delivery.stopSoundAlert}
               onOpenHistory={() => delivery.setTab("history")}
               onOpenSettings={() => delivery.setTab("settings")}
             />
@@ -63,12 +64,14 @@ export function DeliveryApp() {
             />
           )}
 
+          {/* Earnings tab commented out
           {delivery.tab === "earnings" && (
             <EarningsView
               todayEarnings={delivery.todayEarnings}
               onOpenHistory={() => delivery.setTab("history")}
             />
           )}
+          */}
 
           {delivery.tab === "history" && <HistoryView history={delivery.history} />}
 
@@ -76,6 +79,8 @@ export function DeliveryApp() {
             <SettingsView
               settings={delivery.settings}
               onUpdateSettings={delivery.updateSettings}
+              onTestSoundAlert={delivery.testSoundAlert}
+              soundOptions={delivery.soundOptions}
               isOnline={delivery.isOnline}
               onToggleOnline={delivery.toggleOnline}
               hubs={delivery.hubs}

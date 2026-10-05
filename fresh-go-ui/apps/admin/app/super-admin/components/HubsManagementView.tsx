@@ -17,6 +17,10 @@ import {
   RefreshCw,
   Building,
   AlertTriangle,
+  KeyRound,
+  Copy,
+  Check,
+  Lock,
 } from "lucide-react";
 
 type HubFormData = {
@@ -56,6 +60,59 @@ export function HubsManagementView({
   const [formData, setFormData] = useState<HubFormData>(initialFormData);
   const [saving, setSaving] = useState(false);
   const [deletingHub, setDeletingHub] = useState<Hub | null>(null);
+
+  // Hub Admin Password & Credentials State
+  const [credentialsHub, setCredentialsHub] = useState<Hub | null>(null);
+  const [hubPasswordInput, setHubPasswordInput] = useState("");
+  const [hubAdminPhoneInput, setHubAdminPhoneInput] = useState("");
+  const [generatingPassword, setGeneratingPassword] = useState(false);
+  const [copiedCredential, setCopiedCredential] = useState(false);
+  const [passwordSuccessMessage, setPasswordSuccessMessage] = useState<string | null>(null);
+
+  const openCredentialsModal = (hub: Hub) => {
+    setCredentialsHub(hub);
+    setHubPasswordInput(hub.adminPasswordRaw || "");
+    setHubAdminPhoneInput(hub.admins?.[0]?.phone || hub.contactPhone || "+919999999999");
+    setPasswordSuccessMessage(null);
+    setCopiedCredential(false);
+  };
+
+  const handleGenerateSavePassword = async (generateRandom = false) => {
+    if (!credentialsHub) return;
+    setGeneratingPassword(true);
+    setPasswordSuccessMessage(null);
+    try {
+      let pwdToSend = hubPasswordInput.trim();
+      if (generateRandom || !pwdToSend) {
+        const rand = Math.floor(1000 + Math.random() * 9000);
+        pwdToSend = `FreshGo@${credentialsHub.code.replace(/[^a-zA-Z0-9]/g, "")}${rand}`;
+      }
+
+      const res = await api.hubs.setAdminPassword(credentialsHub.id, {
+        password: pwdToSend,
+        adminPhone: hubAdminPhoneInput.trim() || undefined,
+      });
+
+      setHubPasswordInput(res.password || pwdToSend);
+      setPasswordSuccessMessage(`Credentials updated successfully! Hub Phone: ${res.hubNumber}`);
+      onToast(`Admin credentials generated for ${credentialsHub.name}`, "success");
+      fetchHubs();
+    } catch (err: any) {
+      onToast(err?.message || "Failed to update hub admin password", "error");
+    } finally {
+      setGeneratingPassword(false);
+    }
+  };
+
+  const copyCredentialsToClipboard = () => {
+    if (!credentialsHub) return;
+    const phone = hubAdminPhoneInput || credentialsHub.contactPhone || "+919999999999";
+    const text = `FreshGo Hub Admin Credentials:\nHub: ${credentialsHub.name} (${credentialsHub.code})\nLogin Identifier: ${phone} (or ${credentialsHub.code})\nPassword: ${hubPasswordInput}`;
+    navigator.clipboard.writeText(text);
+    setCopiedCredential(true);
+    setTimeout(() => setCopiedCredential(false), 3000);
+    onToast("Credentials copied to clipboard!", "info");
+  };
 
   const fetchHubs = async () => {
     setLoading(true);
@@ -473,7 +530,27 @@ export function HubsManagementView({
                       </td>
 
                       <td style={{ padding: "14px 18px", textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: "8px" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                          <button
+                            onClick={() => openCredentialsModal(hub)}
+                            title="Generate or view Hub Admin Password"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              padding: "6px 10px",
+                              borderRadius: "7px",
+                              border: "1px solid #1F4D46",
+                              background: "#E4ECE9",
+                              color: "#1F4D46",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <KeyRound size={13} />
+                            Password
+                          </button>
                           <button
                             onClick={() => openEditModal(hub)}
                             title="Edit Hub"
@@ -872,6 +949,229 @@ export function HubsManagementView({
               >
                 Yes, Delete Hub
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hub Admin Password Generator Modal */}
+      {credentialsHub && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(15, 46, 41, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "grid",
+            placeItems: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: "520px",
+              background: "#FFFFFF",
+              borderRadius: "18px",
+              padding: "28px",
+              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.3)",
+              display: "grid",
+              gap: "20px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    width: "44px",
+                    height: "44px",
+                    borderRadius: "12px",
+                    background: "#E4ECE9",
+                    color: "#1F4D46",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  <KeyRound size={22} />
+                </div>
+                <div>
+                  <h3
+                    style={{
+                      fontFamily: "'Fraunces', serif",
+                      fontSize: "20px",
+                      color: "#0F2E29",
+                      margin: 0,
+                    }}
+                  >
+                    Hub Admin Credentials
+                  </h3>
+                  <p style={{ fontSize: "12px", color: "#5C6B66", margin: "2px 0 0" }}>
+                    {credentialsHub.name} · {credentialsHub.code}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCredentialsHub(null)}
+                style={{
+                  border: "none",
+                  background: "#F6F2EA",
+                  borderRadius: "50%",
+                  width: "32px",
+                  height: "32px",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  color: "#1F4D46",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {passwordSuccessMessage && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  background: "#E3F1E9",
+                  color: "#2E7D5B",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
+              >
+                ✓ {passwordSuccessMessage}
+              </div>
+            )}
+
+            <div style={{ display: "grid", gap: "14px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 800, color: "#1F4D46", marginBottom: "6px" }}>
+                  HUB ADMIN PHONE NUMBER (LOGIN IDENTIFIER)
+                </label>
+                <input
+                  type="text"
+                  value={hubAdminPhoneInput}
+                  onChange={(e) => setHubAdminPhoneInput(e.target.value)}
+                  placeholder="+919999999999"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    border: "1px solid #D1D5DB",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <small style={{ color: "#8B968F", fontSize: "11px", display: "block", marginTop: "4px" }}>
+                  Hub admins can log in using either this phone number or hub code: <strong>{credentialsHub.code}</strong>
+                </small>
+              </div>
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: 800, color: "#1F4D46" }}>
+                    HUB ADMIN PASSWORD
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateSavePassword(true)}
+                    disabled={generatingPassword}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#E5623E",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    🎲 Auto-Generate Strong Password
+                  </button>
+                </div>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    value={hubPasswordInput}
+                    onChange={(e) => setHubPasswordInput(e.target.value)}
+                    placeholder="Enter or generate password"
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #D1D5DB",
+                      fontSize: "14px",
+                      fontWeight: 700,
+                      fontFamily: "monospace",
+                      boxSizing: "border-box",
+                      background: "#F9FAF9",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "6px" }}>
+              <button
+                type="button"
+                onClick={copyCredentialsToClipboard}
+                disabled={!hubPasswordInput}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "10px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid #E3DDCF",
+                  background: "#F6F2EA",
+                  color: "#1F4D46",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: !hubPasswordInput ? "not-allowed" : "pointer",
+                }}
+              >
+                {copiedCredential ? <Check size={16} color="#2E7D5B" /> : <Copy size={16} />}
+                {copiedCredential ? "Copied!" : "Copy Credentials"}
+              </button>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => setCredentialsHub(null)}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid #E3DDCF",
+                    background: "#FFFFFF",
+                    color: "#5C6B66",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGenerateSavePassword(false)}
+                  disabled={generatingPassword || !hubPasswordInput.trim()}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    background: "#1F4D46",
+                    color: "#FFFFFF",
+                    fontSize: "13px",
+                    fontWeight: 800,
+                    border: "none",
+                    cursor: generatingPassword || !hubPasswordInput.trim() ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {generatingPassword ? "Saving..." : "Save Password"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

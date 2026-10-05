@@ -41,6 +41,7 @@ import { SnackbarNotification } from "./components/SnackbarNotification";
 import { BackendConnectionError } from "./components/BackendConnectionError";
 import { ComingSoonView } from "./components/ComingSoonView";
 import { CustomerLocationModal } from "./components/CustomerLocationModal";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { customerApi, ServiceabilityResult, BackendHub, BackendAddress } from "./lib/api";
 import {
   acquireAccurateLocation,
@@ -66,6 +67,7 @@ export default function App() {
 
   // Cart State: { [productId]: quantity }
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
+  const [cartCuts, setCartCuts] = useState<{ [productId: string]: string }>({});
 
   // Favorites
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -218,6 +220,61 @@ export default function App() {
     syncWithBackend();
   }, []);
 
+  // Real-time synchronization of customer orders from backend (No bluff timers)
+  useEffect(() => {
+    if (!user.isLoggedIn) return;
+
+    let isMounted = true;
+    const pollOrders = async () => {
+      try {
+        const liveOrders = await customerApi.getMyOrders();
+        if (isMounted && Array.isArray(liveOrders)) {
+          setOrders((prev) => {
+            // Dispatch notification only on REAL backend status transitions
+            liveOrders.forEach((newOrd) => {
+              const prevOrd = prev.find((p) => p.id === newOrd.id);
+              if (prevOrd && prevOrd.status !== newOrd.status) {
+                if (newOrd.status === "preparing") {
+                  dispatchOrderNotification({
+                    orderId: newOrd.id,
+                    status: "preparing",
+                    title: "Order Being Prepared 🥩",
+                    message: `Order #${newOrd.id} is being cut, vacuum-sealed and packed at the hub.`,
+                  });
+                } else if (newOrd.status === "out_for_delivery") {
+                  dispatchOrderNotification({
+                    orderId: newOrd.id,
+                    status: "out_for_delivery",
+                    title: "Out for Delivery 🛵",
+                    message: `${newOrd.riderName || "Delivery Partner"} is on the way to your doorstep!`,
+                  });
+                } else if (newOrd.status === "delivered") {
+                  dispatchOrderNotification({
+                    orderId: newOrd.id,
+                    status: "delivered",
+                    title: "Order Delivered! 🐟",
+                    message: `Order #${newOrd.id} delivered at your address. Freshness guaranteed!`,
+                  });
+                }
+              }
+            });
+            return liveOrders;
+          });
+        }
+      } catch {
+        // quiet background poll error
+      }
+    };
+
+    pollOrders();
+    const pollInterval = setInterval(pollOrders, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
+  }, [user.isLoggedIn]);
+
   // --------------------------------------------------------------------------
   // Mobile Screen & Hardware Back Navigation
   // --------------------------------------------------------------------------
@@ -355,9 +412,14 @@ export default function App() {
   const handleAddToCart = (
     productId: string,
     quantity: number = 1,
+    selectedCut?: string,
   ) => {
     const matched = products.find((p) => p.id === productId || p.slug === productId);
     const key = matched ? matched.id : productId;
+
+    if (selectedCut) {
+      setCartCuts((prev) => ({ ...prev, [key]: selectedCut }));
+    }
 
     // Check available stock
     const available = matched?.availableStockKg;
@@ -407,6 +469,13 @@ export default function App() {
         delete next[productId];
         if (matched?.slug) delete next[matched.slug];
         if (matched?.id) delete next[matched.id];
+        setCartCuts((cuts) => {
+          const nextCuts = { ...cuts };
+          delete nextCuts[productId];
+          if (matched?.slug) delete nextCuts[matched.slug];
+          if (matched?.id) delete nextCuts[matched.id];
+          return nextCuts;
+        });
       } else {
         const available = matched?.availableStockKg;
         const cappedQty =
@@ -430,6 +499,14 @@ export default function App() {
       if (matched?.slug) delete next[matched.slug];
       if (matched?.id) delete next[matched.id];
       return next;
+    });
+    setCartCuts((cuts) => {
+      const nextCuts = { ...cuts };
+      const matched = products.find((p) => p.id === productId || p.slug === productId);
+      delete nextCuts[productId];
+      if (matched?.slug) delete nextCuts[matched.slug];
+      if (matched?.id) delete nextCuts[matched.id];
+      return nextCuts;
     });
   };
 
@@ -467,7 +544,7 @@ export default function App() {
 
   // Checkout / Place Order
   const handlePlaceOrder = async (orderDetails: {
-    items: { product: Product; quantity: number }[];
+    items: { product: Product; quantity: number; selectedCut?: string }[];
     total: number;
     paymentMethod: "cod" | "upi";
     address: string;
@@ -505,14 +582,19 @@ export default function App() {
       return;
     }
 
-    // 1. Send live order to backend
-    const res = await customerApi.createOrder(orderDetails);
-    if (!res.success && res.error) {
+    // 1. Send live order to backend with hubId and cut preparations
+    const targetHubId = serviceability?.hub?.id || (orderDetails as any).hubId;
+
+    const res = await customerApi.createOrder({
+      ...orderDetails,
+      hubId: targetHubId,
+    });
+    if (!res.success) {
       dispatchOrderNotification({
         orderId: "ORDER_FAILED",
         status: "cancelled",
         title: "Could Not Place Order",
-        message: res.error,
+        message: res.error || "Failed to create order on server. Please try again.",
       });
       return;
     }
@@ -526,81 +608,29 @@ export default function App() {
       total: orderDetails.total,
       paymentMethod: orderDetails.paymentMethod,
       deliveryAddress: orderDetails.address,
-      riderName: "Ramesh K.",
+      riderName: "Express Logistics",
       riderPhone: "+91 91234 56789",
-      estimatedArrival: "Arriving in 25 mins",
+      estimatedArrival: "Order placed · Hub preparing fresh cuts",
     };
 
     setOrders((prev) => [newOrder, ...prev]);
     setCart({}); // clear cart
+    setCartCuts({}); // clear cut preparations
     setActiveNavigation("Orders"); // navigate to orders screen
 
-    // 2. Dispatch Order Placed Notification (In-App Snackbar if active, Mobile notification if backgrounded)
+    // 2. Dispatch Order Placed Notification
     const hubName = serviceability?.hub?.name || "Express Hub";
     await dispatchOrderNotification({
       orderId,
       status: "placed",
       title: "Order Placed Successfully! 🎉",
-      message: `Order #${orderId} confirmed · ${hubName} is preparing your fresh cuts.`,
+      message: `Order #${orderId} confirmed · ${hubName} will prepare your fresh cuts.`,
     });
 
-    // 3. Schedule realistic order status milestone updates
-    // Milestone 1: Confirmed & Preparing (after 8s)
-    setTimeout(async () => {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId
-            ? { ...o, status: "preparing", estimatedArrival: "Packing at Central Hub" }
-            : o,
-        ),
-      );
-      await dispatchOrderNotification({
-        orderId,
-        status: "preparing",
-        title: "Order Being Packed 🥩",
-        message: `Order #${orderId} is being cut, vacuum-sealed & packed in cold chain.`,
-      });
-    }, 8000);
-
-    // Milestone 2: Out for Delivery (after 22s)
-    setTimeout(async () => {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId
-            ? { ...o, status: "out_for_delivery", estimatedArrival: "Arriving in 14 mins" }
-            : o,
-        ),
-      );
-      await dispatchOrderNotification({
-        orderId,
-        status: "out_for_delivery",
-        title: "Out for Delivery 🛵",
-        message: `Rider Ramesh K. has picked up your cold-chain box! Arriving in ~14 mins.`,
-      });
-    }, 22000);
-
-    // Milestone 3: Delivered (after 45s)
-    setTimeout(async () => {
-      await customerApi.markOrderDelivered(orderId);
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId
-            ? { ...o, status: "delivered", estimatedArrival: "Delivered at doorstep" }
-            : o,
-        ),
-      );
-      await dispatchOrderNotification({
-        orderId,
-        status: "delivered",
-        title: "Order Delivered! 🐟",
-        message: `Order #${orderId} delivered at ${orderDetails.address}. Freshness guaranteed!`,
-      });
-    }, 45000);
-
-    // 4. Refresh live orders from backend
+    // 3. Immediately refresh live orders from backend (Real updates only, no bluff timers)
     try {
       const liveOrders = await customerApi.getMyOrders();
-      if (liveOrders.length > 0) {
+      if (liveOrders && liveOrders.length > 0) {
         setOrders(liveOrders);
       }
     } catch {
@@ -661,7 +691,8 @@ export default function App() {
         <View style={styles.app}>
           {/* Active View Container */}
           <View style={styles.viewContainer}>
-            {isListingOpen ? (
+            <ErrorBoundary onReset={() => setActiveNavigation("Home")}>
+              {isListingOpen ? (
               <ProductListingView
                 initialCategory={listingCategory}
                 initialSearch={listingSearch}
@@ -730,6 +761,7 @@ export default function App() {
                 {activeNavigation === "Cart" && (
                   <CartView
                     cart={cart}
+                    cartCuts={cartCuts}
                     products={products}
                     deliveryLocation={customerAddress}
                     deliveryCoords={customerCoords}
@@ -797,6 +829,7 @@ export default function App() {
                   ))}
               </>
             )}
+            </ErrorBoundary>
           </View>
 
           {/* Bottom Navigation */}

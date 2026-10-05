@@ -69,7 +69,7 @@ const LOCATIONIQ_KEY =
 // Real fallback hubs (Kozhikode Central & Kannur City)
 const DEFAULT_HUBS: BackendHub[] = [
   {
-    id: "hub-kozhikode",
+    id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
     name: "FreshGo Central Hub (Mavoor Road)",
     code: "HUB-CLT-01",
     address: "Mavoor Road, Kozhikode, Kerala 673004",
@@ -80,7 +80,7 @@ const DEFAULT_HUBS: BackendHub[] = [
     isActive: true,
   },
   {
-    id: "hub-kannur",
+    id: "4942d016-533c-4fa7-a820-6e64c76e12c7",
     name: "Kannur Hub",
     code: "HUB-CLT-02",
     address: "Kannur City, Kerala 670004",

@@ -157,6 +157,11 @@ export class OrdersService {
 
       const cut =
         product.cuts.find((c) => c.id === item.cutOptionId) ||
+        (item.cutName
+          ? product.cuts.find(
+              (c) => c.name.toLowerCase() === item.cutName!.toLowerCase(),
+            )
+          : null) ||
         product.cuts.find((c) => c.isDefault) ||
         product.cuts[0];
       const grossGrams = 700; // Standard 1kg whole fish equivalent ~700g net, or live weight
@@ -167,7 +172,8 @@ export class OrdersService {
         unitPrice: product.basePrice,
         cuttingCharge: cut?.priceModifier || 0,
         quantity: item.quantity,
-        cutOptionId: cut?.id,
+        cutOptionId: cut?.id || null,
+        cutName: item.cutName || cut?.name || "Standard Cut",
         grossWeightGrams: grossGrams,
         expectedNetWeightGrams: netGrams,
       };
@@ -255,7 +261,58 @@ export class OrdersService {
 
       // Ensure valid zoneId (referencing DeliveryZone) and hubId (referencing Hub)
       let validZoneId: string | null = null;
-      let matchedHubId: string | null = (zoneCheck as any)?.hub?.id || null;
+      let matchedHubId: string | null = null;
+
+      // 1. If explicit hubId was requested in DTO
+      if (dto.hubId) {
+        try {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(dto.hubId);
+          const directHub = await tx.hub.findFirst({
+            where: isUuid
+              ? { id: dto.hubId, isActive: true }
+              : {
+                  OR: [
+                    { code: dto.hubId },
+                    { name: { contains: dto.hubId.replace(/^hub-?/i, ""), mode: "insensitive" } },
+                  ],
+                  isActive: true,
+                },
+          });
+          if (directHub) {
+            matchedHubId = directHub.id;
+          }
+        } catch {
+          // Continue to proximity matching
+        }
+      }
+
+      // 2. Proximity match to active hubs using address coordinates
+      if (!matchedHubId && address.latitude && address.longitude) {
+        const activeHubs = await tx.hub.findMany({ where: { isActive: true } });
+        if (activeHubs.length > 0) {
+          let closestHub = activeHubs[0];
+          let minDistance = Number.MAX_VALUE;
+          for (const h of activeHubs) {
+            const d = Math.hypot(h.latitude - address.latitude, h.longitude - address.longitude);
+            if (d < minDistance) {
+              minDistance = d;
+              closestHub = h;
+            }
+          }
+          matchedHubId = closestHub.id;
+        }
+      }
+
+      // 3. Fallback to zone hub or first active hub
+      if (!matchedHubId) {
+        matchedHubId = (zoneCheck as any)?.hub?.id || null;
+      }
+      if (!matchedHubId) {
+        const defaultHub = await tx.hub.findFirst({
+          where: { isActive: true },
+        });
+        matchedHubId = defaultHub?.id || null;
+      }
 
       if (zone?.id) {
         const existingZone = await tx.deliveryZone.findUnique({
@@ -264,14 +321,6 @@ export class OrdersService {
         if (existingZone) {
           validZoneId = existingZone.id;
         }
-      }
-
-      // If no hub matched yet, fall back to default active hub
-      if (!matchedHubId) {
-        const defaultHub = await tx.hub.findFirst({
-          where: { isActive: true },
-        });
-        matchedHubId = defaultHub?.id || null;
       }
 
       const newOrder = await tx.order.create({
@@ -304,6 +353,7 @@ export class OrdersService {
             create: pricingItems.map((it) => ({
               productId: it.productId,
               cutOptionId: it.cutOptionId || null,
+              cutName: it.cutName || null,
               batchId: allocatedBatches[it.productId] || null,
               quantity: it.quantity,
               unitPrice: it.unitPrice,

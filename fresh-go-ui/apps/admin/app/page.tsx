@@ -16,6 +16,7 @@ import { Product } from "./models/product";
 import { ProductFormView } from "./views/ProductFormView";
 import { ProductsView } from "./views/ProductsView";
 import { FeaturedSectionsView } from "./views/FeaturedSectionsView";
+import { DeliveryPartnersView } from "./components/DeliveryPartnersView";
 
 type ProductDisplay =
   | { name: "list" }
@@ -64,9 +65,9 @@ export default function AdminPage() {
   };
 
   const assign = async (orderId: string, partnerProfileId?: string) => {
-    setAssigned((current) => [...current, orderId]);
     const res = await dispatchController.assignOrder(orderId, partnerProfileId);
     if (res?.success) {
+      setAssigned((current) => [...current, orderId]);
       showToast(
         res.message || `Order #${orderId} assigned to partner`,
         "success"
@@ -491,6 +492,14 @@ export default function AdminPage() {
             onAssign={assign}
             orders={dispatchController.orders}
             partners={dispatchController.partners}
+            currentUser={currentUser}
+          />
+        )}
+
+        {section === "delivery-partners" && (
+          <DeliveryPartnersView
+            currentUser={currentUser}
+            onToast={showToast}
           />
         )}
 

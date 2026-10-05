@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   deliveryApi,
   DeliveryHub,
@@ -16,6 +16,7 @@ import {
 } from "../lib/socket";
 import {
   ActiveDelivery,
+  AlertSoundType,
   defaultSettings,
   DeliveryHistoryItem,
   DeliveryPhase,
@@ -24,6 +25,14 @@ import {
   DeliveryTab,
   IssueTicket,
 } from "../models/delivery";
+import {
+  startOrderAlertLoop,
+  stopOrderAlertLoop,
+  playAlertSoundPreset,
+  playOrderAlertSound,
+  unlockAudioContext,
+  ALERT_SOUND_OPTIONS,
+} from "../lib/sound";
 
 export function useDeliveryController() {
   const [user, setUser] = useState<DeliveryUser | null>(null);
@@ -40,19 +49,76 @@ export function useDeliveryController() {
   const [recentDeliveries, setRecentDeliveries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Settings & Support
-  const [settings, setSettings] = useState<DeliverySettings>(defaultSettings);
+  // Settings & Support (persisted in localStorage)
+  const [settings, setSettings] = useState<DeliverySettings>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("freshgo_delivery_settings");
+        if (saved) return { ...defaultSettings, ...JSON.parse(saved) };
+      } catch {}
+    }
+    return defaultSettings;
+  });
+
   const [tickets, setTickets] = useState<IssueTicket[]>([]);
   const [selectedReportOrderId, setSelectedReportOrderId] = useState<string | undefined>(undefined);
   const [isLiveTripShared, setIsLiveTripShared] = useState(false);
   const [isSosModalOpen, setIsSosModalOpen] = useState(false);
+
+  // Refs for callbacks to avoid re-binding socket listeners on each render
+  const isOnlineRef = useRef(isOnline);
+  useEffect(() => {
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
+
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  const activeTripRef = useRef(activeTrip);
+  useEffect(() => {
+    activeTripRef.current = activeTrip;
+  }, [activeTrip]);
+
+  const prevOrderIdsRef = useRef<Set<string>>(new Set());
+  const hasInitialLoadedOrdersRef = useRef<boolean>(false);
+
+  // Whether an unassigned order is waiting for this rider to accept
+  const hasPendingOrderToAccept = Boolean(
+    user &&
+    isOnline &&
+    settings.soundAlerts !== false &&
+    availableOrders.length > 0 &&
+    !activeTrip
+  );
+
+  // --- Continuous Looping Alert Sound (repeats until partner accepts/declines) ---
+  useEffect(() => {
+    if (hasPendingOrderToAccept) {
+      startOrderAlertLoop(settings.alertSound || "chime", 0.85);
+    } else {
+      stopOrderAlertLoop();
+    }
+
+    return () => {
+      stopOrderAlertLoop();
+    };
+  }, [hasPendingOrderToAccept, settings.alertSound, settings.soundAlerts]);
 
   // --- Load Available Orders from Selected Hub ---
   const loadAvailableOrders = useCallback(async (hubId?: string) => {
     if (!deliveryApi.getToken()) return;
     try {
       const orders = await deliveryApi.getAvailableOrders(hubId);
-      setAvailableOrders(Array.isArray(orders) ? orders : []);
+      const list = Array.isArray(orders) ? orders : [];
+      setAvailableOrders(list);
+
+      // Trigger order arrival sound loop when new order appears while online
+      if (list.length > 0 && isOnlineRef.current && settingsRef.current.soundAlerts !== false && !activeTripRef.current) {
+        startOrderAlertLoop(settingsRef.current.alertSound || "chime", 0.85);
+      }
+      prevOrderIdsRef.current = new Set(list.map((o: any) => o.id));
     } catch (err) {
       console.warn("[delivery] Failed to load available orders:", err);
     }
@@ -82,38 +148,50 @@ export function useDeliveryController() {
 
     if (existingUser && token) {
       setUser(existingUser);
-      setSelectedHubState(savedHub);
+
+      // Priority 1: User's assigned hub from backend profile
+      const assignedHub = existingUser.hub || existingUser.partnerProfile?.hub;
+      const initialHub = assignedHub || savedHub;
+      if (initialHub) {
+        setSelectedHubState(initialHub);
+        deliveryApi.saveSelectedHub(initialHub);
+      }
 
       // 1. Fetch available hubs
       deliveryApi.getHubs()
         .then((fetchedHubs) => {
           if (Array.isArray(fetchedHubs)) {
             setHubs(fetchedHubs);
-            // Default to first hub or user's assigned hub if none selected
-            if (!savedHub && fetchedHubs.length > 0) {
-              const defaultHub =
-                fetchedHubs.find((h) => h.id === existingUser.hubId) ||
-                fetchedHubs[0];
-              setSelectedHubState(defaultHub);
-              deliveryApi.saveSelectedHub(defaultHub);
+            const userAssignedHub =
+              fetchedHubs.find(
+                (h) => h.id === existingUser.hubId || h.id === existingUser.partnerProfile?.hubId
+              ) || initialHub;
+
+            if (userAssignedHub) {
+              setSelectedHubState(userAssignedHub);
+              deliveryApi.saveSelectedHub(userAssignedHub);
             }
           }
         })
         .catch(console.warn);
 
-      // 2. Load dashboard & available orders
+      // 2. Load dashboard & available orders for this partner's hub
       loadDashboard();
-      loadAvailableOrders(savedHub?.id);
+      loadAvailableOrders(initialHub?.id);
 
       // 3. Connect Socket.io
       const socket = initDeliverySocket(token, {
         onConnect: () => {
-          if (savedHub) {
-            subscribeToHub(savedHub.id);
+          const currentHub = deliveryApi.getSelectedHub() || initialHub;
+          if (currentHub) {
+            subscribeToHub(currentHub.id);
           }
         },
         onNewHubOrder: (newOrder) => {
-          console.log("[delivery] Real-time new order received:", newOrder);
+          console.log("[delivery] Real-time new order received via socket:", newOrder);
+          if (isOnlineRef.current && settingsRef.current.soundAlerts !== false) {
+            startOrderAlertLoop(settingsRef.current.alertSound || "chime", 0.85);
+          }
           loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
         },
         onOrderStatusChanged: () => {
@@ -122,17 +200,28 @@ export function useDeliveryController() {
         },
       });
 
-      if (savedHub) {
-        subscribeToHub(savedHub.id);
+      const currentHub = deliveryApi.getSelectedHub() || initialHub;
+      if (currentHub) {
+        subscribeToHub(currentHub.id);
       }
     }
 
     setIsLoading(false);
 
     return () => {
+      stopOrderAlertLoop();
       disconnectDeliverySocket();
     };
   }, [loadDashboard, loadAvailableOrders]);
+
+  // --- Periodic Polling (Every 10s when online to catch all incoming orders) ---
+  useEffect(() => {
+    if (!user || !isOnline) return;
+    const interval = setInterval(() => {
+      loadAvailableOrders(selectedHub?.id || deliveryApi.getSelectedHub()?.id);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [user, isOnline, selectedHub, loadAvailableOrders]);
 
   // --- Hub Selection ---
   const changeHub = (hub: DeliveryHub) => {
@@ -155,7 +244,13 @@ export function useDeliveryController() {
           const activeHub = deliveryApi.getSelectedHub();
           if (activeHub) subscribeToHub(activeHub.id);
         },
-        onNewHubOrder: () => loadAvailableOrders(deliveryApi.getSelectedHub()?.id),
+        onNewHubOrder: (newOrder) => {
+          console.log("[delivery] Real-time new order received via socket:", newOrder);
+          if (isOnlineRef.current && settingsRef.current.soundAlerts !== false) {
+            startOrderAlertLoop(settingsRef.current.alertSound || "chime", 0.85);
+          }
+          loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
+        },
         onOrderStatusChanged: () => {
           loadDashboard();
           loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
@@ -167,7 +262,9 @@ export function useDeliveryController() {
       if (Array.isArray(hubsList)) {
         setHubs(hubsList);
         const matched =
-          hubsList.find((h) => h.id === loggedInUser.hubId) || hubsList[0];
+          hubsList.find((h) => h.id === loggedInUser.hubId) ||
+          hubsList.find((h) => h.code === "HUB-CLT-01" || h.name.includes("Mavoor")) ||
+          hubsList[0];
         if (matched) {
           changeHub(matched);
         }
@@ -179,6 +276,7 @@ export function useDeliveryController() {
 
   // --- Logout Handler ---
   const logout = () => {
+    stopOrderAlertLoop();
     disconnectDeliverySocket();
     deliveryApi.clearSession();
     setUser(null);
@@ -189,24 +287,63 @@ export function useDeliveryController() {
 
   // --- Online / Offline Toggle ---
   const toggleOnline = async () => {
+    unlockAudioContext();
     const nextStatus = !isOnline;
+    if (!nextStatus) {
+      stopOrderAlertLoop();
+    }
     setIsOnlineState(nextStatus);
+    isOnlineRef.current = nextStatus;
     try {
       await deliveryApi.updateOnlineStatus(nextStatus);
+      if (nextStatus) {
+        loadAvailableOrders(selectedHub?.id || deliveryApi.getSelectedHub()?.id);
+      }
     } catch (err) {
       console.warn("[delivery] Failed to update duty status:", err);
     }
   };
 
   // --- Accept Order ---
-  const acceptRequest = async (orderId?: string) => {
-    const targetId = orderId || (availableOrders.length > 0 ? availableOrders[0].id : null);
-    if (!targetId || !isOnline) return;
+  const acceptRequest = async (orderId?: string | any) => {
+    let cleanId = "";
+    if (
+      typeof orderId === "string" &&
+      orderId.trim().length > 0 &&
+      orderId !== "[object Object]"
+    ) {
+      cleanId = orderId.trim();
+    } else if (
+      orderId &&
+      typeof orderId === "object" &&
+      !orderId.nativeEvent &&
+      !orderId._reactName
+    ) {
+      cleanId = orderId.id || orderId.orderId || orderId.orderNumber || "";
+    }
+
+    const targetId =
+      cleanId || (availableOrders.length > 0 ? availableOrders[0].id : "current");
+
+    if (!isOnline) {
+      alert("You are currently offline. Switch on Duty Status to accept orders.");
+      return;
+    }
+
+    // Immediately stop looping chime on partner action
+    stopOrderAlertLoop();
 
     try {
       const trip = await deliveryApi.acceptOrder(targetId);
       setActiveTrip(trip);
-      setAvailableOrders((prev) => prev.filter((o) => o.id !== targetId));
+      setAvailableOrders((prev) =>
+        prev.filter(
+          (o) =>
+            o.id !== trip.orderId &&
+            o.id !== targetId &&
+            o.orderNumber !== targetId
+        )
+      );
       setTab("active");
     } catch (err: any) {
       alert(err?.message || "Could not accept order");
@@ -214,10 +351,24 @@ export function useDeliveryController() {
   };
 
   // --- Decline / Dismiss from list ---
-  const declineRequest = (orderId?: string) => {
-    const targetId = orderId || (availableOrders.length > 0 ? availableOrders[0].id : null);
+  const declineRequest = (orderId?: string | any) => {
+    const rawTarget =
+      typeof orderId === "string" &&
+      orderId.trim().length > 0 &&
+      orderId !== "[object Object]"
+        ? orderId.trim()
+        : null;
+    const targetId =
+      rawTarget || (availableOrders.length > 0 ? availableOrders[0].id : null);
     if (!targetId) return;
-    setAvailableOrders((prev) => prev.filter((o) => o.id !== targetId));
+
+    setAvailableOrders((prev) => {
+      const remaining = prev.filter((o) => o.id !== targetId && o.orderNumber !== targetId);
+      if (remaining.length === 0) {
+        stopOrderAlertLoop();
+      }
+      return remaining;
+    });
   };
 
   // --- Advance Active Delivery Milestone ---
@@ -245,7 +396,7 @@ export function useDeliveryController() {
   // Map Backend Order to UI DeliveryRequest
   const currentRequest: DeliveryRequest | null = availableOrders.length > 0
     ? {
-        id: availableOrders[0].orderNumber || availableOrders[0].id,
+        id: availableOrders[0].id,
         orderNumber: availableOrders[0].orderNumber,
         customer: availableOrders[0].customer?.name || "Customer",
         customerPhone: availableOrders[0].customer?.phone,
@@ -303,8 +454,23 @@ export function useDeliveryController() {
     status: item.phase === "DELIVERED" ? "Delivered" : "Cancelled",
   }));
 
-  const updateSettings = (update: Partial<DeliverySettings>) =>
-    setSettings((current) => ({ ...current, ...update }));
+  const updateSettings = (update: Partial<DeliverySettings>) => {
+    unlockAudioContext();
+    setSettings((current) => {
+      const next = { ...current, ...update };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("freshgo_delivery_settings", JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+  };
+
+  const testSoundAlert = (soundType?: AlertSoundType) => {
+    unlockAudioContext();
+    playAlertSoundPreset(soundType || settings.alertSound || "chime", 0.85);
+  };
 
   const openHelp = () => {
     setPreviousTab(tab);
@@ -372,6 +538,9 @@ export function useDeliveryController() {
     todayEarnings,
     settings,
     updateSettings,
+    testSoundAlert,
+    stopSoundAlert: stopOrderAlertLoop,
+    soundOptions: ALERT_SOUND_OPTIONS,
     tickets,
     submitTicket,
     openHelp,

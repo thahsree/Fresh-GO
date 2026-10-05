@@ -18,6 +18,7 @@ export type AdminUser = {
     name: string;
     code: string;
     city: string;
+    address?: string;
   } | null;
 };
 
@@ -78,6 +79,7 @@ export type Hub = {
   longitude: number;
   deliveryRadiusKm: number;
   contactPhone?: string | null;
+  adminPasswordRaw?: string | null;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -87,6 +89,35 @@ export type Hub = {
     phone: string;
     role: string;
   }>;
+};
+
+export type DeliveryPartnerItem = {
+  id: string;
+  userId: string;
+  vehicleType: string;
+  vehicleNumber?: string;
+  licenseNumber?: string;
+  licensePhoto?: string;
+  kycStatus: "PENDING" | "VERIFIED" | "REJECTED";
+  partnerId?: string;
+  hubId?: string;
+  isOnline: boolean;
+  rating: number;
+  codCashInHand: number;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    isActive: boolean;
+  };
+  hub?: {
+    id: string;
+    name: string;
+    code: string;
+    contactPhone?: string;
+  };
 };
 
 export type SalesReportKPIs = {
@@ -137,14 +168,27 @@ export type QueueOrder = {
   id: string;
   orderNumber: string;
   status: string;
+  subtotal?: number;
+  cuttingChargesTotal?: number;
+  deliveryFee?: number;
+  discountAmount?: number;
   totalAmount: number;
   paymentMethod: string;
   paymentStatus: string;
   deliveryAddress: any;
+  deliveryAddressSnapshotJson?: string;
+  notes?: string;
   placedAt: string;
   customer?: {
     name?: string;
     phone: string;
+  };
+  hub?: {
+    id: string;
+    name: string;
+    code: string;
+    city?: string;
+    address?: string;
   };
   deliveryPartner?: {
     id: string;
@@ -247,13 +291,13 @@ class ApiClient {
   }
 
   /**
-   * Logs in a Super Admin user and verifies SUPER_ADMIN role
+   * Logs in a Super Admin user with mobile and password
    */
-  async loginSuperAdmin(phone: string, otp: string): Promise<AdminUser> {
+  async loginSuperAdmin(phone: string, password: string): Promise<AdminUser> {
     const res = await this.post<{
       accessToken: string;
       user: AdminUser;
-    }>("/auth/otp/verify", { phone, otp, role: "SUPER_ADMIN" }, false);
+    }>("/auth/super-admin/login", { phone, password }, false);
 
     if (res.user.role !== "SUPER_ADMIN") {
       throw new Error("Access denied: Account does not have Super Admin permissions.");
@@ -263,13 +307,13 @@ class ApiClient {
   }
 
   /**
-   * Logs in a Hub Admin user with ADMIN role
+   * Logs in a Hub Admin user with Hub Number / Code and password
    */
-  async loginHubAdmin(phone: string, otp: string): Promise<AdminUser> {
+  async loginHubAdmin(hubIdentifier: string, password: string): Promise<AdminUser> {
     const res = await this.post<{
       accessToken: string;
       user: AdminUser;
-    }>("/auth/otp/verify", { phone, otp, role: "ADMIN" }, false);
+    }>("/auth/hub-admin/login", { hubIdentifier, password }, false);
 
     this.setSession(res.accessToken, res.user);
     return res.user;
@@ -586,6 +630,32 @@ class ApiClient {
       areaName?: string;
       consentGiven: boolean;
     }) => this.post<{ id: string; message: string }>("/hubs/notify-interest", data, false),
+    setAdminPassword: (
+      hubId: string,
+      data?: { password?: string; adminPhone?: string }
+    ) =>
+      this.post<{
+        success: boolean;
+        hubId: string;
+        hubName: string;
+        hubNumber: string;
+        hubCode: string;
+        password?: string;
+      }>(`/hubs/${hubId}/admin-password`, data || {}, true),
+  };
+
+  readonly deliveryPartners = {
+    getAll: (hubId?: string) =>
+      this.get<DeliveryPartnerItem[]>(
+        hubId ? `/delivery/partners?hubId=${hubId}` : "/delivery/partners",
+        true
+      ),
+    updateStatus: (id: string, status: "VERIFIED" | "REJECTED" | "PENDING") =>
+      this.put<DeliveryPartnerItem>(
+        `/delivery/partners/${id}/status`,
+        { status },
+        true
+      ),
   };
 
   readonly analytics = {

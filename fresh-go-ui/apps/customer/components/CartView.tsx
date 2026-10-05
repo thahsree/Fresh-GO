@@ -40,6 +40,7 @@ export type CartItem = {
 
 type CartViewProps = {
   cart: { [productId: string]: number };
+  cartCuts?: { [productId: string]: string };
   products?: Product[];
   deliveryAddress?: string; // backwards compatibility fallback
   deliveryLocation?: string; // GPS zone / city
@@ -52,7 +53,7 @@ type CartViewProps = {
   onRemoveItem: (productId: string) => void;
   onExploreProducts: () => void;
   onPlaceOrder: (order: {
-    items: { product: Product; quantity: number }[];
+    items: { product: Product; quantity: number; selectedCut?: string }[];
     total: number;
     paymentMethod: "cod" | "upi";
     address: string;
@@ -73,6 +74,7 @@ type CartViewProps = {
 
 export function CartView({
   cart,
+  cartCuts = {},
   products = [],
   deliveryAddress: initialDeliveryAddress,
   deliveryLocation: propDeliveryLocation,
@@ -185,15 +187,24 @@ export function CartView({
     addressText: string;
   } | null>(null);
 
+  type CartItemWithProduct = {
+    product: Product;
+    quantity: number;
+    selectedCut?: string;
+  };
+
   const cartEntries = Object.entries(cart).filter(([_, qty]) => qty > 0);
-  const itemsWithProduct = cartEntries
-    .map(([id, qty]) => {
+  const itemsWithProduct: CartItemWithProduct[] = cartEntries
+    .map(([id, qty]): CartItemWithProduct | null => {
       const product = products.find((p) => p.id === id || p.slug === id);
-      return product ? { product, quantity: qty } : null;
+      const selectedCut =
+        cartCuts?.[id] ||
+        (product?.id ? cartCuts?.[product.id] : undefined) ||
+        (product?.slug ? cartCuts?.[product.slug] : undefined) ||
+        product?.cuts?.[0];
+      return product ? { product, quantity: qty, selectedCut } : null;
     })
-    .filter(
-      (item): item is { product: Product; quantity: number } => item !== null,
-    );
+    .filter((item): item is CartItemWithProduct => item !== null);
 
   const stockExceededItems = itemsWithProduct.filter(
     ({ product, quantity }) =>
@@ -389,7 +400,7 @@ export function CartView({
 
       {/* 2. Cart Items List */}
       <View style={styles.itemsList}>
-        {itemsWithProduct.map(({ product, quantity }) => (
+        {itemsWithProduct.map(({ product, quantity, selectedCut }) => (
           <View key={product.id} style={styles.itemCard}>
             <Image
               source={{ uri: product.image }}
@@ -413,6 +424,11 @@ export function CartView({
                 Rs {product.price.toLocaleString()}
                 <Text style={styles.itemUnit}> {product.unit}</Text>
               </Text>
+              {selectedCut && (
+                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary, marginTop: 2 }}>
+                  Cut: {selectedCut}
+                </Text>
+              )}
 
               <View style={styles.itemFooter}>
                 <View style={styles.stepper}>

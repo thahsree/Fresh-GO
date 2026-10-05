@@ -48,6 +48,7 @@ import {
                 tls: isTls ? {} : undefined,
                 maxRetriesPerRequest: null,
                 enableReadyCheck: false,
+                retryStrategy: (times) => Math.min(times * 2000, 30000),
               },
             };
           } catch {
@@ -71,6 +72,7 @@ import {
             tls: useTls ? {} : undefined,
             maxRetriesPerRequest: null,
             enableReadyCheck: false,
+            retryStrategy: (times) => Math.min(times * 2000, 30000),
           },
         };
       },

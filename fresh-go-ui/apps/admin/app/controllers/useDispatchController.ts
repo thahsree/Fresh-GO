@@ -37,41 +37,24 @@ export function useDispatchController() {
     const liveOrder = orders.find(
       (o) => o.id === orderId || o.orderNumber === orderId
     );
-
-    // If order is not present in live backend queue (e.g. static/demo order), handle locally
-    if (!liveOrder) {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId || o.orderNumber === orderId
-            ? { ...o, status: "ASSIGNED" }
-            : o
-        )
-      );
-      return {
-        success: true,
-        isDemo: true,
-        message: `Order #${orderId} assigned locally (demo)`,
-      };
-    }
+    const targetOrderId = liveOrder?.id || orderId;
+    const cleanPartnerId =
+      partnerProfileId && partnerProfileId.trim() !== ""
+        ? partnerProfileId.trim()
+        : undefined;
 
     try {
       await api.ensureAdminAuth();
-      const res = await api.dispatch.assignOrder(liveOrder.id, partnerProfileId);
+      const res = await api.dispatch.assignOrder(targetOrderId, cleanPartnerId);
       await fetchTower();
       return {
         success: true,
         message:
           res.message ||
-          `Order #${liveOrder.orderNumber} dispatched to partner`,
+          `Order #${liveOrder?.orderNumber || orderId} dispatched to partner`,
       };
     } catch (err: any) {
       console.warn("Assign order backend notice:", err?.message || err);
-      // Optimistically mark as assigned in local state
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === liveOrder.id ? { ...o, status: "ASSIGNED" } : o
-        )
-      );
       return {
         success: false,
         error: err?.message || "Could not dispatch order to partner",
@@ -83,35 +66,18 @@ export function useDispatchController() {
     const liveOrder = orders.find(
       (o) => o.id === orderId || o.orderNumber === orderId
     );
-
-    if (!liveOrder) {
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === orderId || o.orderNumber === orderId
-            ? { ...o, status }
-            : o
-        )
-      );
-      return {
-        success: true,
-        isDemo: true,
-        message: `Status updated to ${status} (demo)`,
-      };
-    }
+    const targetOrderId = liveOrder?.id || orderId;
 
     try {
       await api.ensureAdminAuth();
-      await api.orders.updateStatus(liveOrder.id, status);
+      await api.orders.updateStatus(targetOrderId, status);
       await fetchTower();
       return {
         success: true,
-        message: `Order #${liveOrder.orderNumber} moved to ${status}`,
+        message: `Order #${liveOrder?.orderNumber || orderId} moved to ${status}`,
       };
     } catch (err: any) {
       console.warn("Update order status backend notice:", err?.message || err);
-      setOrders((prev) =>
-        prev.map((o) => (o.id === liveOrder.id ? { ...o, status } : o))
-      );
       return {
         success: false,
         error: err?.message || "Could not update order status",

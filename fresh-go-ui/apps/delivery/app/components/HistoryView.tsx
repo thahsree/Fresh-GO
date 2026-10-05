@@ -67,7 +67,9 @@ export function HistoryView({ history }: HistoryViewProps) {
                 <small>{delivery.completedAt}</small>
               </div>
               <div className="history-earning">
+                {/* Earnings on order history commented out
                 <strong>{delivery.earnings ? `₹${delivery.earnings}` : "—"}</strong>
+                */}
                 <span
                   className={
                     delivery.status === "Delivered" ? "delivered" : "cancelled"

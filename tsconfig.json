@@ -22,7 +22,8 @@
     }
   },
   "include": [
-    "fresh-go-backend/src/**/*"
+    "fresh-go-backend/src/**/*",
+    "fresh-go-backend/prisma/**/*"
   ],
   "exclude": [
     "**/node_modules",

@@ -101,7 +101,9 @@ export class UsersService {
       data: {
         isOnline: dto.isOnline !== undefined ? dto.isOnline : undefined,
         vehicleType: dto.vehicleType
-          ? (dto.vehicleType as VehicleType)
+          ? dto.vehicleType.toUpperCase().includes("SCOOTER") || dto.vehicleType.toUpperCase().includes("EV")
+            ? VehicleType.SCOOTER
+            : VehicleType.BIKE
           : undefined,
         preferredZoneId: dto.preferredZoneId,
         licenseNumber: dto.licenseNumber,

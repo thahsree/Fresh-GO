@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { QueueOrder, ActivePartner } from "../lib/api";
+import { QueueOrder, ActivePartner, AdminUser } from "../lib/api";
 
 type DispatchViewProps = {
   assigned: string[];
   onAssign: (orderId: string, partnerProfileId?: string) => void;
   orders?: QueueOrder[];
   partners?: ActivePartner[];
+  currentUser?: AdminUser | null;
 };
 
 export function DispatchView({
@@ -15,8 +16,10 @@ export function DispatchView({
   onAssign,
   orders = [],
   partners = [],
+  currentUser,
 }: DispatchViewProps) {
   const [selectedPartnerId, setSelectedPartnerId] = useState<string>("");
+  const [rowPartnerMap, setRowPartnerMap] = useState<Record<string, string>>({});
 
   const unassignedOrders = orders.filter(
     (o) =>
@@ -27,36 +30,40 @@ export function DispatchView({
       !assigned.includes(o.id)
   );
 
+  const onlineCount = partners.filter((p) => p.isOnline).length;
+  const hubName = currentUser?.hub?.name || "Fulfillment Hub";
+  const hubAddress = currentUser?.hub?.address || "Local Express Delivery Coverage Zone";
+
   return (
     <div className="grid">
       <section className="panel">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h2>Live dispatch & delivery partners</h2>
           <span className="badge success">
-            {partners.length > 0 ? `${partners.length} online rider${partners.length > 1 ? "s" : ""}` : "1 partner seeded"}
+            {onlineCount} online · {partners.length} total
           </span>
         </div>
 
         <div className="attention" style={{ marginBottom: 18 }}>
           {partners.length === 0 ? (
-            <div style={{ padding: "10px 0" }}>
-              <div>
-                <strong>Ramesh K. (Zone 1 Rider)</strong>
-                <p className="muted" style={{ margin: "2px 0 0" }}>
-                  Bike · +91 91234 56789 · ⭐ 4.9 · Kozhikode Hub
-                </p>
-              </div>
-              <span className="badge success">Available</span>
+            <div style={{ padding: "20px 14px", textAlign: "center", background: "#F6F2EA", borderRadius: "10px" }}>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "13px", fontWeight: 700 }}>
+                No delivery partners registered for {hubName} yet.
+              </p>
+              <small style={{ color: "var(--soft)", fontSize: "11px", display: "block", marginTop: "4px" }}>
+                Delivery partners who register for this hub will appear here once approved.
+              </small>
             </div>
           ) : (
             partners.map((partner) => {
               const partnerName =
                 partner.name || partner.user?.name || "Delivery Partner";
               const partnerPhone =
-                partner.phone || partner.user?.phone || "+91 91234 56789";
+                partner.phone || partner.user?.phone || "No phone number";
               const vehicle = partner.vehicleType || "BIKE";
-              const rating = partner.rating || 4.9;
+              const rating = partner.rating || 5.0;
               const isBusy = (partner.activeOrdersCount || 0) > 0;
+              const isOnline = partner.isOnline;
 
               return (
                 <div key={partner.id} style={{ padding: "10px 0" }}>
@@ -67,9 +74,16 @@ export function DispatchView({
                     </p>
                   </div>
                   <span
-                    className={`badge ${isBusy ? "warning" : "success"}`}
+                    className={`badge ${!isOnline ? "error" : isBusy ? "warning" : "success"}`}
+                    style={
+                      !isOnline
+                        ? { background: "#EAEAEA", color: "#666" }
+                        : undefined
+                    }
                   >
-                    {isBusy
+                    {!isOnline
+                      ? "Offline"
+                      : isBusy
                       ? `${partner.activeOrdersCount} on delivery`
                       : "Available"}
                   </span>
@@ -82,10 +96,10 @@ export function DispatchView({
         <div className="map-placeholder">
           <div>
             <div style={{ fontWeight: 800, color: "#1F4D46", marginBottom: 4 }}>
-              📍 FreshGo Central Hub · Mavoor Road
+              📍 {hubName}
             </div>
             <div style={{ fontSize: 11, color: "var(--muted)" }}>
-              Coverage: Zone 1 (12 km radius · Kozhikode Central) · Instant 25-min Dispatch
+              {hubAddress} · Instant 25-min Dispatch
             </div>
           </div>
         </div>
@@ -102,7 +116,7 @@ export function DispatchView({
         {partners.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 4 }}>
-              Select dispatch partner:
+              Default dispatch partner for queue:
             </label>
             <select
               style={{
@@ -121,7 +135,7 @@ export function DispatchView({
                 const vehicle = p.vehicleType || "BIKE";
                 return (
                   <option key={p.id} value={p.id}>
-                    {partnerName} ({vehicle})
+                    {partnerName} ({vehicle}) {p.isOnline ? "🟢 Online" : "⚪ Offline"}
                   </option>
                 );
               })}
@@ -156,23 +170,94 @@ export function DispatchView({
           </div>
         ) : (
           <div className="attention">
-            {unassignedOrders.map((o) => (
-              <div className="row" key={o.id}>
-                <div>
-                  <strong>#{o.orderNumber || o.id.slice(0, 8)}</strong>
-                  <span className="muted">
-                    {" "}· {o.customer?.name || "Customer"} · Rs {o.totalAmount}
-                  </span>
-                </div>
-                <button
-                  className="assign"
-                  disabled={assigned.includes(o.id)}
-                  onClick={() => onAssign(o.id, selectedPartnerId || undefined)}
+            {unassignedOrders.map((o) => {
+              const currentChoice =
+                rowPartnerMap[o.id] !== undefined
+                  ? rowPartnerMap[o.id]
+                  : selectedPartnerId;
+
+              return (
+                <div
+                  className="row"
+                  key={o.id}
+                  style={{
+                    alignItems: "center",
+                    padding: "12px 0",
+                    flexWrap: "wrap",
+                    gap: "10px",
+                  }}
                 >
-                  {assigned.includes(o.id) ? "Assigned" : "Assign rider"}
-                </button>
-              </div>
-            ))}
+                  <div style={{ flex: 1, minWidth: "220px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <strong>#{o.orderNumber || o.id.slice(0, 8)}</strong>
+                      <span className="muted">
+                        · {o.customer?.name || "Customer"} · Rs {o.totalAmount}
+                      </span>
+                    </div>
+                    {o.items && o.items.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "#1F4D46",
+                          marginTop: "3px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        🔪{" "}
+                        {o.items
+                          .map(
+                            (i: any) =>
+                              `${i.product?.name || "Item"}${
+                                i.cutName ? ` (${i.cutName})` : ""
+                              } × ${i.quantity}`
+                          )
+                          .join(", ")}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {partners.length > 0 && (
+                      <select
+                        style={{
+                          padding: "6px 8px",
+                          borderRadius: "6px",
+                          border: "1px solid var(--border)",
+                          fontSize: "11px",
+                          maxWidth: "180px",
+                          background: "#FFFFFF",
+                        }}
+                        value={currentChoice}
+                        onChange={(e) =>
+                          setRowPartnerMap((prev) => ({
+                            ...prev,
+                            [o.id]: e.target.value,
+                          }))
+                        }
+                      >
+                        <option value="">Auto-assign</option>
+                        {partners.map((p) => {
+                          const pName = p.name || p.user?.name || "Rider";
+                          const vehicle = p.vehicleType || "BIKE";
+                          return (
+                            <option key={p.id} value={p.id}>
+                              {pName} ({vehicle}) {p.isOnline ? "🟢" : "⚪"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
+                    <button
+                      className="assign"
+                      disabled={assigned.includes(o.id)}
+                      onClick={() => onAssign(o.id, currentChoice || undefined)}
+                    >
+                      {assigned.includes(o.id) ? "Assigned" : "Assign rider"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

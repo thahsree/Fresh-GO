@@ -1,5 +1,6 @@
+import React, { useState, useEffect } from "react";
 import { Button } from "@fresh-food/ui";
-import { CheckCircle2, CircleDollarSign, MapPin, PackageCheck, Radio, X } from "lucide-react";
+import { Bell, CheckCircle2, CircleDollarSign, MapPin, PackageCheck, Radio, VolumeX, X } from "lucide-react";
 import { DeliveryRequest } from "../models/delivery";
 import { DeliveryHub } from "../lib/api";
 
@@ -7,6 +8,7 @@ type DashboardViewProps = {
   isOnline: boolean;
   onAccept: () => void;
   onDecline: () => void;
+  onSilenceAlert?: () => void;
   onOpenHistory: () => void;
   request: DeliveryRequest | null;
   availableOrdersCount?: number;
@@ -19,6 +21,7 @@ export function DashboardView({
   isOnline,
   onAccept,
   onDecline,
+  onSilenceAlert,
   onOpenHistory,
   request,
   availableOrdersCount = 0,
@@ -26,6 +29,12 @@ export function DashboardView({
   selectedHub,
   onOpenSettings,
 }: DashboardViewProps) {
+  const [isAlertMuted, setIsAlertMuted] = useState(false);
+
+  useEffect(() => {
+    setIsAlertMuted(false);
+  }, [request?.id]);
+
   const todayDate = new Date().toLocaleDateString("en-IN", {
     weekday: "long",
     day: "numeric",
@@ -61,19 +70,34 @@ export function DashboardView({
           <strong>{request ? "1" : "0"}</strong>
           <span>Ready to accept</span>
         </div>
+        {/* Earnings metric card commented out
         <div className="metric-card highlight">
           <CircleDollarSign size={18} />
           <strong>₹{todayEarnings.toLocaleString()}</strong>
           <span>Earned today</span>
         </div>
+        */}
       </section>
 
       {request ? (
         <section className="card request-card" style={{ borderColor: "#1f4d46", borderWidth: 2 }}>
           <div className="card-heading">
             <div>
-              <span className="status-label">Ready for Pickup</span>
-              <h2>Order #{request.id}</h2>
+              <span className="status-label" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    backgroundColor: isAlertMuted ? "#9ca3af" : "#2e7d5b",
+                    animation: isAlertMuted ? "none" : "pulse 1.2s infinite",
+                  }}
+                />
+                <Bell size={12} color={isAlertMuted ? "#6b7280" : "#2e7d5b"} />
+                {isAlertMuted ? "Alert Muted" : "Alert Ringing"} · Ready for Pickup
+              </span>
+              <h2>Order #{request.orderNumber || request.id}</h2>
             </div>
             <span className="eta-chip">{request.eta}</span>
           </div>
@@ -98,9 +122,38 @@ export function DashboardView({
 
           <div className="request-meta">
             <span>{request.payment}</span>
-            <strong style={{ color: "#1f4d46", fontSize: 13 }}>
-              Earn ₹{request.earnings}
-            </strong>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {!isAlertMuted && onSilenceAlert && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSilenceAlert();
+                    setIsAlertMuted(true);
+                  }}
+                  title="Silence alert chime"
+                  style={{
+                    background: "#f3f4f6",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "6px",
+                    padding: "4px 8px",
+                    fontSize: "11px",
+                    color: "#4b5563",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  <VolumeX size={12} /> Silence Chime
+                </button>
+              )}
+              {/* Earnings on order alert card commented out
+              <strong style={{ color: "#1f4d46", fontSize: 13 }}>
+                Earn ₹{request.earnings}
+              </strong>
+              */}
+            </div>
           </div>
 
           {!isOnline && (
@@ -112,13 +165,13 @@ export function DashboardView({
               variant="outline"
               label="Dismiss"
               icon={<X size={17} />}
-              onPress={onDecline}
+              onPress={() => onDecline()}
             />
             <Button
               variant="primary"
               label="Accept Delivery"
               disabled={!isOnline}
-              onPress={onAccept}
+              onPress={() => onAccept()}
             />
           </div>
         </section>

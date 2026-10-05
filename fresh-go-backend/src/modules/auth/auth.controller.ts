@@ -9,7 +9,14 @@ import {
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
-import { SendOtpDto, VerifyOtpDto } from "./dto/auth.dto";
+import {
+  SendOtpDto,
+  VerifyOtpDto,
+  SuperAdminLoginDto,
+  HubAdminLoginDto,
+  DeliveryLoginDto,
+  DeliveryRegisterDto,
+} from "./dto/auth.dto";
 import { Public } from "../../common/decorators/public.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
@@ -18,6 +25,34 @@ import { User } from "@prisma/client";
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
+
+  @Public()
+  @Post("super-admin/login")
+  @HttpCode(HttpStatus.OK)
+  async superAdminLogin(@Body() dto: SuperAdminLoginDto) {
+    return this.authService.loginSuperAdmin(dto);
+  }
+
+  @Public()
+  @Post("hub-admin/login")
+  @HttpCode(HttpStatus.OK)
+  async hubAdminLogin(@Body() dto: HubAdminLoginDto) {
+    return this.authService.loginHubAdmin(dto);
+  }
+
+  @Public()
+  @Post("delivery/login")
+  @HttpCode(HttpStatus.OK)
+  async deliveryLogin(@Body() dto: DeliveryLoginDto) {
+    return this.authService.loginDeliveryPartner(dto);
+  }
+
+  @Public()
+  @Post("delivery/register")
+  @HttpCode(HttpStatus.OK)
+  async deliveryRegister(@Body() dto: DeliveryRegisterDto) {
+    return this.authService.registerDeliveryPartner(dto);
+  }
 
   @Public()
   @Throttle({
