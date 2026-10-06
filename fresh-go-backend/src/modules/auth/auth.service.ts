@@ -56,7 +56,8 @@ export class AuthService {
       phone.endsWith("9876543210") ||
       phone.endsWith("9999988888") ||
       phone.endsWith("8888888888") ||
-      phone.endsWith("9999999999");
+      phone.endsWith("9999999999") ||
+      phone.endsWith("9741002566");
 
     // Generate 6-digit OTP (123456 for mock mode or designated Play Store test phones; cryptographically random for real SMS)
     const otp = isMock || isTestPhone
@@ -111,7 +112,8 @@ export class AuthService {
       phone.endsWith("9876543210") ||
       phone.endsWith("9999988888") ||
       phone.endsWith("8888888888") ||
-      phone.endsWith("9999999999");
+      phone.endsWith("9999999999") ||
+      phone.endsWith("9741002566");
     const isValid =
       cachedOtp === otp ||
       (isMock && otp === "123456") ||
