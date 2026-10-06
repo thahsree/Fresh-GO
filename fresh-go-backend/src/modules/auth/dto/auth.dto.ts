@@ -24,6 +24,24 @@ export class VerifyOtpDto {
   name?: string;
 }
 
+export class FirebaseLoginDto {
+  @IsNotEmpty()
+  @IsString()
+  phone: string;
+
+  @IsNotEmpty()
+  @IsString()
+  idToken: string;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: "CUSTOMER" | "DELIVERY_PARTNER" | "ADMIN" | "SUPER_ADMIN";
+}
+
 export class SuperAdminLoginDto {
   @IsNotEmpty()
   @IsString()

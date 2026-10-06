@@ -28,6 +28,7 @@
     "android": {
       "package": "com.freshgofreshandmeat.app",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

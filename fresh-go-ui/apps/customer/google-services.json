@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "96640122388",
+    "project_id": "freshgo-60966",
+    "storage_bucket": "freshgo-60966.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:96640122388:android:d0643a1af6eac369b9f101",
+        "android_client_info": {
+          "package_name": "com.freshgofreshandmeat.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFEZgkfd75OPVW97n3DePrtzabBWNcQls"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

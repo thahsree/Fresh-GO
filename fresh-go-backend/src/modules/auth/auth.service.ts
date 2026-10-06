@@ -13,6 +13,7 @@ import { SmsService } from "../notifications/sms.service";
 import {
   SendOtpDto,
   VerifyOtpDto,
+  FirebaseLoginDto,
   SuperAdminLoginDto,
   HubAdminLoginDto,
   DeliveryLoginDto,
@@ -255,6 +256,92 @@ export class AuthService {
           },
         });
       }
+    }
+
+    const tokens = await this.generateTokens(user.id, user.phone, user.role);
+
+    return {
+      user: {
+        id: user.id,
+        phone: user.phone,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        hubId: user.hubId,
+        hub: user.hub
+          ? {
+              id: user.hub.id,
+              name: user.hub.name,
+              code: user.hub.code,
+              city: user.hub.city,
+              latitude: user.hub.latitude,
+              longitude: user.hub.longitude,
+            }
+          : null,
+        customerProfile: user.customerProfile,
+        partnerProfile: user.partnerProfile,
+        walletBalance: user.wallet?.balance || 0,
+      },
+      ...tokens,
+    };
+  }
+
+  async firebaseLogin(dto: FirebaseLoginDto) {
+    const { phone, idToken, name, role = Role.CUSTOMER } = dto;
+    if (!idToken) {
+      throw new BadRequestException("Firebase ID token is required");
+    }
+
+    try {
+      const parts = idToken.split(".");
+      if (parts.length === 3) {
+        const payloadJson = Buffer.from(parts[1], "base64").toString("utf-8");
+        const payload = JSON.parse(payloadJson);
+        const tokenPhone = payload.phone_number;
+        if (
+          tokenPhone &&
+          tokenPhone.replace(/\D/g, "") !== phone.replace(/\D/g, "")
+        ) {
+          throw new BadRequestException(
+            "Phone number does not match verified credential",
+          );
+        }
+      }
+    } catch (e: any) {
+      if (e instanceof BadRequestException) throw e;
+    }
+
+    let user = await this.prisma.user.findUnique({
+      where: { phone },
+      include: {
+        customerProfile: true,
+        partnerProfile: true,
+        wallet: true,
+        hub: true,
+      },
+    });
+
+    if (!user) {
+      const assignedRole = (role as Role) || Role.CUSTOMER;
+      user = await this.prisma.user.create({
+        data: {
+          phone,
+          name: name || "Customer",
+          role: assignedRole,
+          ...(assignedRole === Role.CUSTOMER
+            ? {
+                customerProfile: { create: {} },
+                wallet: { create: { balance: 0.0 } },
+              }
+            : {}),
+        },
+        include: {
+          customerProfile: true,
+          partnerProfile: true,
+          wallet: true,
+          hub: true,
+        },
+      });
     }
 
     const tokens = await this.generateTokens(user.id, user.phone, user.role);

@@ -410,6 +410,89 @@ class CustomerApiClient {
     };
   }
 
+  async sendFirebaseOtp(rawPhone: string): Promise<{ success: boolean; sessionInfo: string; message: string }> {
+    const digits = rawPhone.replace(/\D/g, "");
+    if (digits.length !== 10) {
+      throw new Error("Please enter a valid 10-digit mobile number");
+    }
+    const phone = `+91${digits}`;
+    const apiKey = "AIzaSyBo2groYEN_V0unj10YoqS2f1_BpjL6zVQ";
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: phone }),
+      }
+    );
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(data.error.message || "Failed to send verification code via Firebase");
+    }
+    return {
+      success: true,
+      sessionInfo: data.sessionInfo,
+      message: "Verification code sent via SMS",
+    };
+  }
+
+  async verifyFirebaseOtp(
+    sessionInfo: string,
+    rawPhone: string,
+    code: string,
+    name?: string
+  ): Promise<{ success: boolean; user: UserProfile; error?: string }> {
+    const digits = rawPhone.replace(/\D/g, "");
+    const phone = `+91${digits}`;
+    const cleanCode = code.trim();
+    const apiKey = "AIzaSyBo2groYEN_V0unj10YoqS2f1_BpjL6zVQ";
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionInfo, code: cleanCode }),
+      }
+    );
+    const data = await res.json();
+    if (data.error) {
+      throw new Error(data.error.message || "Invalid or expired verification code");
+    }
+
+    const loginRes = await this.post<{
+      accessToken: string;
+      user: {
+        id: string;
+        phone: string;
+        name: string;
+        email?: string;
+      };
+    }>(
+      "/auth/firebase-login",
+      {
+        phone,
+        idToken: data.idToken,
+        name: name?.trim() || undefined,
+        role: "CUSTOMER",
+      },
+      false
+    );
+
+    if (!loginRes?.accessToken || !loginRes?.user) {
+      throw new Error("Verification failed. Please try again.");
+    }
+
+    const profile: UserProfile = {
+      name: loginRes.user.name || name?.trim() || "Customer",
+      phone: loginRes.user.phone || phone,
+      email: loginRes.user.email || "",
+      isLoggedIn: true,
+    };
+
+    await this.setSession(loginRes.accessToken, profile);
+    return { success: true, user: profile };
+  }
+
   async verifyOtp(
     rawPhone: string,
     otp: string,

@@ -12,6 +12,7 @@ import { AuthService } from "./auth.service";
 import {
   SendOtpDto,
   VerifyOtpDto,
+  FirebaseLoginDto,
   SuperAdminLoginDto,
   HubAdminLoginDto,
   DeliveryLoginDto,
@@ -74,6 +75,17 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto);
+  }
+
+  @Public()
+  @Throttle({
+    short: { limit: 2, ttl: 1000 },
+    long: { limit: 8, ttl: 60000 },
+  })
+  @Post("firebase-login")
+  @HttpCode(HttpStatus.OK)
+  async firebaseLogin(@Body() dto: FirebaseLoginDto) {
+    return this.authService.firebaseLogin(dto);
   }
 
   @UseGuards(JwtAuthGuard)
