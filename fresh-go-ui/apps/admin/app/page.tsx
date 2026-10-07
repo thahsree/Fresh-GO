@@ -422,6 +422,7 @@ export default function AdminPage() {
         {section === "products" && productDisplay.name === "list" && (
           <ProductsView
             products={productController.products}
+            categories={productController.categories}
             deleteProduct={async (id: string) => {
               const target = productController.products.find(
                 (p) => p.id === id
@@ -471,6 +472,7 @@ export default function AdminPage() {
         {section === "inventory" && (
           <InventoryView
             products={productController.products}
+            categories={productController.categories}
             onUpdateStock={async (id: string, newStock: number) => {
               const target = productController.products.find((p) => p.id === id);
               if (!target) return;

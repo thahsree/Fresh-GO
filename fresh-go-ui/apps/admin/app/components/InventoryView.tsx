@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   Snowflake,
@@ -13,13 +13,19 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { getStockState, Product } from "../models/product";
+import { Category } from "../lib/api";
 
 type InventoryViewProps = {
   products: Product[];
+  categories?: Category[];
   onUpdateStock?: (id: string, newStock: number) => Promise<void> | void;
 };
 
-export function InventoryView({ products, onUpdateStock }: InventoryViewProps) {
+export function InventoryView({
+  products,
+  categories: categoriesProp = [],
+  onUpdateStock,
+}: InventoryViewProps) {
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -30,7 +36,26 @@ export function InventoryView({ products, onUpdateStock }: InventoryViewProps) {
   const healthyCount = products.filter((p) => getStockState(p.stock) === "Healthy").length;
   const lowOrOutCount = products.filter((p) => getStockState(p.stock) !== "Healthy").length;
 
-  const categories = ["All", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))];
+  const DEFAULT_CATEGORIES = ["Fish", "Meat", "Vegetables", "Frozen", "Offers"];
+  const categories = useMemo(() => {
+    const seen = new Set<string>(["all"]);
+    const list: string[] = ["All"];
+    const sources = [
+      ...DEFAULT_CATEGORIES,
+      ...categoriesProp.map((c) => c.name).filter(Boolean),
+      ...products.map((p) => p.category).filter(Boolean),
+    ];
+    for (const cat of sources) {
+      const trimmed = cat.trim();
+      const lower = trimmed.toLowerCase();
+      if (!lower) continue;
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(trimmed.charAt(0).toUpperCase() + trimmed.slice(1));
+      }
+    }
+    return list;
+  }, [categoriesProp, products]);
 
   const filtered = products.filter((product) => {
     const matchesQuery = `${product.name} ${product.category} ${product.origin || ""}`
@@ -41,7 +66,7 @@ export function InventoryView({ products, onUpdateStock }: InventoryViewProps) {
 
     if (selectedCategory === "All") return true;
     if (selectedCategory === "Low Stock") return getStockState(product.stock) !== "Healthy";
-    return product.category.toLowerCase() === selectedCategory.toLowerCase();
+    return product.category?.toLowerCase().trim() === selectedCategory.toLowerCase().trim();
   });
 
   const PAGE_SIZE = 25;
@@ -180,7 +205,7 @@ export function InventoryView({ products, onUpdateStock }: InventoryViewProps) {
           <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", marginRight: 4 }}>
             Filter:
           </span>
-          {categories.map((cat) => (
+          {categories.map((cat: string) => (
             <button
               key={cat}
               type="button"

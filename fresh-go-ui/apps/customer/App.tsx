@@ -54,15 +54,15 @@ import {
   requestNotificationPermission,
   registerPushTokenWithBackend,
 } from "./lib/notifications";
-import { type Category, type Product } from "./models/catalog";
+import { type Category, type Product, categories as defaultCategories } from "./models/catalog";
 
 export default function App() {
   // Navigation: "Home" | "Cart" | "Orders" | "Profile"
   const [activeNavigation, setActiveNavigation] = useState("Home");
 
-  // Dynamic Catalog & Categories State (Empty until loaded from backend)
+  // Dynamic Catalog & Categories State (Initialized with standard categories, updated from backend)
   const [products, setProducts] = useState<Product[]>([]);
-  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>(defaultCategories);
   const [hubs, setHubs] = useState<BackendHub[]>([]);
 
   // Cart State: { [productId]: quantity }

@@ -9,11 +9,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStockState, Product } from "../models/product";
+import { Category } from "../lib/api";
 
 type ProductsViewProps = {
   products: Product[];
+  categories?: Category[];
   deleteProduct: (id: string) => Promise<void> | void;
   updateProduct?: (id: string, input: any) => Promise<void> | void;
   onCreate: () => void;
@@ -22,6 +24,7 @@ type ProductsViewProps = {
 
 export function ProductsView({
   products,
+  categories = [],
   deleteProduct,
   updateProduct,
   onCreate,
@@ -61,10 +64,31 @@ export function ProductsView({
   const [currentPage, setCurrentPage] = useState(1);
   const tableWrapRef = useRef<HTMLDivElement>(null);
 
-  // Derive unique categories from products
-  const uniqueCategories = Array.from(
-    new Set(products.map((p) => p.category).filter(Boolean))
-  );
+  // Canonical default categories ensure Meat, Fish, Vegetables, Frozen, Offers are always present
+  const DEFAULT_CATEGORIES = ["Fish", "Meat", "Vegetables", "Frozen", "Offers"];
+
+  const uniqueCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+
+    const candidateSources = [
+      ...DEFAULT_CATEGORIES,
+      ...(categories || []).map((c) => c.name).filter(Boolean),
+      ...products.map((p) => p.category).filter(Boolean),
+    ];
+
+    for (const cat of candidateSources) {
+      const trimmed = cat.trim();
+      const lower = trimmed.toLowerCase();
+      if (!lower) continue;
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+        list.push(formatted);
+      }
+    }
+    return list;
+  }, [categories, products]);
 
   const visibleProducts = products.filter((product) => {
     const matchesQuery = `${product.name} ${product.category} ${product.origin || ""}`
@@ -72,7 +96,10 @@ export function ProductsView({
       .includes(query.toLowerCase());
     if (!matchesQuery) return false;
 
-    if (categoryFilter !== "all" && product.category.toLowerCase() !== categoryFilter.toLowerCase()) {
+    if (
+      categoryFilter !== "all" &&
+      product.category?.toLowerCase().trim() !== categoryFilter.toLowerCase().trim()
+    ) {
       return false;
     }
 
@@ -339,30 +366,34 @@ export function ProductsView({
           >
             All ({products.length})
           </button>
-          {uniqueCategories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setCategoryFilter(cat)}
-              style={{
-                padding: "5px 12px",
-                borderRadius: "20px",
-                fontSize: "12px",
-                fontWeight: 700,
-                cursor: "pointer",
-                border:
-                  categoryFilter === cat
+          {uniqueCategories.map((cat) => {
+            const count = products.filter(
+              (p) => p.category?.toLowerCase().trim() === cat.toLowerCase().trim()
+            ).length;
+            const isSelected = categoryFilter.toLowerCase().trim() === cat.toLowerCase().trim();
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setCategoryFilter(isSelected ? "all" : cat)}
+                style={{
+                  padding: "5px 12px",
+                  borderRadius: "20px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  border: isSelected
                     ? "1px solid var(--primary)"
                     : "1px solid var(--border)",
-                background:
-                  categoryFilter === cat ? "var(--primary)" : "var(--surface)",
-                color: categoryFilter === cat ? "#FFFFFF" : "var(--text)",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {cat} ({products.filter((p) => p.category === cat).length})
-            </button>
-          ))}
+                  background: isSelected ? "var(--primary)" : "var(--surface)",
+                  color: isSelected ? "#FFFFFF" : "var(--text)",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
         </div>
 
         <div className="table-wrap products-table-wrap" ref={tableWrapRef}>

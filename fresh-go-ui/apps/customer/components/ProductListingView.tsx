@@ -47,6 +47,14 @@ type ProductListingViewProps = {
   onToggleFavorite: (productId: string) => void;
 };
 
+const DEFAULT_CATEGORIES: Category[] = [
+  { id: "cat-fish", name: "Fish", slug: "fish", icon: "🐟", tint: "#E4ECE9" },
+  { id: "cat-meat", name: "Meat", slug: "meat", icon: "🥩", tint: "#FBE7DF" },
+  { id: "cat-vegetables", name: "Vegetables", slug: "vegetables", icon: "🥬", tint: "#EAF3E6" },
+  { id: "cat-frozen", name: "Frozen", slug: "frozen", icon: "❄️", tint: "#E0F2FE" },
+  { id: "cat-offers", name: "Offers", slug: "offers", icon: "🔥", tint: "#FBEEDC" },
+];
+
 export function ProductListingView({
   initialCategory = null,
   initialSearch = "",
@@ -72,6 +80,17 @@ export function ProductListingView({
   const [priceFilter, setPriceFilter] = useState<PriceFilter>("all");
   const [onlyFresh, setOnlyFresh] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+  // Guarantee all standard categories (Meat, Fish, Vegetables, etc.) are always present in filter bar
+  const resolvedCategories = useMemo(() => {
+    const list = [...categories];
+    for (const def of DEFAULT_CATEGORIES) {
+      if (!list.some((c) => c.name.toLowerCase().trim() === def.name.toLowerCase().trim())) {
+        list.push(def);
+      }
+    }
+    return list;
+  }, [categories]);
 
   // Filter & Sort Logic
   const filteredProducts = useMemo(() => {
@@ -99,7 +118,8 @@ export function ProductListingView({
             p.name.toLowerCase().includes("biryani") ||
             p.category.toLowerCase() === "meat" ||
             p.name.toLowerCase().includes("mutton") ||
-            p.name.toLowerCase().includes("chicken"),
+            p.name.toLowerCase().includes("chicken") ||
+            p.name.toLowerCase().includes("beef"),
         );
       } else if (needLower.includes("frozen")) {
         list = list.filter(
@@ -263,11 +283,14 @@ export function ProductListingView({
             </Text>
           </Pressable>
 
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.name;
+          {resolvedCategories.map((cat) => {
+            const isSelected = Boolean(
+              selectedCategory &&
+                selectedCategory.toLowerCase().trim() === cat.name.toLowerCase().trim(),
+            );
             return (
               <Pressable
-                key={cat.name}
+                key={cat.id || cat.name}
                 style={[
                   styles.catChip,
                   isSelected && styles.catChipActive,

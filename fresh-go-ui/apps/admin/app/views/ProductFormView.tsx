@@ -45,6 +45,7 @@ export function ProductFormView({
           { id: "meat", name: "Meat" },
           { id: "vegetables", name: "Vegetables" },
           { id: "frozen", name: "Frozen" },
+          { id: "offers", name: "Offers" },
         ];
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

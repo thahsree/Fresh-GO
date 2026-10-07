@@ -181,7 +181,19 @@ export function FeaturedSectionsView({
 
   // Filtered products for picker
   const pickerCategories = useMemo(() => {
-    return Array.from(new Set(allProducts.map((p) => p.category).filter(Boolean)));
+    const DEFAULT_CATEGORIES = ["Fish", "Meat", "Vegetables", "Frozen", "Offers"];
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const cat of [...DEFAULT_CATEGORIES, ...allProducts.map((p) => p.category).filter(Boolean)]) {
+      const trimmed = cat.trim();
+      const lower = trimmed.toLowerCase();
+      if (!lower) continue;
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        list.push(trimmed.charAt(0).toUpperCase() + trimmed.slice(1));
+      }
+    }
+    return list;
   }, [allProducts]);
 
   const filteredPickerProducts = useMemo(() => {

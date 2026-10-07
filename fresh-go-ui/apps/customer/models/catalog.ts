@@ -44,9 +44,14 @@ export type Product = {
   tag?: string;
 };
 
-// Clean schema-driven state: no hardcoded mock products.
-// All live products and categories are loaded directly from the FreshGo backend database.
-export const categories: Category[] = [];
+// Clean schema-driven state with standard canonical categories
+export const categories: Category[] = [
+  { id: "cat-fish", name: "Fish", slug: "fish", icon: "🐟", tint: "#E4ECE9", sortOrder: 1 },
+  { id: "cat-meat", name: "Meat", slug: "meat", icon: "🥩", tint: "#FBE7DF", sortOrder: 2 },
+  { id: "cat-vegetables", name: "Vegetables", slug: "vegetables", icon: "🥬", tint: "#EAF3E6", sortOrder: 3 },
+  { id: "cat-frozen", name: "Frozen", slug: "frozen", icon: "❄️", tint: "#E0F2FE", sortOrder: 4 },
+  { id: "cat-offers", name: "Offers", slug: "offers", icon: "🔥", tint: "#FBEEDC", sortOrder: 5 },
+];
 export const freshProducts: Product[] = [];
 export const bestSellers: Product[] = [];
 export const frozenProducts: Product[] = [];
