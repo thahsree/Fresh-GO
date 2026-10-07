@@ -32,6 +32,7 @@ export default () => ({
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",
     twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || "",
     fast2smsApiKey: process.env.FAST2SMS_API_KEY || "",
+    fast2smsRoute: process.env.FAST2SMS_ROUTE || "q",
   },
   storage: {
     endpoint: process.env.S3_ENDPOINT || "",

@@ -86,17 +86,9 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
     setErrorMessage("");
 
     try {
-      try {
-        const fbRes = await customerApi.sendFirebaseOtp(cleanPhone);
-        if (fbRes.sessionInfo) {
-          setSessionInfo(fbRes.sessionInfo);
-        }
-      } catch (fbErr: any) {
-        console.log("[AuthView] Firebase phone auth fallback:", fbErr.message);
-        await customerApi.sendOtp(cleanPhone);
-      }
-      setDevOtp("");
-      setIsMock(false);
+      const res = await customerApi.sendOtp(cleanPhone);
+      setDevOtp(res.devOtp || "");
+      setIsMock(!!res.isMock);
       setOtp("");
       setStep("otp");
       setTimer(30);
@@ -118,18 +110,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
     setErrorMessage("");
 
     try {
-      let res: any;
-      if (sessionInfo) {
-        try {
-          res = await customerApi.verifyFirebaseOtp(sessionInfo, phone, cleanOtp, name);
-        } catch (fbVerifyErr: any) {
-          console.log("[AuthView] Firebase verify fallback:", fbVerifyErr.message);
-          res = await customerApi.verifyOtp(phone, cleanOtp, name);
-        }
-      } else {
-        res = await customerApi.verifyOtp(phone, cleanOtp, name);
-      }
-
+      const res = await customerApi.verifyOtp(phone, cleanOtp, name);
       if (res.success && res.user) {
         onSuccess(res.user);
         dispatchOrderNotification({
@@ -155,18 +136,9 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
     setIsLoading(true);
     setErrorMessage("");
     try {
-      if (sessionInfo) {
-        try {
-          const fbRes = await customerApi.sendFirebaseOtp(cleanPhone);
-          if (fbRes.sessionInfo) setSessionInfo(fbRes.sessionInfo);
-        } catch {
-          await customerApi.sendOtp(cleanPhone);
-        }
-      } else {
-        await customerApi.sendOtp(cleanPhone);
-      }
-      setDevOtp("");
-      setIsMock(false);
+      const res = await customerApi.sendOtp(cleanPhone);
+      setDevOtp(res.devOtp || "");
+      setIsMock(!!res.isMock);
       setOtp("");
       setTimer(30);
     } catch (err: any) {

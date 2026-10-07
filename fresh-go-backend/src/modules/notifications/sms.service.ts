@@ -27,13 +27,24 @@ export class SmsService {
           return false;
         }
         const rawNumber = phone.replace("+91", "").replace("+", "").trim();
+        const route = this.configService.get<string>("sms.fast2smsRoute", "q");
+        const payload: any = {
+          numbers: rawNumber,
+        };
+
+        if (route === "otp") {
+          payload.route = "otp";
+          payload.variables_values = otp;
+        } else {
+          payload.route = "q";
+          payload.message = `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`;
+          payload.language = "english";
+          payload.flash = 0;
+        }
+
         const res = await axios.post(
           "https://www.fast2sms.com/dev/bulkV2",
-          {
-            route: "otp",
-            variables_values: otp,
-            numbers: rawNumber,
-          },
+          payload,
           {
             headers: {
               authorization: apiKey,
