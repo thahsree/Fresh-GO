@@ -11,7 +11,7 @@ export type Product = {
   name: string;
   category: "Fish" | "Meat" | "Vegetables" | "Frozen" | string;
   categoryId?: string;
-  unit: "kg" | "bunch" | "pack" | string;
+  unit: "kg" | "500g" | "300g" | "200g" | "bunch" | "pack" | string;
   price: number;
   stock: number;
   active: boolean;

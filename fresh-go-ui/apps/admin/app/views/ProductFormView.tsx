@@ -228,6 +228,8 @@ export function ProductFormView({
             >
               <option value="kg">kg</option>
               <option value="500g">500g</option>
+              <option value="300g">300g</option>
+              <option value="200g">200g</option>
               <option value="pack">pack</option>
               <option value="bunch">bunch</option>
             </select>
