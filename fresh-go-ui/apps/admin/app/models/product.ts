@@ -6,6 +6,13 @@ export type ProductTag =
   | "Fresh Produce"
   | string;
 
+export type CutOption = {
+  id?: string;
+  name: string;
+  priceModifier?: number;
+  isDefault?: boolean;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -24,6 +31,7 @@ export type Product = {
   isDailyCatch?: boolean;
   isFlashFrozen?: boolean;
   tag?: ProductTag;
+  cuts?: CutOption[];
 };
 
 export type ProductInput = Omit<Product, "id">;

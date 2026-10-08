@@ -47,6 +47,7 @@ export function useProductController() {
           isDailyCatch: Boolean(bp.isDailyCatch),
           isFlashFrozen: Boolean(bp.isFlashFrozen),
           tag: bp.tag || (bp.isDailyCatch ? "Fresh Catch" : bp.isFlashFrozen ? "Frozen" : "Fresh"),
+          cuts: bp.cuts || [],
         }));
         setProducts(mapped);
         setIsBackendConnected(true);
@@ -131,6 +132,13 @@ export function useProductController() {
       isDailyCatch: Boolean(input.isDailyCatch),
       isFlashFrozen: Boolean(input.isFlashFrozen),
       tag: input.tag || (input.isDailyCatch ? "Fresh Catch" : input.isFlashFrozen ? "Frozen" : "Fresh"),
+      cuts: input.cuts && input.cuts.length > 0
+        ? input.cuts.map((c) => ({
+            name: c.name,
+            priceModifier: c.priceModifier,
+            isDefault: c.isDefault,
+          }))
+        : [],
     });
 
     await fetchBackendData();
@@ -165,6 +173,13 @@ export function useProductController() {
           isDailyCatch: input.isDailyCatch,
           isFlashFrozen: input.isFlashFrozen,
           tag: input.tag,
+          cuts: input.cuts !== undefined
+            ? input.cuts.map((c) => ({
+                name: c.name,
+                priceModifier: c.priceModifier,
+                isDefault: c.isDefault,
+              }))
+            : undefined,
         });
         await fetchBackendData();
         return;

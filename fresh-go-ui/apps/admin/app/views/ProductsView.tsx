@@ -473,7 +473,37 @@ export function ProductsView({
                           </div>
                           <div>
                             <strong>{product.name}</strong>
-                            <small>per {product.unit}</small>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "2px" }}>
+                              <small>per {product.unit}</small>
+                              {product.cuts && product.cuts.length > 0 ? (
+                                <span
+                                  style={{
+                                    fontSize: "10.5px",
+                                    background: "rgba(3, 105, 161, 0.1)",
+                                    color: "var(--primary, #0369a1)",
+                                    padding: "1px 6px",
+                                    borderRadius: "4px",
+                                    fontWeight: 600,
+                                  }}
+                                  title={`Available cuts: ${product.cuts.map((c) => c.name).join(", ")}`}
+                                >
+                                  🔪 {product.cuts.length} cuts
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    fontSize: "10.5px",
+                                    background: "rgba(100, 116, 139, 0.1)",
+                                    color: "var(--muted, #64748b)",
+                                    padding: "1px 6px",
+                                    borderRadius: "4px",
+                                  }}
+                                  title="No cut preferences required for this product"
+                                >
+                                  No cuts
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>

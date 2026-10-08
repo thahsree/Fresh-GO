@@ -703,19 +703,19 @@ class CustomerApiClient {
     const categoryName = bp.category?.name || (isFrozen ? "Frozen" : "Fish");
     const unitFormatted = bp.unit.startsWith("/") ? bp.unit : `/${bp.unit}`;
 
-    // Available cuts
+    // Available cuts - only populated if admin configured cut preferences
     const cuts = bp.cuts && bp.cuts.length > 0
       ? bp.cuts.map((c) => c.name)
-      : isFrozen
-      ? ["1-inch Steaks", "Standard Cut"]
-      : ["Steak / Slice Cut", "Curry Cut (Medium)"];
+      : [];
 
-    const cutOptions = bp.cuts?.map((c) => ({
-      id: c.id,
-      name: c.name,
-      priceModifier: c.priceModifier,
-      isDefault: c.isDefault,
-    }));
+    const cutOptions = bp.cuts && bp.cuts.length > 0
+      ? bp.cuts.map((c) => ({
+          id: c.id,
+          name: c.name,
+          priceModifier: c.priceModifier,
+          isDefault: c.isDefault,
+        }))
+      : [];
 
     const stockText =
       bp.availableStockKg !== undefined && bp.availableStockKg > 0
@@ -1047,8 +1047,12 @@ class CustomerApiClient {
         cutOptionId:
           item.product.cutOptions?.find(
             (c) => c.name?.toLowerCase() === item.selectedCut?.toLowerCase()
-          )?.id || item.product.cutOptions?.[0]?.id,
-        cutName: item.selectedCut || item.product.cuts?.[0] || "Standard Cut",
+          )?.id || item.product.cutOptions?.[0]?.id || undefined,
+        cutName:
+          item.selectedCut ||
+          (item.product.cuts && item.product.cuts.length > 0
+            ? item.product.cuts[0]
+            : undefined),
       }));
 
       const payload = {

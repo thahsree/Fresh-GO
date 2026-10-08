@@ -367,4 +367,20 @@ input::-webkit-credentials-auto-fill-button {
   background-color: #F4F9F6 !important;
 }
 
+@keyframes fadeInDropdown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.custom-dropdown-container button:focus-visible {
+  outline: 2px solid var(--primary);
+  border-color: var(--primary);
+}
+
 

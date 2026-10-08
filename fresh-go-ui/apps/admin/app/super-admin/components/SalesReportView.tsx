@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api, SalesReportResponse, Hub } from "../../lib/api";
+import { CustomDropdown } from "../../components/CustomDropdown";
 import {
   TrendingUp,
   DollarSign,
@@ -219,29 +220,18 @@ export function SalesReportView({
           </div>
 
           {/* Hub Filter Selector */}
-          <div style={{ position: "relative" }}>
-            <select
-              value={selectedHubId}
-              onChange={(e) => setSelectedHubId(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid #E3DDCF",
-                background: "#FFFFFF",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#1F4D46",
-                outline: "none",
-              }}
-            >
-              <option value="">All Fulfillment Hubs</option>
-              {hubs.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name} ({h.code})
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomDropdown
+            value={selectedHubId}
+            onChange={setSelectedHubId}
+            options={[
+              { value: "", label: "All Fulfillment Hubs" },
+              ...hubs.map((h) => ({
+                value: h.id,
+                label: `${h.name} (${h.code})`,
+              })),
+            ]}
+            style={{ minWidth: "200px", width: "auto" }}
+          />
 
           {/* Refresh */}
           <button

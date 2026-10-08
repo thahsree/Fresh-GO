@@ -68,6 +68,12 @@ export type BackendProduct = {
   availableStockKg?: number;
   isInStock?: boolean;
   batches?: any[];
+  cuts?: Array<{
+    id?: string;
+    name: string;
+    priceModifier?: number;
+    isDefault?: boolean;
+  }>;
 };
 
 export type FeaturedSectionItem = {
@@ -515,6 +521,7 @@ class ApiClient {
       servesCount?: number;
       storageTemp?: string;
       shelfLifeDays?: number;
+      cuts?: Array<{ name: string; priceModifier?: number; isDefault?: boolean }>;
     }) => this.post<BackendProduct>("/catalog/products", data, true),
     updateProduct: (
       id: string,
@@ -535,6 +542,7 @@ class ApiClient {
         isDailyCatch?: boolean;
         isFlashFrozen?: boolean;
         tag?: string;
+        cuts?: Array<{ name: string; priceModifier?: number; isDefault?: boolean }>;
       }
     ) => this.put<BackendProduct>(`/catalog/products/${id}`, data, true),
     deleteProduct: (id: string) =>

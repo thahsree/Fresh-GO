@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api, DeliveryPartnerItem, AdminUser, Hub } from "../lib/api";
+import { CustomDropdown } from "./CustomDropdown";
 import {
   Bike,
   CheckCircle,
@@ -183,28 +184,18 @@ export function DeliveryPartnersView({
         {/* Action Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           {currentUser?.role === "SUPER_ADMIN" && hubsList.length > 0 && (
-            <select
+            <CustomDropdown
               value={selectedHubId}
-              onChange={(e) => setSelectedHubId(e.target.value)}
-              style={{
-                padding: "9px 12px",
-                borderRadius: "8px",
-                border: "1px solid #E3DDCF",
-                fontSize: "13px",
-                fontWeight: 600,
-                color: "#1F4D46",
-                background: "#F6F2EA",
-                outline: "none",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">All Fulfillment Hubs</option>
-              {hubsList.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.name} ({h.code})
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedHubId}
+              options={[
+                { value: "", label: "All Fulfillment Hubs" },
+                ...hubsList.map((h) => ({
+                  value: h.id,
+                  label: `${h.name} (${h.code})`,
+                })),
+              ]}
+              style={{ minWidth: "210px", width: "auto" }}
+            />
           )}
 
           <div style={{ position: "relative" }}>

@@ -17,6 +17,7 @@ import {
   Eye,
 } from "lucide-react";
 import { QueueOrder } from "../lib/api";
+import { CustomDropdown } from "./CustomDropdown";
 
 type OrdersViewProps = {
   assigned?: string[];
@@ -133,19 +134,31 @@ export function OrdersView({
 
   const PAGE_SIZE = 25;
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const tableWrapRef = useRef<HTMLDivElement>(null);
 
-  const filtered = displayRows.filter(
-    (row) =>
+  const filtered = displayRows.filter((row) => {
+    const matchesSearch =
       row.displayId.toLowerCase().includes(search.toLowerCase()) ||
       row.customer.toLowerCase().includes(search.toLowerCase()) ||
-      row.items.toLowerCase().includes(search.toLowerCase())
-  );
+      row.items.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
 
-  // Reset to page 1 on search
+    if (statusFilter !== "ALL") {
+      const s = row.rawStatus.toUpperCase();
+      if (statusFilter === "CONFIRMED") {
+        if (s !== "CONFIRMED" && s !== "PLACED") return false;
+      } else if (s !== statusFilter) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  // Reset to page 1 on search or statusFilter change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search]);
+  }, [search, statusFilter]);
 
   // Close drawer on Escape key
   useEffect(() => {
@@ -183,19 +196,37 @@ export function OrdersView({
         <div>
           <h2>Order queue</h2>
           <span className="muted">
-            {search.trim()
+            {search.trim() || statusFilter !== "ALL"
               ? `${filtered.length} of ${displayRows.length} orders found`
               : hasLiveOrders
               ? `${liveOrders.length} live orders in database (click any row to view cutting & order details)`
               : `${displayRows.length} orders in queue`}
           </span>
         </div>
-        <input
-          className="search"
-          placeholder="Search order, customer, or product"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          <CustomDropdown
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: "ALL", label: "All Statuses" },
+              { value: "CONFIRMED", label: "Confirmed / Placed" },
+              { value: "CUTTING_PREPARING", label: "Cutting / Prep" },
+              { value: "PACKED", label: "Packed" },
+              { value: "DISPATCH_READY", label: "Ready to Dispatch" },
+              { value: "ASSIGNED", label: "Assigned" },
+              { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+              { value: "DELIVERED", label: "Delivered" },
+              { value: "CANCELLED", label: "Cancelled" },
+            ]}
+            style={{ minWidth: "175px", width: "auto" }}
+          />
+          <input
+            className="search"
+            placeholder="Search order, customer, or product"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="table-wrap products-table-wrap" ref={tableWrapRef}>
@@ -1093,6 +1124,36 @@ export function OrdersView({
                         🚀 Ready for Dispatch
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Direct Status Selector */}
+                {onUpdateStatus && (
+                  <div style={{ marginTop: 10 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 4 }}>
+                      Update Status:
+                    </label>
+                    <CustomDropdown
+                      value={selectedOrder.status}
+                      onChange={(nextStatus) => {
+                        onUpdateStatus(selectedOrder.id, nextStatus);
+                        setSelectedOrder((prev) =>
+                          prev ? { ...prev, status: nextStatus } : null
+                        );
+                      }}
+                      options={[
+                        { value: "PLACED", label: "Placed / New" },
+                        { value: "CONFIRMED", label: "Confirmed" },
+                        { value: "CUTTING_PREPARING", label: "Cutting / Prep" },
+                        { value: "PACKED", label: "Packed" },
+                        { value: "DISPATCH_READY", label: "Ready for Dispatch" },
+                        { value: "ASSIGNED", label: "Assigned" },
+                        { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+                        { value: "DELIVERED", label: "Delivered" },
+                        { value: "CANCELLED", label: "Cancelled" },
+                      ]}
+                      size="sm"
+                    />
                   </div>
                 )}
               </div>

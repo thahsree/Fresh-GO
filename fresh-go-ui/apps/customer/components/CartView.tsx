@@ -197,11 +197,13 @@ export function CartView({
   const itemsWithProduct: CartItemWithProduct[] = cartEntries
     .map(([id, qty]): CartItemWithProduct | null => {
       const product = products.find((p) => p.id === id || p.slug === id);
-      const selectedCut =
-        cartCuts?.[id] ||
-        (product?.id ? cartCuts?.[product.id] : undefined) ||
-        (product?.slug ? cartCuts?.[product.slug] : undefined) ||
-        product?.cuts?.[0];
+      const hasCuts = Boolean(product?.cuts && product.cuts.length > 0);
+      const selectedCut = hasCuts
+        ? cartCuts?.[id] ||
+          (product?.id ? cartCuts?.[product.id] : undefined) ||
+          (product?.slug ? cartCuts?.[product.slug] : undefined) ||
+          product?.cuts?.[0]
+        : undefined;
       return product ? { product, quantity: qty, selectedCut } : null;
     })
     .filter((item): item is CartItemWithProduct => item !== null);

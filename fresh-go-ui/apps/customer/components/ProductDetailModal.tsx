@@ -9,7 +9,7 @@ import {
   Star,
   X,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Image,
   Modal,
@@ -45,10 +45,15 @@ export function ProductDetailModal({
   if (!product) return null;
 
   const [quantity, setQuantity] = useState(1);
-  const [selectedCut, setSelectedCut] = useState<string>(
-    product.cuts?.[0] ?? "Standard Cut",
+  const [selectedCut, setSelectedCut] = useState<string | undefined>(
+    product.cuts?.[0]
   );
   const [justAdded, setJustAdded] = useState(false);
+
+  useEffect(() => {
+    setSelectedCut(product?.cuts?.[0]);
+    setQuantity(1);
+  }, [product?.id]);
 
   const relatedProducts = products
     .filter(
@@ -75,7 +80,9 @@ export function ProductDetailModal({
 
   const handleAdd = () => {
     if (isOutOfStock || quantity > maxStock) return;
-    onAddToCart(product.id, quantity, selectedCut);
+    const cutToPass =
+      product.cuts && product.cuts.length > 0 ? selectedCut : undefined;
+    onAddToCart(product.id, quantity, cutToPass);
     setJustAdded(true);
     setTimeout(() => {
       setJustAdded(false);

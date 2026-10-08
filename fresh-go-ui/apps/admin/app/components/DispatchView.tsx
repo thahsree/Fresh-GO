@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { QueueOrder, ActivePartner, AdminUser } from "../lib/api";
+import { CustomDropdown } from "./CustomDropdown";
 
 type DispatchViewProps = {
   assigned: string[];
@@ -118,28 +119,23 @@ export function DispatchView({
             <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 4 }}>
               Default dispatch partner for queue:
             </label>
-            <select
-              style={{
-                width: "100%",
-                padding: "8px",
-                borderRadius: "6px",
-                border: "1px solid var(--border)",
-                fontSize: "12px",
-              }}
+            <CustomDropdown
               value={selectedPartnerId}
-              onChange={(e) => setSelectedPartnerId(e.target.value)}
-            >
-              <option value="">Auto-assign nearest partner</option>
-              {partners.map((p) => {
-                const partnerName = p.name || p.user?.name || "Rider";
-                const vehicle = p.vehicleType || "BIKE";
-                return (
-                  <option key={p.id} value={p.id}>
-                    {partnerName} ({vehicle}) {p.isOnline ? "🟢 Online" : "⚪ Offline"}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={setSelectedPartnerId}
+              options={[
+                { value: "", label: "Auto-assign nearest partner" },
+                ...partners.map((p) => {
+                  const partnerName = p.name || p.user?.name || "Rider";
+                  const vehicle = p.vehicleType || "BIKE";
+                  return {
+                    value: p.id,
+                    label: `${partnerName} (${vehicle})`,
+                    badge: p.isOnline ? "Online" : "Offline",
+                    badgeColor: p.isOnline ? "#10B981" : "#94A3B8",
+                  };
+                }),
+              ]}
+            />
           </div>
         )}
 
@@ -218,34 +214,31 @@ export function DispatchView({
 
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {partners.length > 0 && (
-                      <select
-                        style={{
-                          padding: "6px 8px",
-                          borderRadius: "6px",
-                          border: "1px solid var(--border)",
-                          fontSize: "11px",
-                          maxWidth: "180px",
-                          background: "#FFFFFF",
-                        }}
+                      <CustomDropdown
+                        size="sm"
                         value={currentChoice}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           setRowPartnerMap((prev) => ({
                             ...prev,
-                            [o.id]: e.target.value,
+                            [o.id]: val,
                           }))
                         }
-                      >
-                        <option value="">Auto-assign</option>
-                        {partners.map((p) => {
-                          const pName = p.name || p.user?.name || "Rider";
-                          const vehicle = p.vehicleType || "BIKE";
-                          return (
-                            <option key={p.id} value={p.id}>
-                              {pName} ({vehicle}) {p.isOnline ? "🟢" : "⚪"}
-                            </option>
-                          );
-                        })}
-                      </select>
+                        options={[
+                          { value: "", label: "Auto-assign" },
+                          ...partners.map((p) => {
+                            const pName = p.name || p.user?.name || "Rider";
+                            const vehicle = p.vehicleType || "BIKE";
+                            return {
+                              value: p.id,
+                              label: `${pName} (${vehicle})`,
+                              badge: p.isOnline ? "Online" : "Offline",
+                              badgeColor: p.isOnline ? "#10B981" : "#94A3B8",
+                            };
+                          }),
+                        ]}
+                        style={{ minWidth: "170px" }}
+                        align="right"
+                      />
                     )}
                     <button
                       className="assign"

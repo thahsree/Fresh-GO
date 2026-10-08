@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getStockState, Product } from "../models/product";
 import { Category } from "../lib/api";
+import { CustomDropdown } from "./CustomDropdown";
 
 type InventoryViewProps = {
   products: Product[];
@@ -176,7 +177,16 @@ export function InventoryView({
             </span>
           </div>
 
-          <div className="toolbar-actions" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="toolbar-actions" style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <CustomDropdown
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              options={categories.map((cat: string) => ({
+                value: cat,
+                label: cat === "All" ? "All Categories" : cat,
+              }))}
+              style={{ minWidth: "160px", width: "auto" }}
+            />
             <label className="search-wrap" style={{ minWidth: "240px" }}>
               <Search size={16} aria-hidden="true" style={{ color: "var(--muted)" }} />
               <input

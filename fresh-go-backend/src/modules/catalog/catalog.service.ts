@@ -117,6 +117,7 @@ export class CatalogService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
+    const hasDefaultCut = dto.cuts?.some((c) => c.isDefault);
     const created = await this.prisma.product.create({
       data: {
         name: dto.name,
@@ -144,10 +145,10 @@ export class CatalogService {
         tag: null,
         cuts: dto.cuts?.length
           ? {
-              create: dto.cuts.map((c) => ({
-                name: c.name,
-                priceModifier: c.priceModifier || 0.0,
-                isDefault: c.isDefault || false,
+              create: dto.cuts.map((c, idx) => ({
+                name: c.name.trim(),
+                priceModifier: Number(c.priceModifier) || 0.0,
+                isDefault: hasDefaultCut ? Boolean(c.isDefault) : idx === 0,
               })),
             }
           : undefined,
@@ -205,6 +206,28 @@ export class CatalogService {
     if (dto.isBestSeller !== undefined) updateData.isBestSeller = dto.isBestSeller;
     if (dto.isTodaysOffer !== undefined) updateData.isTodaysOffer = dto.isTodaysOffer;
     if (dto.originalPrice !== undefined) updateData.originalPrice = dto.originalPrice;
+
+    if (dto.cuts !== undefined) {
+      // Disconnect order items referencing old cuts to preserve referential integrity
+      await this.prisma.orderItem.updateMany({
+        where: { cutOption: { productId: id } },
+        data: { cutOptionId: null },
+      });
+      await this.prisma.productCutOption.deleteMany({
+        where: { productId: id },
+      });
+      if (dto.cuts.length > 0) {
+        const hasDefaultCut = dto.cuts.some((c) => c.isDefault);
+        await this.prisma.productCutOption.createMany({
+          data: dto.cuts.map((c, idx) => ({
+            productId: id,
+            name: c.name.trim(),
+            priceModifier: Number(c.priceModifier) || 0.0,
+            isDefault: hasDefaultCut ? Boolean(c.isDefault) : idx === 0,
+          })),
+        });
+      }
+    }
 
     const updated = await this.prisma.product.update({
       where: { id },

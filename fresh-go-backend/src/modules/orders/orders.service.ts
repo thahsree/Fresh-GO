@@ -173,7 +173,7 @@ export class OrdersService {
         cuttingCharge: cut?.priceModifier || 0,
         quantity: item.quantity,
         cutOptionId: cut?.id || null,
-        cutName: item.cutName || cut?.name || "Standard Cut",
+        cutName: item.cutName || cut?.name || (product.cuts.length > 0 ? "Standard Cut" : null),
         grossWeightGrams: grossGrams,
         expectedNetWeightGrams: netGrams,
       };

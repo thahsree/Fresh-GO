@@ -416,9 +416,18 @@ export default function App() {
   ) => {
     const matched = products.find((p) => p.id === productId || p.slug === productId);
     const key = matched ? matched.id : productId;
+    const hasCuts = Boolean(matched?.cuts && matched.cuts.length > 0);
 
-    if (selectedCut) {
+    if (selectedCut && hasCuts) {
       setCartCuts((prev) => ({ ...prev, [key]: selectedCut }));
+    } else if (!hasCuts) {
+      setCartCuts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        if (matched?.slug) delete next[matched.slug];
+        if (matched?.id) delete next[matched.id];
+        return next;
+      });
     }
 
     // Check available stock

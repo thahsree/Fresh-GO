@@ -179,6 +179,12 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   tag?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateCutOptionDto)
+  cuts?: CreateCutOptionDto[];
 }
 
 export class CreateFeaturedSectionDto {
