@@ -1,10 +1,6 @@
 "use client";
 
 export function getAdminApiBase(): string {
-  if (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_API_URL) {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
-    if (envUrl.length > 0) return envUrl;
-  }
   if (typeof window !== "undefined" && window.location) {
     const host = window.location.hostname;
     if (host === "localhost" || host === "127.0.0.1") {
@@ -13,6 +9,10 @@ export function getAdminApiBase(): string {
     if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
       return `http://${host}:4000/api/v1`;
     }
+  }
+  if (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_API_URL) {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    if (envUrl.length > 0) return envUrl;
   }
   return "https://fresh-go.duckdns.org/api/v1";
 }
@@ -74,6 +74,12 @@ export type BackendProduct = {
     priceModifier?: number;
     isDefault?: boolean;
   }>;
+  unitOptions?: Array<{
+    name: string;
+    price: number;
+    isDefault?: boolean;
+  }>;
+  grossWeightDescription?: string | null;
 };
 
 export type FeaturedSectionItem = {
@@ -408,7 +414,8 @@ class ApiClient {
     options: RequestInit = {},
     requireAuth = true
   ): Promise<T> {
-    const url = `${API_BASE}${endpoint}`;
+    const baseUrl = getAdminApiBase();
+    const url = `${baseUrl}${endpoint}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(options.headers as Record<string, string>),
@@ -421,7 +428,18 @@ class ApiClient {
       }
     }
 
-    const res = await fetch(url, { ...options, headers });
+    let res: Response;
+    try {
+      res = await fetch(url, { ...options, headers });
+    } catch (networkErr: any) {
+      const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
+      const errorMsg = isLocal
+        ? `Cannot connect to local backend at ${url}. Please ensure your backend is running on port 4000 ("npm run start:dev").`
+        : `Cannot connect to backend server at ${url}. Server might be unreachable or blocking cross-origin requests.`;
+      console.error(`[Admin API] Network error:`, networkErr?.message || networkErr);
+      throw new Error(errorMsg);
+    }
+
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok) {
@@ -522,6 +540,7 @@ class ApiClient {
       storageTemp?: string;
       shelfLifeDays?: number;
       cuts?: Array<{ name: string; priceModifier?: number; isDefault?: boolean }>;
+      unitOptions?: Array<{ name: string; price: number; isDefault?: boolean }>;
     }) => this.post<BackendProduct>("/catalog/products", data, true),
     updateProduct: (
       id: string,
@@ -543,6 +562,7 @@ class ApiClient {
         isFlashFrozen?: boolean;
         tag?: string;
         cuts?: Array<{ name: string; priceModifier?: number; isDefault?: boolean }>;
+        unitOptions?: Array<{ name: string; price: number; isDefault?: boolean }>;
       }
     ) => this.put<BackendProduct>(`/catalog/products/${id}`, data, true),
     deleteProduct: (id: string) =>

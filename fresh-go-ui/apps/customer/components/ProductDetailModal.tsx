@@ -19,7 +19,7 @@ import {
   Text,
   View,
 } from "react-native";
-import type { Product } from "../models/catalog";
+import type { Product, ProductUnit } from "../models/catalog";
 
 type ProductDetailModalProps = {
   product: Product | null;
@@ -27,7 +27,12 @@ type ProductDetailModalProps = {
   isFavorite: boolean;
   products?: Product[];
   onClose: () => void;
-  onAddToCart: (productId: string, quantity: number, selectedCut?: string) => void;
+  onAddToCart: (
+    productId: string,
+    quantity: number,
+    selectedCut?: string,
+    selectedUnit?: ProductUnit
+  ) => void;
   onToggleFavorite: (productId: string) => void;
   onSelectProduct?: (product: Product) => void;
 };
@@ -48,10 +53,16 @@ export function ProductDetailModal({
   const [selectedCut, setSelectedCut] = useState<string | undefined>(
     product.cuts?.[0]
   );
+  const [selectedUnit, setSelectedUnit] = useState<ProductUnit | undefined>(
+    product.unitOptions?.find((u) => u.isDefault) || product.unitOptions?.[0]
+  );
   const [justAdded, setJustAdded] = useState(false);
 
   useEffect(() => {
     setSelectedCut(product?.cuts?.[0]);
+    setSelectedUnit(
+      product?.unitOptions?.find((u) => u.isDefault) || product?.unitOptions?.[0]
+    );
     setQuantity(1);
   }, [product?.id]);
 
@@ -78,19 +89,25 @@ export function ProductDetailModal({
     product.availableStockKg > 0 &&
     product.availableStockKg <= 5;
 
+  const currentUnitPrice = selectedUnit ? selectedUnit.price : product.price;
+  const currentUnitLabel = selectedUnit ? `/${selectedUnit.name}` : product.unit;
+  const totalPrice = currentUnitPrice * quantity;
+
   const handleAdd = () => {
     if (isOutOfStock || quantity > maxStock) return;
     const cutToPass =
       product.cuts && product.cuts.length > 0 ? selectedCut : undefined;
-    onAddToCart(product.id, quantity, cutToPass);
+    const unitToPass =
+      product.unitOptions && product.unitOptions.length > 0
+        ? selectedUnit
+        : undefined;
+    onAddToCart(product.id, quantity, cutToPass, unitToPass);
     setJustAdded(true);
     setTimeout(() => {
       setJustAdded(false);
       onClose();
     }, 600);
   };
-
-  const totalPrice = product.price * quantity;
 
   return (
     <Modal
@@ -167,8 +184,8 @@ export function ProductDetailModal({
             <Text style={styles.title}>{product.name}</Text>
             <View style={styles.priceRow}>
               <Text style={styles.price}>
-                Rs {product.price.toLocaleString()}
-                <Text style={styles.unit}> {product.unit}</Text>
+                Rs {currentUnitPrice.toLocaleString()}
+                <Text style={styles.unit}> {currentUnitLabel}</Text>
               </Text>
               {product.netWeight && (
                 <Text style={styles.weightTag}>{product.netWeight}</Text>
@@ -227,6 +244,37 @@ export function ProductDetailModal({
                   <Text style={{ fontSize: 10.5, color: "#D97706" }}>
                     Order now before this fresh batch sells out.
                   </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Unit / Pack Size Selection */}
+            {product.unitOptions && product.unitOptions.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Choose Unit / Pack Size</Text>
+                <View style={styles.cutOptions}>
+                  {product.unitOptions.map((unitOpt) => {
+                    const isSelected = selectedUnit?.name === unitOpt.name;
+                    return (
+                      <Pressable
+                        key={unitOpt.name}
+                        style={[
+                          styles.cutChip,
+                          isSelected && styles.cutChipSelected,
+                        ]}
+                        onPress={() => setSelectedUnit(unitOpt)}
+                      >
+                        <Text
+                          style={[
+                            styles.cutChipText,
+                            isSelected && styles.cutChipTextSelected,
+                          ]}
+                        >
+                          {unitOpt.name} (Rs {unitOpt.price})
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
             )}

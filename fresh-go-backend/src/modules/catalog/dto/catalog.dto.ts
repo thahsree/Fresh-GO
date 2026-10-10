@@ -23,6 +23,20 @@ export class CreateCutOptionDto {
   isDefault?: boolean;
 }
 
+export class CreateUnitOptionDto {
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  price: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
+}
+
 export class CreateProductDto {
   @IsNotEmpty()
   @IsString()
@@ -101,6 +115,12 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => CreateCutOptionDto)
   cuts?: CreateCutOptionDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateUnitOptionDto)
+  unitOptions?: CreateUnitOptionDto[];
 }
 
 export class UpdateProductDto {
@@ -185,6 +205,12 @@ export class UpdateProductDto {
   @ValidateNested({ each: true })
   @Type(() => CreateCutOptionDto)
   cuts?: CreateCutOptionDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateUnitOptionDto)
+  unitOptions?: CreateUnitOptionDto[];
 }
 
 export class CreateFeaturedSectionDto {

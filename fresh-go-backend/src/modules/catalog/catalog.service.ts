@@ -5,12 +5,36 @@ import {
   UpdateProductDto,
   CreateFeaturedSectionDto,
   UpdateFeaturedSectionDto,
+  CreateUnitOptionDto,
 } from "./dto/catalog.dto";
 import { FreshnessStatus, Prisma } from "@prisma/client";
 
 @Injectable()
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private enrichProductWithUnitOptions<T extends { grossWeightDescription?: string | null }>(
+    product: T
+  ): T & { unitOptions?: CreateUnitOptionDto[] } {
+    let unitOptions: CreateUnitOptionDto[] | undefined = undefined;
+    if (product.grossWeightDescription) {
+      try {
+        const parsed = JSON.parse(product.grossWeightDescription);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0].name &&
+          parsed[0].price !== undefined
+        ) {
+          unitOptions = parsed;
+        }
+      } catch {}
+    }
+    return {
+      ...product,
+      unitOptions,
+    };
+  }
 
   async getCategories() {
     return this.prisma.category.findMany({
@@ -66,11 +90,11 @@ export class CatalogService {
         (sum, b) => sum + b.remainingQuantityKg,
         0,
       );
-      return {
+      return this.enrichProductWithUnitOptions({
         ...product,
         availableStockKg: Math.round(totalAvailableKg * 10) / 10,
         isInStock: totalAvailableKg > 0.5,
-      };
+      });
     });
   }
 
@@ -96,7 +120,7 @@ export class CatalogService {
       0,
     );
 
-    return {
+    return this.enrichProductWithUnitOptions({
       ...product,
       latestBatch: latestBatch
         ? {
@@ -108,7 +132,7 @@ export class CatalogService {
         : null,
       availableStockKg: Math.round(totalAvailableKg * 10) / 10,
       isInStock: totalAvailableKg > 0.5,
-    };
+    });
   }
 
   async createProduct(dto: CreateProductDto) {
@@ -118,20 +142,28 @@ export class CatalogService {
       .replace(/(^-|-$)/g, "");
 
     const hasDefaultCut = dto.cuts?.some((c) => c.isDefault);
+    const defaultUnitOption =
+      dto.unitOptions?.find((u) => u.isDefault) || dto.unitOptions?.[0];
+    const basePrice = defaultUnitOption ? Number(defaultUnitOption.price) : dto.basePrice;
+    const unit = defaultUnitOption ? defaultUnitOption.name : dto.unit;
+    const grossWeightDescription = dto.unitOptions?.length
+      ? JSON.stringify(dto.unitOptions)
+      : dto.grossWeightDescription;
+
     const created = await this.prisma.product.create({
       data: {
         name: dto.name,
         slug: `${slug}-${Date.now().toString().slice(-4)}`,
         categoryId: dto.categoryId,
-        basePrice: dto.basePrice,
-        unit: dto.unit,
+        basePrice,
+        unit,
         description:
           dto.description && dto.description.trim().length > 0
             ? dto.description
             : `${dto.name} - freshly sourced and hygienically packed.`,
         origin: dto.origin || "Local Sourcing",
         storageTip: dto.storageTip || "Store in cold temperature. Consume fresh.",
-        grossWeightDescription: dto.grossWeightDescription,
+        grossWeightDescription,
         netWeightDescription: dto.netWeightDescription,
         image:
           dto.image && dto.image.trim().length > 0
@@ -176,11 +208,11 @@ export class CatalogService {
       });
     }
 
-    return {
+    return this.enrichProductWithUnitOptions({
       ...created,
       availableStockKg: stockKg,
       isInStock: stockKg > 0.5,
-    };
+    });
   }
 
   async updateProduct(id: string, dto: UpdateProductDto) {
@@ -229,6 +261,21 @@ export class CatalogService {
       }
     }
 
+    if (dto.unitOptions !== undefined) {
+      if (dto.unitOptions.length > 0) {
+        updateData.grossWeightDescription = JSON.stringify(dto.unitOptions);
+        const defaultUnitOption =
+          dto.unitOptions.find((u) => u.isDefault) || dto.unitOptions[0];
+        if (defaultUnitOption) {
+          if (dto.basePrice === undefined)
+            updateData.basePrice = Number(defaultUnitOption.price);
+          if (dto.unit === undefined) updateData.unit = defaultUnitOption.name;
+        }
+      } else {
+        updateData.grossWeightDescription = null;
+      }
+    }
+
     const updated = await this.prisma.product.update({
       where: { id },
       data: updateData,
@@ -266,11 +313,11 @@ export class CatalogService {
       }
     }
 
-    return {
+    return this.enrichProductWithUnitOptions({
       ...updated,
       availableStockKg: stockVal !== undefined ? Number(stockVal) : 0,
       isInStock: (stockVal ?? 0) > 0.5,
-    };
+    });
   }
 
   async deleteProduct(id: string) {
@@ -364,11 +411,14 @@ export class CatalogService {
           (sum, b) => sum + b.remainingQuantityKg,
           0
         );
-        productMap.set(p.id, {
-          ...p,
-          availableStockKg: Math.round(totalStock * 10) / 10,
-          isInStock: totalStock > 0.5,
-        });
+        productMap.set(
+          p.id,
+          this.enrichProductWithUnitOptions({
+            ...p,
+            availableStockKg: Math.round(totalStock * 10) / 10,
+            isInStock: totalStock > 0.5,
+          })
+        );
       });
     }
 

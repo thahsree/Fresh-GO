@@ -54,7 +54,7 @@ import {
   requestNotificationPermission,
   registerPushTokenWithBackend,
 } from "./lib/notifications";
-import { type Category, type Product, categories as defaultCategories } from "./models/catalog";
+import { type Category, type Product, type ProductUnit, categories as defaultCategories } from "./models/catalog";
 
 export default function App() {
   // Navigation: "Home" | "Cart" | "Orders" | "Profile"
@@ -68,6 +68,7 @@ export default function App() {
   // Cart State: { [productId]: quantity }
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
   const [cartCuts, setCartCuts] = useState<{ [productId: string]: string }>({});
+  const [cartUnits, setCartUnits] = useState<{ [productId: string]: ProductUnit }>({});
 
   // Favorites
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -413,15 +414,29 @@ export default function App() {
     productId: string,
     quantity: number = 1,
     selectedCut?: string,
+    selectedUnit?: ProductUnit,
   ) => {
     const matched = products.find((p) => p.id === productId || p.slug === productId);
     const key = matched ? matched.id : productId;
     const hasCuts = Boolean(matched?.cuts && matched.cuts.length > 0);
+    const hasUnits = Boolean(matched?.unitOptions && matched.unitOptions.length > 0);
 
     if (selectedCut && hasCuts) {
       setCartCuts((prev) => ({ ...prev, [key]: selectedCut }));
     } else if (!hasCuts) {
       setCartCuts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        if (matched?.slug) delete next[matched.slug];
+        if (matched?.id) delete next[matched.id];
+        return next;
+      });
+    }
+
+    if (selectedUnit && hasUnits) {
+      setCartUnits((prev) => ({ ...prev, [key]: selectedUnit }));
+    } else if (!hasUnits) {
+      setCartUnits((prev) => {
         const next = { ...prev };
         delete next[key];
         if (matched?.slug) delete next[matched.slug];
@@ -485,6 +500,13 @@ export default function App() {
           if (matched?.id) delete nextCuts[matched.id];
           return nextCuts;
         });
+        setCartUnits((units) => {
+          const nextUnits = { ...units };
+          delete nextUnits[productId];
+          if (matched?.slug) delete nextUnits[matched.slug];
+          if (matched?.id) delete nextUnits[matched.id];
+          return nextUnits;
+        });
       } else {
         const available = matched?.availableStockKg;
         const cappedQty =
@@ -516,6 +538,14 @@ export default function App() {
       if (matched?.slug) delete nextCuts[matched.slug];
       if (matched?.id) delete nextCuts[matched.id];
       return nextCuts;
+    });
+    setCartUnits((units) => {
+      const nextUnits = { ...units };
+      const matched = products.find((p) => p.id === productId || p.slug === productId);
+      delete nextUnits[productId];
+      if (matched?.slug) delete nextUnits[matched.slug];
+      if (matched?.id) delete nextUnits[matched.id];
+      return nextUnits;
     });
   };
 
@@ -553,7 +583,13 @@ export default function App() {
 
   // Checkout / Place Order
   const handlePlaceOrder = async (orderDetails: {
-    items: { product: Product; quantity: number; selectedCut?: string }[];
+    items: {
+      product: Product;
+      quantity: number;
+      selectedCut?: string;
+      selectedUnit?: ProductUnit;
+      itemUnitPrice?: number;
+    }[];
     total: number;
     paymentMethod: "cod" | "upi";
     address: string;
@@ -625,6 +661,7 @@ export default function App() {
     setOrders((prev) => [newOrder, ...prev]);
     setCart({}); // clear cart
     setCartCuts({}); // clear cut preparations
+    setCartUnits({}); // clear unit selections
     setActiveNavigation("Orders"); // navigate to orders screen
 
     // 2. Dispatch Order Placed Notification
@@ -648,13 +685,30 @@ export default function App() {
   };
 
   // Reorder
-  const handleReorder = (items: { product: Product; quantity: number }[]) => {
+  const handleReorder = (
+    items: {
+      product: Product;
+      quantity: number;
+      selectedCut?: string;
+      selectedUnit?: any;
+    }[],
+  ) => {
     const nextCart = { ...cart };
+    const nextCuts = { ...cartCuts };
+    const nextUnits = { ...cartUnits };
     for (const item of items) {
       nextCart[item.product.id] =
         (nextCart[item.product.id] ?? 0) + item.quantity;
+      if (item.selectedCut) {
+        nextCuts[item.product.id] = item.selectedCut;
+      }
+      if (item.selectedUnit) {
+        nextUnits[item.product.id] = item.selectedUnit;
+      }
     }
     setCart(nextCart);
+    setCartCuts(nextCuts);
+    setCartUnits(nextUnits);
     setActiveNavigation("Cart");
   };
 
@@ -771,6 +825,7 @@ export default function App() {
                   <CartView
                     cart={cart}
                     cartCuts={cartCuts}
+                    cartUnits={cartUnits}
                     products={products}
                     deliveryLocation={customerAddress}
                     deliveryCoords={customerCoords}

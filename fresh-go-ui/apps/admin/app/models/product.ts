@@ -13,6 +13,12 @@ export type CutOption = {
   isDefault?: boolean;
 };
 
+export type UnitOption = {
+  name: string;
+  price: number;
+  isDefault?: boolean;
+};
+
 export type Product = {
   id: string;
   name: string;
@@ -32,6 +38,7 @@ export type Product = {
   isFlashFrozen?: boolean;
   tag?: ProductTag;
   cuts?: CutOption[];
+  unitOptions?: UnitOption[];
 };
 
 export type ProductInput = Omit<Product, "id">;

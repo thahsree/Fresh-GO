@@ -29,26 +29,53 @@ export function useProductController() {
       }
 
       if (backendProds && backendProds.length > 0) {
-        const mapped: Product[] = backendProds.map((bp: BackendProduct) => ({
-          id: bp.id,
-          name: bp.name,
-          category: bp.category?.name || "Fish",
-          categoryId: bp.categoryId,
-          unit: bp.unit || "kg",
-          price: Number(bp.basePrice),
-          stock: bp.availableStockKg !== undefined ? bp.availableStockKg : 10,
-          active: bp.isActive,
-          image: bp.imageUrl || (bp as any).image || "",
-          description: bp.description || "",
-          origin: bp.origin || "",
-          isBestSeller: Boolean(bp.isBestSeller),
-          isTodaysOffer: Boolean(bp.isTodaysOffer),
-          originalPrice: bp.originalPrice !== null && bp.originalPrice !== undefined ? Number(bp.originalPrice) : undefined,
-          isDailyCatch: Boolean(bp.isDailyCatch),
-          isFlashFrozen: Boolean(bp.isFlashFrozen),
-          tag: bp.tag || (bp.isDailyCatch ? "Fresh Catch" : bp.isFlashFrozen ? "Frozen" : "Fresh"),
-          cuts: bp.cuts || [],
-        }));
+        const mapped: Product[] = backendProds.map((bp: BackendProduct) => {
+          let unitOptions = bp.unitOptions;
+          if (!unitOptions && bp.grossWeightDescription) {
+            try {
+              const parsed = JSON.parse(bp.grossWeightDescription);
+              if (
+                Array.isArray(parsed) &&
+                parsed.length > 0 &&
+                parsed[0].name &&
+                parsed[0].price !== undefined
+              ) {
+                unitOptions = parsed;
+              }
+            } catch {}
+          }
+
+          return {
+            id: bp.id,
+            name: bp.name,
+            category: bp.category?.name || "Fish",
+            categoryId: bp.categoryId,
+            unit: bp.unit || "kg",
+            price: Number(bp.basePrice),
+            stock: bp.availableStockKg !== undefined ? bp.availableStockKg : 10,
+            active: bp.isActive,
+            image: bp.imageUrl || (bp as any).image || "",
+            description: bp.description || "",
+            origin: bp.origin || "",
+            isBestSeller: Boolean(bp.isBestSeller),
+            isTodaysOffer: Boolean(bp.isTodaysOffer),
+            originalPrice:
+              bp.originalPrice !== null && bp.originalPrice !== undefined
+                ? Number(bp.originalPrice)
+                : undefined,
+            isDailyCatch: Boolean(bp.isDailyCatch),
+            isFlashFrozen: Boolean(bp.isFlashFrozen),
+            tag:
+              bp.tag ||
+              (bp.isDailyCatch
+                ? "Fresh Catch"
+                : bp.isFlashFrozen
+                ? "Frozen"
+                : "Fresh"),
+            cuts: bp.cuts || [],
+            unitOptions: unitOptions || [],
+          };
+        });
         setProducts(mapped);
         setIsBackendConnected(true);
         if (typeof window !== "undefined") {
@@ -139,6 +166,13 @@ export function useProductController() {
             isDefault: c.isDefault,
           }))
         : [],
+      unitOptions: input.unitOptions && input.unitOptions.length > 0
+        ? input.unitOptions.map((u) => ({
+            name: u.name,
+            price: Number(u.price),
+            isDefault: Boolean(u.isDefault),
+          }))
+        : [],
     });
 
     await fetchBackendData();
@@ -178,6 +212,13 @@ export function useProductController() {
                 name: c.name,
                 priceModifier: c.priceModifier,
                 isDefault: c.isDefault,
+              }))
+            : undefined,
+          unitOptions: input.unitOptions !== undefined
+            ? input.unitOptions.map((u) => ({
+                name: u.name,
+                price: Number(u.price),
+                isDefault: Boolean(u.isDefault),
               }))
             : undefined,
         });

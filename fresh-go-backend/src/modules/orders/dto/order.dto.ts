@@ -24,6 +24,14 @@ export class OrderItemDto {
   @IsString()
   cutName?: string;
 
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  unitPrice?: number;
+
   @IsNotEmpty()
   @IsNumber()
   @Min(1)

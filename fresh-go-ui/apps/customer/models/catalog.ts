@@ -14,6 +14,12 @@ export type ProductCut = {
   isDefault?: boolean;
 };
 
+export type ProductUnit = {
+  name: string;
+  price: number;
+  isDefault?: boolean;
+};
+
 export type Product = {
   id: string;
   slug?: string;
@@ -33,6 +39,7 @@ export type Product = {
   grossWeight?: string;
   cuts?: string[];
   cutOptions?: ProductCut[];
+  unitOptions?: ProductUnit[];
   storageTip?: string;
   rating?: number;
   reviewsCount?: number;

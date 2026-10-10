@@ -26,7 +26,13 @@ export type CustomerOrder = {
   id: string;
   date: string;
   status: "placed" | "preparing" | "out_for_delivery" | "delivered";
-  items: { product: Product; quantity: number; selectedCut?: string }[];
+  items: {
+    product: Product;
+    quantity: number;
+    selectedCut?: string;
+    selectedUnit?: any;
+    itemUnitPrice?: number;
+  }[];
   total: number;
   paymentMethod: "cod" | "upi";
   deliveryAddress: string;
@@ -37,7 +43,14 @@ export type CustomerOrder = {
 
 type OrdersViewProps = {
   orders: CustomerOrder[];
-  onReorder: (items: { product: Product; quantity: number }[]) => void;
+  onReorder: (
+    items: {
+      product: Product;
+      quantity: number;
+      selectedCut?: string;
+      selectedUnit?: any;
+    }[],
+  ) => void;
   onExploreProducts: () => void;
   onDeleteOrder?: (orderId: string) => void;
 };
@@ -254,26 +267,46 @@ export function OrdersView({
 
                 {/* Items in Order */}
                 <View style={styles.itemsPreview}>
-                  {order.items.map(({ product, quantity, selectedCut }) => (
-                    <View key={product.id} style={styles.itemRow}>
-                      <Image
-                        source={{ uri: product.image }}
-                        style={styles.itemThumb}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.itemTitle} numberOfLines={1}>
-                          {product.name}
-                        </Text>
-                        <Text style={styles.itemMeta}>
-                          Qty: {quantity} · Rs {product.price} {product.unit}
-                          {selectedCut ? ` · Cut: ${selectedCut}` : ""}
-                        </Text>
-                      </View>
-                      <Text style={styles.itemLineTotal}>
-                        Rs {(product.price * quantity).toLocaleString()}
-                      </Text>
-                    </View>
-                  ))}
+                  {order.items.map(
+                    (
+                      {
+                        product,
+                        quantity,
+                        selectedCut,
+                        selectedUnit,
+                        itemUnitPrice,
+                      },
+                      idx,
+                    ) => {
+                      const pricePerUnit =
+                        itemUnitPrice ??
+                        selectedUnit?.price ??
+                        product.price;
+                      const unitLabel = selectedUnit?.name || product.unit;
+
+                      return (
+                        <View key={`${product.id}-${idx}`} style={styles.itemRow}>
+                          <Image
+                            source={{ uri: product.image }}
+                            style={styles.itemThumb}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.itemTitle} numberOfLines={1}>
+                              {product.name}
+                            </Text>
+                            <Text style={styles.itemMeta}>
+                              Qty: {quantity} · Rs {pricePerUnit}{" "}
+                              {unitLabel ? `/${unitLabel}` : ""}
+                              {selectedCut ? ` · Cut: ${selectedCut}` : ""}
+                            </Text>
+                          </View>
+                          <Text style={styles.itemLineTotal}>
+                            Rs {(pricePerUnit * quantity).toLocaleString()}
+                          </Text>
+                        </View>
+                      );
+                    },
+                  )}
                 </View>
 
                 {/* Card Footer: Total & Actions */}

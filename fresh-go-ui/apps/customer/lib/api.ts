@@ -19,12 +19,25 @@ declare const process: any;
  * 3. Local LAN / Wi-Fi / Emulator: uses Metro's host with port 8081 which proxies /api/ to 4000
  */
 export function getApiBase(): string {
+  const isDev =
+    typeof __DEV__ !== "undefined"
+      ? __DEV__
+      : typeof process !== "undefined" && process?.env?.NODE_ENV !== "production";
+
   // 1. Explicit environment variable (inlined by Expo CLI / Metro bundler)
   if (typeof process !== "undefined") {
     const raw = process?.env?.EXPO_PUBLIC_API_URL || process?.env?.NEXT_PUBLIC_API_URL;
     if (raw) {
       const envUrl = raw.trim().replace(/\/+$/, "");
-      if (envUrl.length > 0) return envUrl;
+      const isDuckDns = envUrl.includes("duckdns.org");
+      // If developing locally, do not force remote DuckDNS
+      if (envUrl.length > 0 && (!isDev || !isDuckDns)) {
+        // If on native mobile device and env is localhost, let LAN candidate resolver map it to host IP
+        const isLocalhost = envUrl.includes("localhost") || envUrl.includes("127.0.0.1");
+        if (Platform.OS === "web" || !isLocalhost) {
+          return envUrl;
+        }
+      }
     }
   }
 
@@ -34,11 +47,14 @@ export function getApiBase(): string {
       const host = window.location.hostname;
       // In local dev with Metro proxy on localhost / 127.0.0.1
       if (host === "localhost" || host === "127.0.0.1") {
-        return `${window.location.origin}/api/v1`;
+        return "http://localhost:4000/api/v1";
+      }
+      if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
+        return `http://${host}:4000/api/v1`;
       }
     }
     // Deployed web app (e.g. Vercel) -> use live production backend
-    return "https://fresh-go.duckdns.org/api/v1";
+    return isDev ? "http://localhost:4000/api/v1" : "https://fresh-go.duckdns.org/api/v1";
   }
 
   // 3. Extract candidate hosts from Expo Constants & React Native SourceCode
@@ -95,8 +111,8 @@ export function getApiBase(): string {
     }
   }
 
-  // 4. Default Production Backend for deployed apps
-  return "https://fresh-go.duckdns.org/api/v1";
+  // 4. Fallback: Localhost / Wi-Fi IP on port 4000 for local dev, DuckDNS for production build
+  return isDev ? "http://10.104.176.61:4000/api/v1" : "https://fresh-go.duckdns.org/api/v1";
 }
 
 export const API_BASE = getApiBase();
@@ -156,6 +172,11 @@ export type BackendProduct = {
   rating?: number;
   reviewsCount?: number;
   cuts?: BackendCut[];
+  unitOptions?: Array<{
+    name: string;
+    price: number;
+    isDefault?: boolean;
+  }>;
   batches?: BackendBatch[];
   availableStockKg?: number;
   isInStock?: boolean;
@@ -717,6 +738,21 @@ class CustomerApiClient {
         }))
       : [];
 
+    let unitOptions = bp.unitOptions && bp.unitOptions.length > 0 ? bp.unitOptions : undefined;
+    if (!unitOptions && bp.grossWeightDescription) {
+      try {
+        const parsed = JSON.parse(bp.grossWeightDescription);
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed[0].name &&
+          parsed[0].price !== undefined
+        ) {
+          unitOptions = parsed;
+        }
+      } catch {}
+    }
+
     const stockText =
       bp.availableStockKg !== undefined && bp.availableStockKg > 0
         ? `${bp.availableStockKg} ${bp.unit} avail.`
@@ -748,6 +784,7 @@ class CustomerApiClient {
       grossWeight: bp.grossWeightDescription || undefined,
       cuts,
       cutOptions,
+      unitOptions,
       storageTip:
         bp.storageTip ||
         (isFrozen
@@ -921,6 +958,12 @@ class CustomerApiClient {
             product: this.transformProduct(item.product),
             quantity: item.quantity,
             selectedCut: item.cutName || (item as any).cutOption?.name,
+            itemUnitPrice:
+              typeof item.unitPrice === "number"
+                ? item.unitPrice
+                : item.unitPrice
+                ? Number(item.unitPrice)
+                : undefined,
           }));
 
           const dateStr = o.placedAt
@@ -1040,10 +1083,16 @@ class CustomerApiClient {
         };
       }
 
-      // Map order items for backend DTO including cut preparations
+      // Map order items for backend DTO including cut preparations & unit preferences
       const orderItems = orderDetails.items.map((item) => ({
         productId: item.product.id,
         quantity: item.quantity,
+        unitName: (item as any).selectedUnit?.name || undefined,
+        unitPrice:
+          (item as any).effectivePrice ||
+          (item as any).selectedUnit?.price ||
+          (item as any).itemUnitPrice ||
+          undefined,
         cutOptionId:
           item.product.cutOptions?.find(
             (c) => c.name?.toLowerCase() === item.selectedCut?.toLowerCase()

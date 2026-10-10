@@ -167,13 +167,45 @@ export class OrdersService {
       const grossGrams = 700; // Standard 1kg whole fish equivalent ~700g net, or live weight
       const netGrams = 500;
 
+      let unitPrice = product.basePrice;
+      if (product.grossWeightDescription) {
+        try {
+          const opts = JSON.parse(product.grossWeightDescription);
+          if (Array.isArray(opts)) {
+            const match = item.unitName
+              ? opts.find(
+                  (u: any) =>
+                    u.name?.toLowerCase() === item.unitName!.toLowerCase()
+                )
+              : null;
+            if (match && typeof match.price === "number") {
+              unitPrice = Number(match.price);
+            }
+          }
+        } catch {}
+      } else if (item.unitPrice && item.unitPrice > 0) {
+        unitPrice = item.unitPrice;
+      }
+
+      const baseCutTitle = item.cutName || cut?.name;
+      let finalCutName: string | null = null;
+      if (baseCutTitle && item.unitName) {
+        finalCutName = `${baseCutTitle} · ${item.unitName}`;
+      } else if (baseCutTitle) {
+        finalCutName = baseCutTitle;
+      } else if (item.unitName) {
+        finalCutName = item.unitName;
+      } else if (product.cuts.length > 0) {
+        finalCutName = "Standard Cut";
+      }
+
       return {
         productId: product.id,
-        unitPrice: product.basePrice,
+        unitPrice,
         cuttingCharge: cut?.priceModifier || 0,
         quantity: item.quantity,
         cutOptionId: cut?.id || null,
-        cutName: item.cutName || cut?.name || (product.cuts.length > 0 ? "Standard Cut" : null),
+        cutName: finalCutName,
         grossWeightGrams: grossGrams,
         expectedNetWeightGrams: netGrams,
       };

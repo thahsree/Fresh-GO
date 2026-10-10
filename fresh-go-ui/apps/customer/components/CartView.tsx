@@ -26,7 +26,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import type { Product } from "../models/catalog";
+import type { Product, ProductUnit } from "../models/catalog";
 import { customerApi, BackendAddress } from "../lib/api";
 import { reverseGeocodeLocation } from "../lib/location";
 import { dispatchOrderNotification } from "../lib/notifications";
@@ -36,11 +36,13 @@ export type CartItem = {
   productId: string;
   quantity: number;
   selectedCut?: string;
+  selectedUnit?: ProductUnit;
 };
 
 type CartViewProps = {
   cart: { [productId: string]: number };
   cartCuts?: { [productId: string]: string };
+  cartUnits?: { [productId: string]: ProductUnit };
   products?: Product[];
   deliveryAddress?: string; // backwards compatibility fallback
   deliveryLocation?: string; // GPS zone / city
@@ -53,7 +55,13 @@ type CartViewProps = {
   onRemoveItem: (productId: string) => void;
   onExploreProducts: () => void;
   onPlaceOrder: (order: {
-    items: { product: Product; quantity: number; selectedCut?: string }[];
+    items: {
+      product: Product;
+      quantity: number;
+      selectedCut?: string;
+      selectedUnit?: ProductUnit;
+      itemUnitPrice?: number;
+    }[];
     total: number;
     paymentMethod: "cod" | "upi";
     address: string;
@@ -75,6 +83,7 @@ type CartViewProps = {
 export function CartView({
   cart,
   cartCuts = {},
+  cartUnits = {},
   products = [],
   deliveryAddress: initialDeliveryAddress,
   deliveryLocation: propDeliveryLocation,
@@ -191,6 +200,9 @@ export function CartView({
     product: Product;
     quantity: number;
     selectedCut?: string;
+    selectedUnit?: ProductUnit;
+    itemUnitPrice: number;
+    itemUnitLabel: string;
   };
 
   const cartEntries = Object.entries(cart).filter(([_, qty]) => qty > 0);
@@ -204,7 +216,29 @@ export function CartView({
           (product?.slug ? cartCuts?.[product.slug] : undefined) ||
           product?.cuts?.[0]
         : undefined;
-      return product ? { product, quantity: qty, selectedCut } : null;
+
+      const hasUnits = Boolean(product?.unitOptions && product.unitOptions.length > 0);
+      const selectedUnit = hasUnits
+        ? cartUnits?.[id] ||
+          (product?.id ? cartUnits?.[product.id] : undefined) ||
+          (product?.slug ? cartUnits?.[product.slug] : undefined) ||
+          product?.unitOptions?.find((u) => u.isDefault) ||
+          product?.unitOptions?.[0]
+        : undefined;
+
+      const itemUnitPrice = selectedUnit ? selectedUnit.price : (product ? product.price : 0);
+      const itemUnitLabel = selectedUnit ? `/${selectedUnit.name}` : (product ? product.unit : "");
+
+      return product
+        ? {
+            product,
+            quantity: qty,
+            selectedCut,
+            selectedUnit,
+            itemUnitPrice,
+            itemUnitLabel,
+          }
+        : null;
     })
     .filter((item): item is CartItemWithProduct => item !== null);
 
@@ -217,7 +251,7 @@ export function CartView({
   const hasStockIssue = stockExceededItems.length > 0;
 
   const itemsTotal = itemsWithProduct.reduce(
-    (sum, { product, quantity }) => sum + product.price * quantity,
+    (sum, item) => sum + item.itemUnitPrice * item.quantity,
     0,
   );
 
@@ -402,7 +436,7 @@ export function CartView({
 
       {/* 2. Cart Items List */}
       <View style={styles.itemsList}>
-        {itemsWithProduct.map(({ product, quantity, selectedCut }) => (
+        {itemsWithProduct.map(({ product, quantity, selectedCut, selectedUnit, itemUnitPrice, itemUnitLabel }) => (
           <View key={product.id} style={styles.itemCard}>
             <Image
               source={{ uri: product.image }}
@@ -423,14 +457,44 @@ export function CartView({
                 </Pressable>
               </View>
               <Text style={styles.itemPrice}>
-                Rs {product.price.toLocaleString()}
-                <Text style={styles.itemUnit}> {product.unit}</Text>
+                Rs {itemUnitPrice.toLocaleString()}
+                <Text style={styles.itemUnit}> {itemUnitLabel}</Text>
               </Text>
-              {selectedCut && (
-                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary, marginTop: 2 }}>
-                  Cut: {selectedCut}
-                </Text>
-              )}
+              
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
+                {selectedUnit && (
+                  <View
+                    style={{
+                      backgroundColor: "#F0FDFA",
+                      borderWidth: 1,
+                      borderColor: "#99F6E4",
+                      borderRadius: 6,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10.5, fontWeight: "700", color: "#0F766E" }}>
+                      Size: {selectedUnit.name}
+                    </Text>
+                  </View>
+                )}
+                {selectedCut && (
+                  <View
+                    style={{
+                      backgroundColor: "#F0FDF4",
+                      borderWidth: 1,
+                      borderColor: "#BBF7D0",
+                      borderRadius: 6,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10.5, fontWeight: "700", color: "#15803D" }}>
+                      Cut: {selectedCut}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               <View style={styles.itemFooter}>
                 <View style={styles.stepper}>
@@ -471,7 +535,7 @@ export function CartView({
                   </Pressable>
                 </View>
                 <Text style={styles.lineTotal}>
-                  Rs {(product.price * quantity).toLocaleString()}
+                  Rs {(itemUnitPrice * quantity).toLocaleString()}
                 </Text>
               </View>
 
