@@ -80,15 +80,15 @@ export function HelpSupportView({ onBack }: HelpSupportViewProps) {
       : FAQS.filter((faq) => faq.category === activeCategory);
 
   const handleCall = () => {
-    Linking.openURL("tel:18002004567").catch(() => {});
+    Linking.openURL("tel:+918891230778").catch(() => {});
   };
 
   const handleEmail = () => {
-    Linking.openURL("mailto:chthashreef22@gmail.com").catch(() => {});
+    Linking.openURL("mailto:Freshgo263@gmail.com").catch(() => {});
   };
 
   const handleWhatsApp = () => {
-    Linking.openURL("https://wa.me/919876543210").catch(() => {});
+    Linking.openURL("https://wa.me/918891230778").catch(() => {});
   };
 
   return (
@@ -136,8 +136,8 @@ export function HelpSupportView({ onBack }: HelpSupportViewProps) {
               <Phone size={20} color={colors.primary} />
             </View>
             <Text style={styles.contactCardTitle}>Call Us</Text>
-            <Text style={styles.contactCardSub}>Toll-Free 24x7</Text>
-            <Text style={styles.contactAction}>1800-200-4567</Text>
+            <Text style={styles.contactCardSub}>Direct Support</Text>
+            <Text style={styles.contactAction}>+91 8891230778</Text>
           </Pressable>
 
           <Pressable
@@ -151,25 +151,35 @@ export function HelpSupportView({ onBack }: HelpSupportViewProps) {
             <Text style={styles.contactCardTitle}>WhatsApp</Text>
             <Text style={styles.contactCardSub}>Instant Chat</Text>
             <Text style={[styles.contactAction, { color: colors.success }]}>
-              +91 98765 43210
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={styles.contactCard}
-            onPress={handleEmail}
-            accessibilityRole="button"
-          >
-            <View style={[styles.contactIconBg, { backgroundColor: colors.accentTint }]}>
-              <Mail size={20} color={colors.accent} />
-            </View>
-            <Text style={styles.contactCardTitle}>Email</Text>
-            <Text style={styles.contactCardSub}>Reply in 2 hours</Text>
-            <Text style={[styles.contactAction, { color: colors.accent }]}>
-              chthashreef22@gmail.com
+              +91 8891230778
             </Text>
           </Pressable>
         </View>
+
+        {/* Email Full-Width Card (Prevents overflow on mobile screens) */}
+        <Pressable
+          style={styles.emailCard}
+          onPress={handleEmail}
+          accessibilityRole="button"
+        >
+          <View style={[styles.contactIconBg, { backgroundColor: colors.accentTint, marginBottom: 0 }]}>
+            <Mail size={20} color={colors.accent} />
+          </View>
+          <View style={styles.emailContent}>
+            <Text style={styles.contactCardTitle}>Email Support</Text>
+            <Text style={styles.contactCardSub}>Quick Response</Text>
+            <Text
+              style={[styles.contactAction, { color: colors.accent, textAlign: "left", marginTop: 2 }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              Freshgo263@gmail.com
+            </Text>
+          </View>
+          <View style={styles.emailBadge}>
+            <Text style={styles.emailBadgeText}>Write Us</Text>
+          </View>
+        </Pressable>
 
         {/* Freshness Assurance Card */}
         <View style={styles.assuranceCard}>
@@ -251,11 +261,11 @@ export function HelpSupportView({ onBack }: HelpSupportViewProps) {
           <View style={styles.infoRow}>
             <Clock size={16} color={colors.textSoft} />
             <Text style={styles.infoText}>
-              Delivery Operations: Daily 6:00 AM – 10:00 PM
+              Delivery Operations: Daily 8:00 AM – 8:00 PM
             </Text>
           </View>
           <Text style={styles.infoSub}>
-            FreshGo Technologies Pvt. Ltd. · Indira Nagar, Bengaluru
+            FreshGo · Miyappadavu, Kasaragod
           </Text>
         </View>
       </ScrollView>
@@ -333,7 +343,7 @@ const styles = StyleSheet.create({
   contactGrid: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 10,
   },
   contactCard: {
     flex: 1,
@@ -343,6 +353,31 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 12,
     alignItems: "center",
+  },
+  emailCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 20,
+  },
+  emailContent: {
+    flex: 1,
+  },
+  emailBadge: {
+    backgroundColor: colors.accentTint,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  emailBadgeText: {
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: "800",
   },
   contactIconBg: {
     width: 38,

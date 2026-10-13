@@ -103,7 +103,7 @@ export function CartView({
 
   // Delivery Location (Macro GPS Zone)
   const activeLocation =
-    propDeliveryLocation || initialDeliveryAddress || "Select Delivery Zone";
+    propDeliveryLocation || initialDeliveryAddress || "Choose your location";
 
   // Saved Doorstep Addresses from backend
   const [savedAddresses, setSavedAddresses] = useState<BackendAddress[]>([]);
@@ -161,7 +161,7 @@ export function CartView({
 
   // Keep area and exact local pincode synced when GPS location changes
   useEffect(() => {
-    if (activeLocation && activeLocation !== "Select Delivery Zone") {
+    if (activeLocation && activeLocation !== "Choose your location") {
       setFormArea(activeLocation);
     }
     if (deliveryPincode && deliveryPincode.trim().length === 6) {

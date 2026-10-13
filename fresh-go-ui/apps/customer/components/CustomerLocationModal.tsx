@@ -233,7 +233,7 @@ export function CustomerLocationModal({
     Number.isFinite(currentCoords?.lng) ? currentCoords.lng : 75.7804
   );
   const [pinAddress, setPinAddress] = useState(
-    currentAddress || "Choose your delivery location"
+    currentAddress || "Choose your location"
   );
   const [pinPincode, setPinPincode] = useState<string>("");
   const [zoomLevel, setZoomLevel] = useState(16);
@@ -1209,7 +1209,7 @@ export function CustomerLocationModal({
               <View style={styles.header}>
                 <View style={styles.headerTitleWrap}>
                   <MapPin size={20} color={colors.primary} />
-                  <Text style={styles.headerTitle}>Select Delivery Location</Text>
+                  <Text style={styles.headerTitle}>Choose Your Location</Text>
                 </View>
                 <Pressable
                   style={styles.closeButton}

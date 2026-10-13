@@ -189,9 +189,9 @@ export function PrivacyPolicyModal({
                 <View style={styles.cardBlock}>
                   <Text style={styles.cardBlockTitle}>4. Grievance Redressal</Text>
                   <Text style={styles.cardBlockDesc}>
-                    FreshGo Technologies Pvt. Ltd.{"\n"}
-                    Mavoor Road, Kozhikode, Kerala 673004{"\n"}
-                    Email: chthashreef22@gmail.com · Phone: +91 70255 04042
+                    FreshGo{"\n"}
+                    Miyappadavu, Kasaragod{"\n"}
+                    Email: Freshgo263@gmail.com · Phone: +91 8891230778
                   </Text>
                 </View>
               </View>
@@ -265,7 +265,7 @@ export function PrivacyPolicyModal({
                   <Text style={styles.cardBlockDesc}>
                     If any item delivered is damaged, has broken packaging, or fails to
                     meet your freshness standards, notify us within 2 hours of delivery
-                    via WhatsApp, phone (+91 70255 04042), or Help & Support.
+                    via WhatsApp, phone (+91 8891230778), or Help & Support.
                   </Text>
                 </View>
 

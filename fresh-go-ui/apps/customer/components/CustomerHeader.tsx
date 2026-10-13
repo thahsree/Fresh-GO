@@ -41,7 +41,7 @@ export function CustomerHeader({
 }: CustomerHeaderProps) {
   const [isFocused, setIsFocused] = useState(false);
   const isSelected = Boolean(address && address.trim().length > 0);
-  const displayAddress = isSelected ? address : "Select Delivery Location";
+  const displayAddress = isSelected ? address : "Choose your location";
 
   const suggestions = useMemo(() => {
     const q = searchValue.toLowerCase().trim();

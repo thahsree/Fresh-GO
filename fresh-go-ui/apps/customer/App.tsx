@@ -104,14 +104,14 @@ export default function App() {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
 
   // Address & Geo-Fencing (10km Radius rule)
-  const storedLoc = getStoredLocation();
-  const [customerAddress, setCustomerAddress] = useState(storedLoc?.address || "");
+  const [customerAddress, setCustomerAddress] = useState<string>("");
   const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number }>({
-    lat: storedLoc?.lat || 11.2588,
-    lng: storedLoc?.lng || 75.7804,
+    lat: 11.2588,
+    lng: 75.7804,
   });
   const [customerPincode, setCustomerPincode] = useState<string>("");
   const [serviceability, setServiceability] = useState<ServiceabilityResult | null>(null);
+  const [hasChosenLocation, setHasChosenLocation] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const checkLocationServiceability = async (lat: number, lng: number) => {
@@ -166,27 +166,7 @@ export default function App() {
       }
       setConnectionError(null);
 
-      // 2. Proactively get real device location first before checking serviceability
-      let activeCoords = { lat: customerCoords.lat, lng: customerCoords.lng };
-      try {
-        const detected = await acquireAccurateLocation({ forcePrompt: false });
-        if (detected && Number.isFinite(detected.lat) && Number.isFinite(detected.lng)) {
-          activeCoords = { lat: detected.lat, lng: detected.lng };
-          setCustomerCoords(activeCoords);
-
-          const geo = await reverseGeocodeLocation(detected.lat, detected.lng);
-          const resolvedAddress = geo.address || `${geo.area}, ${geo.city}`;
-          setCustomerAddress(resolvedAddress);
-          saveStoredLocation(detected, resolvedAddress);
-        }
-      } catch (locErr) {
-        console.warn("Initial location detection error:", locErr);
-      }
-
-      // Check serviceability for the real detected coordinates
-      await checkLocationServiceability(activeCoords.lat, activeCoords.lng);
-
-      // 3. Restore customer session if previously authenticated (non-blocking)
+      // 2. Restore customer session if previously authenticated (non-blocking)
       try {
         const authUser = await customerApi.restoreSession();
         if (authUser) {
@@ -778,14 +758,16 @@ export default function App() {
             ) : (
               <>
                 {activeNavigation === "Home" &&
-                  (serviceability && !serviceability.serviceable ? (
+                  (hasChosenLocation && serviceability && !serviceability.serviceable ? (
                     <ComingSoonView
                       serviceability={serviceability}
                       customerCoordinates={customerCoords}
+                      customerAddress={customerAddress}
                       onSwitchToDemoLocation={() => {
                         const inZone = { lat: 11.2588, lng: 75.7804 };
                         setCustomerCoords(inZone);
                         setCustomerAddress("Mavoor Road, Kozhikode");
+                        setHasChosenLocation(true);
                         checkLocationServiceability(inZone.lat, inZone.lng);
                       }}
                       onRefreshLocation={() => {
@@ -886,6 +868,7 @@ export default function App() {
                         setCustomerAddress(`${addr.street}, ${addr.area}`);
                         if (addr.latitude && addr.longitude) {
                           setCustomerCoords({ lat: addr.latitude, lng: addr.longitude });
+                          setHasChosenLocation(true);
                           checkLocationServiceability(addr.latitude, addr.longitude);
                         }
                       }}
@@ -959,6 +942,7 @@ export default function App() {
             setCustomerCoords(coords);
             setCustomerAddress(address);
             if (pincode) setCustomerPincode(pincode);
+            setHasChosenLocation(true);
             checkLocationServiceability(coords.lat, coords.lng);
           }}
         />
