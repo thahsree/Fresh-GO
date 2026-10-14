@@ -197,7 +197,7 @@ export default function App() {
   useEffect(() => {
     requestNotificationPermission()
       .then(() => registerPushTokenWithBackend())
-      .catch(() => {});
+      .catch(() => { });
     syncWithBackend();
   }, []);
 
@@ -736,146 +736,146 @@ export default function App() {
           <View style={styles.viewContainer}>
             <ErrorBoundary onReset={() => setActiveNavigation("Home")}>
               {isListingOpen ? (
-              <ProductListingView
-                initialCategory={listingCategory}
-                initialSearch={listingSearch}
-                initialNeed={listingNeed}
-                initialSectionId={listingSectionId}
-                initialSectionTitle={listingSectionTitle}
-                favorites={favorites}
-                categories={categoriesList}
-                products={products}
-                onBack={() => {
-                  setIsListingOpen(false);
-                  setListingNeed(null);
-                  setListingSectionId(null);
-                  setListingSectionTitle(null);
-                }}
-                onSelectProduct={handleOpenProduct}
-                onAddProduct={(id) => handleAddToCart(id, 1)}
-                onToggleFavorite={toggleFavorite}
-              />
-            ) : (
-              <>
-                {activeNavigation === "Home" &&
-                  (hasChosenLocation && serviceability && !serviceability.serviceable ? (
-                    <ComingSoonView
-                      serviceability={serviceability}
-                      customerCoordinates={customerCoords}
-                      customerAddress={customerAddress}
-                      onSwitchToDemoLocation={() => {
-                        const inZone = { lat: 11.2588, lng: 75.7804 };
-                        setCustomerCoords(inZone);
-                        setCustomerAddress("Mavoor Road, Kozhikode");
-                        setHasChosenLocation(true);
-                        checkLocationServiceability(inZone.lat, inZone.lng);
-                      }}
-                      onRefreshLocation={() => {
-                        checkLocationServiceability(
-                          customerCoords.lat,
-                          customerCoords.lng
-                        );
-                      }}
-                      onOpenLocationPicker={() => setIsLocationModalOpen(true)}
-                    />
-                  ) : (
-                    <HomeView
-                      searchValue={searchValue}
-                      selectedCategory={selectedCategory}
-                      favorites={favorites}
-                      categories={categoriesList}
-                      products={products}
-                      address={
-                        customerAddress
-                          ? serviceability?.hub?.name
-                            ? `${customerAddress} (${serviceability.hub.name.split("(")[0].trim()})`
-                            : customerAddress
-                          : ""
-                      }
-                      onSearchChange={setSearchValue}
-                      onSelectCategory={setSelectedCategory}
-                      onAddProduct={(id) => handleAddToCart(id, 1)}
-                      onToggleFavorite={toggleFavorite}
-                      onSelectProduct={handleOpenProduct}
-                      onNavigateToListing={handleNavigateToListing}
-                      onPressProfile={() => setActiveNavigation("Profile")}
-                      onPressLocation={() => setIsLocationModalOpen(true)}
-                    />
-                  ))}
-
-                {activeNavigation === "Cart" && (
-                  <CartView
-                    cart={cart}
-                    cartCuts={cartCuts}
-                    cartUnits={cartUnits}
-                    products={products}
-                    deliveryLocation={customerAddress}
-                    deliveryCoords={customerCoords}
-                    deliveryPincode={customerPincode}
-                    onOpenLocationPicker={() => setIsLocationModalOpen(true)}
-                    isLoggedIn={user.isLoggedIn}
-                    onOpenAuth={() => setIsAuthModalOpen(true)}
-                    onUpdateQuantity={handleUpdateQuantity}
-                    onRemoveItem={handleRemoveFromCart}
-                    onExploreProducts={() => {
-                      setIsListingOpen(false);
-                      setActiveNavigation("Home");
-                    }}
-                    onPlaceOrder={handlePlaceOrder}
-                  />
-                )}
-
-                {activeNavigation === "Orders" && (
-                  <OrdersView
-                    orders={orders}
-                    onReorder={handleReorder}
-                    onExploreProducts={() => {
-                      setIsListingOpen(false);
-                      setActiveNavigation("Home");
-                    }}
-                    onDeleteOrder={async (orderId) => {
-                      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-                      await customerApi.deleteOrder(orderId);
-                    }}
-                  />
-                )}
-
-                {activeNavigation === "Profile" &&
-                  (isHelpOpen ? (
-                    <HelpSupportView onBack={() => setIsHelpOpen(false)} />
-                  ) : (
-                    <ProfileView
-                      user={user}
-                      onOpenAuth={() => setIsAuthModalOpen(true)}
-                      onLogout={() => {
-                        customerApi.clearSession();
-                        setUser({
-                          name: "Guest",
-                          phone: "",
-                          isLoggedIn: false,
-                        });
-                        setOrders([]);
-                      }}
-                      onNavigateToOrders={() => {
-                        setIsListingOpen(false);
-                        setActiveNavigation("Orders");
-                      }}
-                      onOpenHelp={() => setIsHelpOpen(true)}
-                      currentAddress={customerAddress}
-                      currentCoords={customerCoords}
-                      currentPincode={customerPincode}
-                      onSelectDeliveryAddress={(addr) => {
-                        setCustomerAddress(`${addr.street}, ${addr.area}`);
-                        if (addr.latitude && addr.longitude) {
-                          setCustomerCoords({ lat: addr.latitude, lng: addr.longitude });
+                <ProductListingView
+                  initialCategory={listingCategory}
+                  initialSearch={listingSearch}
+                  initialNeed={listingNeed}
+                  initialSectionId={listingSectionId}
+                  initialSectionTitle={listingSectionTitle}
+                  favorites={favorites}
+                  categories={categoriesList}
+                  products={products}
+                  onBack={() => {
+                    setIsListingOpen(false);
+                    setListingNeed(null);
+                    setListingSectionId(null);
+                    setListingSectionTitle(null);
+                  }}
+                  onSelectProduct={handleOpenProduct}
+                  onAddProduct={(id) => handleAddToCart(id, 1)}
+                  onToggleFavorite={toggleFavorite}
+                />
+              ) : (
+                <>
+                  {activeNavigation === "Home" &&
+                    (hasChosenLocation && serviceability && !serviceability.serviceable ? (
+                      <ComingSoonView
+                        serviceability={serviceability}
+                        customerCoordinates={customerCoords}
+                        customerAddress={customerAddress}
+                        onSwitchToDemoLocation={() => {
+                          const inZone = { lat: 11.2588, lng: 75.7804 };
+                          setCustomerCoords(inZone);
+                          setCustomerAddress("Mavoor Road, Kozhikode");
                           setHasChosenLocation(true);
-                          checkLocationServiceability(addr.latitude, addr.longitude);
+                          checkLocationServiceability(inZone.lat, inZone.lng);
+                        }}
+                        onRefreshLocation={() => {
+                          checkLocationServiceability(
+                            customerCoords.lat,
+                            customerCoords.lng
+                          );
+                        }}
+                        onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+                      />
+                    ) : (
+                      <HomeView
+                        searchValue={searchValue}
+                        selectedCategory={selectedCategory}
+                        favorites={favorites}
+                        categories={categoriesList}
+                        products={products}
+                        address={
+                          customerAddress
+                            ? serviceability?.hub?.name
+                              ? `${customerAddress} (${serviceability.hub.name.split("(")[0].trim()})`
+                              : customerAddress
+                            : ""
                         }
+                        onSearchChange={setSearchValue}
+                        onSelectCategory={setSelectedCategory}
+                        onAddProduct={(id) => handleAddToCart(id, 1)}
+                        onToggleFavorite={toggleFavorite}
+                        onSelectProduct={handleOpenProduct}
+                        onNavigateToListing={handleNavigateToListing}
+                        onPressProfile={() => setActiveNavigation("Profile")}
+                        onPressLocation={() => setIsLocationModalOpen(true)}
+                      />
+                    ))}
+
+                  {activeNavigation === "Cart" && (
+                    <CartView
+                      cart={cart}
+                      cartCuts={cartCuts}
+                      cartUnits={cartUnits}
+                      products={products}
+                      deliveryLocation={customerAddress}
+                      deliveryCoords={customerCoords}
+                      deliveryPincode={customerPincode}
+                      onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+                      isLoggedIn={user.isLoggedIn}
+                      onOpenAuth={() => setIsAuthModalOpen(true)}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onRemoveItem={handleRemoveFromCart}
+                      onExploreProducts={() => {
+                        setIsListingOpen(false);
+                        setActiveNavigation("Home");
+                      }}
+                      onPlaceOrder={handlePlaceOrder}
+                    />
+                  )}
+
+                  {activeNavigation === "Orders" && (
+                    <OrdersView
+                      orders={orders}
+                      onReorder={handleReorder}
+                      onExploreProducts={() => {
+                        setIsListingOpen(false);
+                        setActiveNavigation("Home");
+                      }}
+                      onDeleteOrder={async (orderId) => {
+                        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+                        await customerApi.deleteOrder(orderId);
                       }}
                     />
-                  ))}
-              </>
-            )}
+                  )}
+
+                  {activeNavigation === "Profile" &&
+                    (isHelpOpen ? (
+                      <HelpSupportView onBack={() => setIsHelpOpen(false)} />
+                    ) : (
+                      <ProfileView
+                        user={user}
+                        onOpenAuth={() => setIsAuthModalOpen(true)}
+                        onLogout={() => {
+                          customerApi.clearSession();
+                          setUser({
+                            name: "Guest",
+                            phone: "",
+                            isLoggedIn: false,
+                          });
+                          setOrders([]);
+                        }}
+                        onNavigateToOrders={() => {
+                          setIsListingOpen(false);
+                          setActiveNavigation("Orders");
+                        }}
+                        onOpenHelp={() => setIsHelpOpen(true)}
+                        currentAddress={customerAddress}
+                        currentCoords={customerCoords}
+                        currentPincode={customerPincode}
+                        onSelectDeliveryAddress={(addr) => {
+                          setCustomerAddress(`${addr.street}, ${addr.area}`);
+                          if (addr.latitude && addr.longitude) {
+                            setCustomerCoords({ lat: addr.latitude, lng: addr.longitude });
+                            setHasChosenLocation(true);
+                            checkLocationServiceability(addr.latitude, addr.longitude);
+                          }
+                        }}
+                      />
+                    ))}
+                </>
+              )}
             </ErrorBoundary>
           </View>
 
@@ -899,7 +899,7 @@ export default function App() {
           isFavorite={
             selectedProduct
               ? favorites.includes(selectedProduct.id) ||
-                Boolean(selectedProduct.slug && favorites.includes(selectedProduct.slug))
+              Boolean(selectedProduct.slug && favorites.includes(selectedProduct.slug))
               : false
           }
           onClose={() => setIsProductModalOpen(false)}
@@ -919,7 +919,7 @@ export default function App() {
               const liveOrders = await customerApi.getMyOrders();
               if (liveOrders) setOrders(liveOrders);
               await customerApi.getAddresses();
-            } catch {}
+            } catch { }
           }}
         />
 
@@ -934,8 +934,8 @@ export default function App() {
             serviceability?.hub?.latitude && serviceability?.hub?.longitude
               ? { lat: serviceability.hub.latitude, lng: serviceability.hub.longitude }
               : serviceability?.nearestHub?.latitude && serviceability?.nearestHub?.longitude
-              ? { lat: serviceability.nearestHub.latitude, lng: serviceability.nearestHub.longitude }
-              : undefined
+                ? { lat: serviceability.nearestHub.latitude, lng: serviceability.nearestHub.longitude }
+                : undefined
           }
           hubs={hubs}
           onLocationConfirm={(coords, address, pincode) => {

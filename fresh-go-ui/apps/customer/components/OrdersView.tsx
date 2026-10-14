@@ -201,7 +201,7 @@ export function OrdersView({
                         style={[
                           styles.timelineCircle,
                           order.status !== "placed" &&
-                            styles.timelineCircleCompleted,
+                          styles.timelineCircleCompleted,
                         ]}
                       >
                         {order.status !== "placed" ? (
@@ -216,7 +216,7 @@ export function OrdersView({
                       style={[
                         styles.timelineLine,
                         order.status === "out_for_delivery" &&
-                          styles.timelineLineActive,
+                        styles.timelineLineActive,
                       ]}
                     />
 
@@ -225,7 +225,7 @@ export function OrdersView({
                         style={[
                           styles.timelineCircle,
                           order.status === "out_for_delivery" &&
-                            styles.timelineCircleCompleted,
+                          styles.timelineCircleCompleted,
                         ]}
                       >
                         <Truck

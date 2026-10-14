@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreshGo - Fresh Fish, Meats & Groceries Delivery</title>
+  <link rel="icon" type="image/png" href="./FreshGologonew.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #F8FAF9;
+      color: #17211E;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 18px;
+      text-align: center;
+    }
+    .container {
+      max-width: 660px;
+      width: 100%;
+      background: #FFFFFF;
+      border: 1px solid #E3ECE7;
+      border-radius: 28px;
+      padding: 40px 28px 32px;
+      box-shadow: 0 12px 36px -10px rgba(10, 92, 74, 0.08), 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+    .brand-logo {
+      width: 190px;
+      height: auto;
+      max-height: 120px;
+      object-fit: contain;
+      margin: 0 auto 16px;
+      display: block;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #EAF5F0;
+      color: #0A5C4A;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      margin-bottom: 20px;
+      border: 1px solid rgba(10, 92, 74, 0.18);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      background: #0A5C4A;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px #0A5C4A;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #0F2E29;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      line-height: 1.25;
+    }
+    p.subtitle {
+      font-size: 1.05rem;
+      color: #5B6864;
+      line-height: 1.55;
+      margin-bottom: 26px;
+    }
+    
+    /* Download Section ON TOP */
+    .download-section {
+      background: linear-gradient(135deg, #0F2E29 0%, #1A4D43 100%);
+      border-radius: 22px;
+      padding: 26px 20px;
+      margin-bottom: 26px;
+      color: #FFFFFF;
+      box-shadow: 0 10px 25px -8px rgba(15, 46, 41, 0.25);
+    }
+    .download-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+    .download-subtitle {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.82);
+      line-height: 1.45;
+      margin-bottom: 18px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .store-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+    .store-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      padding: 10px 18px;
+      text-decoration: none;
+      color: #FFFFFF;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+      min-width: 170px;
+      text-align: left;
+    }
+    .store-btn:hover {
+      background: #111111;
+      border-color: #34A853;
+      transform: translateY(-2px);
+    }
+    .store-icon { flex-shrink: 0; }
+    .btn-text { display: flex; flex-direction: column; }
+    .subtext {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.75);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+      line-height: 1.15;
+    }
+    .maintext {
+      font-size: 1.15rem;
+      color: #FFFFFF;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    /* Feature Highlights */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+    .feature-card {
+      background: #F4F8F6;
+      border: 1px solid #E3ECE7;
+      border-radius: 16px;
+      padding: 18px 14px;
+      text-align: left;
+    }
+    .feature-card h3 {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #0F2E29;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .feature-card p {
+      font-size: 0.82rem;
+      color: #5B6864;
+      line-height: 1.4;
+    }
+
+    /* Footer */
+    .footer {
+      font-size: 0.82rem;
+      color: #71827D;
+      border-top: 1px solid #EBF1EE;
+      padding-top: 20px;
+      line-height: 1.6;
+    }
+    .footer a {
+      color: #0A5C4A;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Mobile Screen Enhancements - Bigger Platform Buttons */
+    @media (max-width: 640px) {
+      body {
+        padding: 20px 14px;
+      }
+      .container {
+        padding: 30px 16px 26px;
+        border-radius: 24px;
+      }
+      .brand-logo {
+        width: 170px;
+        margin-bottom: 12px;
+      }
+      h1 {
+        font-size: 1.65rem;
+      }
+      p.subtitle {
+        font-size: 0.95rem;
+        margin-bottom: 22px;
+      }
+      .download-section {
+        padding: 24px 16px 26px;
+        border-radius: 20px;
+        margin-bottom: 22px;
+      }
+      .download-title {
+        font-size: 1.25rem;
+      }
+      .download-subtitle {
+        font-size: 0.88rem;
+        margin-bottom: 18px;
+      }
+      .store-buttons {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+        max-width: 330px;
+        margin: 0 auto;
+        gap: 14px;
+      }
+      .store-btn {
+        width: 100%;
+        min-width: 0;
+        padding: 15px 22px;
+        border-radius: 16px;
+        gap: 16px;
+        justify-content: center;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      }
+      .store-icon {
+        width: 32px;
+        height: 32px;
+      }
+      .subtext {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+      }
+      .maintext {
+        font-size: 1.28rem;
+        font-weight: 800;
+      }
+      .features {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+    }
+  </style>
+  <script>
+    // Smart redirect if visitor opens marketing link on mobile (?redirect=app or ?download=1)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("redirect") === "app" || params.get("download") === "1" || params.get("scan") === "qr") {
+      const ua = navigator.userAgent || "";
+      if (/android/i.test(ua)) {
+        window.location.href = "https://play.google.com/store/apps/details?id=com.freshgofreshandmeat.app";
+      } else if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
+        window.location.href = "https://apps.apple.com/app/fresh-go/id6470000000";
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <!-- Brand Logo -->
+    <img src="./FreshGologonew.png" alt="FreshGo - Good Food Brighter Tomorrows" class="brand-logo" />
+
+    <div class="badge"><span class="dot"></span> Online & Operational</div>
+    <h1>Fresh Fish, Meats & Groceries</h1>
+    <p class="subtitle">Hyperlocal 15–20 minute delivery for premium fresh meats, poultry, seafood, farm-fresh produce, and daily kitchen essentials.</p>
+
+    <!-- Download Official FreshGo App (ON TOP) -->
+    <div class="download-section">
+      <h2 class="download-title">Download Official FreshGo App</h2>
+      <p class="download-subtitle">Experience live GPS order tracking, daily morning catch alerts, and exclusive app discounts.</p>
+      
+      <div class="store-buttons">
+        <!-- Google Play Store -->
+        <a href="https://play.google.com/store/apps/details?id=com.freshgofreshandmeat.app" target="_blank" rel="noopener" class="store-btn">
+          <svg class="store-icon" viewBox="0 0 24 24" width="28" height="28">
+            <path fill="#4285F4" d="M3.6 1.8l11.4 11.4-3.1 3.1L3.6 1.8z"/>
+            <path fill="#34A853" d="M15 13.2l3.4 3.4-3.4 3.4-3.1-3.1 3.1-3.7z"/>
+            <path fill="#FBBC05" d="M15 13.2L3.6 24.6c.3.1.7.1 1.1-.1l13.7-7.9-3.4-3.4z"/>
+            <path fill="#EA4335" d="M18.4 16.6l-3.4-3.4 3.4-3.4 2.2 1.3c.7.4 1.1 1.2 1.1 2.1s-.4 1.7-1.1 2.1l-2.2 1.3z"/>
+          </svg>
+          <div class="btn-text">
+            <span class="subtext">GET IT ON</span>
+            <span class="maintext">Google Play</span>
+          </div>
+        </a>
+
+        <!-- Apple App Store -->
+        <a href="https://apps.apple.com/app/fresh-go/id6470000000" target="_blank" rel="noopener" class="store-btn">
+          <svg class="store-icon" viewBox="0 0 24 24" width="28" height="28" fill="#ffffff">
+            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.36-.58.67-1.09 1.74-.95 2.77.99.08 2.03-.51 2.68-1.28z"/>
+          </svg>
+          <div class="btn-text">
+            <span class="subtext">Download on the</span>
+            <span class="maintext">App Store</span>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature-card">
+        <h3>⚡ 15–20 Min Delivery</h3>
+        <p>Instant dispatch from cold-chain fulfillment hubs</p>
+      </div>
+      <div class="feature-card">
+        <h3>🐟 100% Fresh Catch</h3>
+        <p>Daily sourced, chemical-free & antibiotic-free</p>
+      </div>
+      <div class="feature-card">
+        <h3>🥩 Customized Cuts</h3>
+        <p>Hygienically cleaned and custom cut to order</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      &copy; 2026 FreshGo. All rights reserved. &bull; Contact: <a href="mailto:support@freshgo.in">support@freshgo.in</a>
+    </div>
+  </div>
+</body>
+</html>

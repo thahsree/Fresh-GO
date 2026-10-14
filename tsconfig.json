@@ -16,9 +16,15 @@
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@common/*": ["fresh-go-backend/src/common/*"],
-      "@modules/*": ["fresh-go-backend/src/modules/*"],
-      "@config/*": ["fresh-go-backend/src/config/*"]
+      "@common/*": [
+        "fresh-go-backend/src/common/*"
+      ],
+      "@modules/*": [
+        "fresh-go-backend/src/modules/*"
+      ],
+      "@config/*": [
+        "fresh-go-backend/src/config/*"
+      ]
     }
   },
   "include": [

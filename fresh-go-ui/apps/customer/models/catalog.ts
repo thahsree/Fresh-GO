@@ -51,6 +51,32 @@ export type Product = {
   tag?: string;
 };
 
+export type UserProfile = {
+  name: string;
+  email?: string;
+  phone: string;
+  isLoggedIn: boolean;
+};
+
+export type CustomerOrder = {
+  id: string;
+  date: string;
+  status: "placed" | "preparing" | "out_for_delivery" | "delivered";
+  items: {
+    product: Product;
+    quantity: number;
+    selectedCut?: string;
+    selectedUnit?: any;
+    itemUnitPrice?: number;
+  }[];
+  total: number;
+  paymentMethod: "cod" | "upi";
+  deliveryAddress: string;
+  riderName?: string;
+  riderPhone?: string;
+  estimatedArrival?: string;
+};
+
 // Clean schema-driven state with standard canonical categories
 export const categories: Category[] = [
   { id: "cat-fish", name: "Fish", slug: "fish", icon: "🐟", tint: "#E4ECE9", sortOrder: 1 },

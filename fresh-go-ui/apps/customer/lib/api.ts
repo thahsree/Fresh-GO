@@ -4,9 +4,11 @@ import { NativeModules, Platform } from "react-native";
 import {
   type Category,
   type Product,
+  type CustomerOrder,
+  type UserProfile,
 } from "../models/catalog";
-import type { CustomerOrder } from "../components/OrdersView";
-import type { UserProfile } from "../components/ProfileView";
+
+export type { CustomerOrder, UserProfile };
 
 declare const process: any;
 

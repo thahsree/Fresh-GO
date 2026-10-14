@@ -249,11 +249,11 @@ export function ProfileView({
           <Text style={styles.avatarText}>
             {user.isLoggedIn
               ? user.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase()
               : "FG"}
           </Text>
         </View>
@@ -315,7 +315,7 @@ export function ProfileView({
 
         <Pressable
           style={styles.quickCard}
-          onPress={() => {}}
+          onPress={() => { }}
           accessibilityRole="button"
         >
           <View style={styles.quickIconBg}>

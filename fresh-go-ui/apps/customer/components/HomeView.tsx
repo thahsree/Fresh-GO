@@ -134,7 +134,7 @@ export function HomeView({
           setFeaturedSections(sections.filter((s: FeaturedSectionAppItem) => s.isActive));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [products]);
 
   useEffect(() => {
