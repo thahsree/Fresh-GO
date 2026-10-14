@@ -14,12 +14,16 @@ const https = require("https");
 
 const CONFIG = {
   // Smart Universal URL: automatically detects Android / iOS / Desktop
-  smartLandingUrl: "https://fresh-go.duckdns.org/?redirect=app",
+  domainUrl: "https://fresh-go.in",
+  smartLandingUrl: "https://fresh-go.in/?redirect=app",
   playStoreUrl:
     "https://play.google.com/store/apps/details?id=com.freshgofreshandmeat.app",
   appStoreUrl: "https://apps.apple.com/app/fresh-go/id6470000000",
-  outputDir: path.resolve(__dirname, "../fresh-go-ui/public/qr-codes"),
-  brandColor: "1F4D46", // FreshGo Dark Emerald
+  outputDirs: [
+    path.resolve(__dirname, "../fresh-go-ui/public/qr-codes"),
+    path.resolve(__dirname, "../freshgo-landing"),
+  ],
+  brandColor: "0F2E29", // FreshGo Dark Emerald
   accentColor: "E5623E", // FreshGo Coral Accent
 };
 
@@ -52,34 +56,50 @@ async function main() {
   console.log("   FreshGo Marketing QR Code Generator");
   console.log("==================================================");
 
-  if (!fs.existsSync(CONFIG.outputDir)) {
-    fs.mkdirSync(CONFIG.outputDir, { recursive: true });
+  for (const dir of CONFIG.outputDirs) {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
 
   const tasks = [
     {
-      name: "1. Smart Universal QR Code (High-Res 1200x1200 PNG)",
-      filename: "freshgo-smart-qr-1200px.png",
-      url: `https://api.qrserver.com/v1/create-qr-code/?size=1200x1200&data=${encodeURIComponent(
+      name: "1. fresh-go.in Website QR (High-Res 1000x1000 PNG)",
+      filename: "fresh-go-in-qr.png",
+      url: `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(
+        CONFIG.domainUrl
+      )}&color=${CONFIG.brandColor}&bgcolor=FFFFFF&margin=2&format=png&ecc=H`,
+    },
+    {
+      name: "2. fresh-go.in Website QR (Vector SVG for Print)",
+      filename: "fresh-go-in-qr.svg",
+      url: `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(
+        CONFIG.domainUrl
+      )}&color=${CONFIG.brandColor}&bgcolor=FFFFFF&margin=2&format=svg&ecc=H`,
+    },
+    {
+      name: "3. fresh-go.in Smart App QR (High-Res 1000x1000 PNG)",
+      filename: "fresh-go-in-smart-qr.png",
+      url: `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(
         CONFIG.smartLandingUrl
       )}&color=${CONFIG.brandColor}&bgcolor=FFFFFF&margin=2&format=png&ecc=H`,
     },
     {
-      name: "2. Smart Universal QR Code (Vector SVG for Print)",
-      filename: "freshgo-smart-qr.svg",
+      name: "4. fresh-go.in Smart App QR (Vector SVG for Print)",
+      filename: "fresh-go-in-smart-qr.svg",
       url: `https://api.qrserver.com/v1/create-qr-code/?size=800x800&data=${encodeURIComponent(
         CONFIG.smartLandingUrl
       )}&color=${CONFIG.brandColor}&bgcolor=FFFFFF&margin=2&format=svg&ecc=H`,
     },
     {
-      name: "3. Direct Google Play Store QR (1000x1000 PNG)",
+      name: "5. Direct Google Play Store QR (1000x1000 PNG)",
       filename: "freshgo-playstore-qr.png",
       url: `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(
         CONFIG.playStoreUrl
       )}&color=0F2E29&bgcolor=FFFFFF&margin=2&format=png&ecc=H`,
     },
     {
-      name: "4. Direct Apple App Store QR (1000x1000 PNG)",
+      name: "6. Direct Apple App Store QR (1000x1000 PNG)",
       filename: "freshgo-appstore-qr.png",
       url: `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(
         CONFIG.appStoreUrl
@@ -87,14 +107,17 @@ async function main() {
     },
   ];
 
-  for (const task of tasks) {
-    const dest = path.join(CONFIG.outputDir, task.filename);
-    try {
-      process.stdout.write(`Generating ${task.name}... `);
-      await downloadFile(task.url, dest);
-      console.log(`[OK] Saved to ${path.relative(process.cwd(), dest)}`);
-    } catch (err) {
-      console.log(`[WARN] (${err.message})`);
+  for (const dir of CONFIG.outputDirs) {
+    console.log(`\nSaving to: ${path.relative(process.cwd(), dir)}/`);
+    for (const task of tasks) {
+      const dest = path.join(dir, task.filename);
+      try {
+        process.stdout.write(`  Generating ${task.name}... `);
+        await downloadFile(task.url, dest);
+        console.log(`[OK] (${fs.statSync(dest).size} bytes)`);
+      } catch (err) {
+        console.log(`[WARN] (${err.message})`);
+      }
     }
   }
 
@@ -107,7 +130,8 @@ async function main() {
   console.log("  - Android devices -> Directly opens Google Play Store");
   console.log("  - iOS devices (iPhone) -> Directly opens Apple App Store");
   console.log("  - PC / Desktop -> Opens FreshGo Web with store badges & QR");
-  console.log(`\nGenerated files located at: ${CONFIG.outputDir}`);
+  console.log(`\nGenerated files saved to:`);
+  CONFIG.outputDirs.forEach(d => console.log(`  - ${path.relative(process.cwd(), d)}/`));
 }
 
 main().catch(console.error);

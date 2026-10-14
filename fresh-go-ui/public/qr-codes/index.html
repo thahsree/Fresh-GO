@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreshGo - QR Code Preview & Downloads</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #F4F6F5;
+      color: #17211E;
+      padding: 40px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+      max-width: 600px;
+    }
+    h1 {
+      font-size: 1.8rem;
+      color: #0F2E29;
+      margin-bottom: 8px;
+    }
+    p {
+      color: #64748B;
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      max-width: 900px;
+      width: 100%;
+    }
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 18px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .card h2 {
+      font-size: 1.15rem;
+      color: #0F2E29;
+      margin-bottom: 4px;
+    }
+    .card .desc {
+      font-size: 0.82rem;
+      color: #64748B;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+    .qr-img {
+      width: 200px;
+      height: 200px;
+      border-radius: 12px;
+      border: 1px solid #EDF2EE;
+      margin-bottom: 20px;
+      background: #FFFFFF;
+    }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+    .btn {
+      flex: 1;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: #0F2E29;
+      color: #FFFFFF;
+    }
+    .btn-primary:hover {
+      background: #1A4D43;
+    }
+    .btn-secondary {
+      background: #F1F5F9;
+      color: #334155;
+    }
+    .btn-secondary:hover {
+      background: #E2E8F0;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      background: #EAF5F0;
+      color: #0A5C4A;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>FreshGo Marketing QR Codes</h1>
+    <p>Scan with your mobile camera to test or download high-resolution files for flyers, standees, boxes, and packaging.</p>
+  </div>
+
+  <div class="grid">
+    <!-- QR 1: Direct Website -->
+    <div class="card">
+      <span class="tag">Direct Website</span>
+      <h2>fresh-go.in</h2>
+      <p class="desc">Opens the clean FreshGo landing page directly on any browser or device.</p>
+      <img src="./fresh-go-in-qr.png" alt="fresh-go.in QR code" class="qr-img">
+      <div class="btn-group">
+        <a href="./fresh-go-in-qr.png" download="fresh-go-in-qr.png" class="btn btn-primary">Download PNG</a>
+        <a href="./fresh-go-in-qr.svg" download="fresh-go-in-qr.svg" class="btn btn-secondary">Vector SVG</a>
+      </div>
+    </div>
+
+    <!-- QR 2: Smart App Redirect -->
+    <div class="card">
+      <span class="tag" style="background:#EBF5FF; color:#1D4ED8;">Smart App Redirect</span>
+      <h2>fresh-go.in/?redirect=app</h2>
+      <p class="desc">Automatically detects visitor device: opens <b>Google Play Store</b> on Android and <b>App Store</b> on iOS.</p>
+      <img src="./fresh-go-in-smart-qr.png" alt="fresh-go.in smart redirect QR code" class="qr-img">
+      <div class="btn-group">
+        <a href="./fresh-go-in-smart-qr.png" download="fresh-go-in-smart-qr.png" class="btn btn-primary">Download PNG</a>
+        <a href="./fresh-go-in-smart-qr.svg" download="fresh-go-in-smart-qr.svg" class="btn btn-secondary">Vector SVG</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
