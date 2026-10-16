@@ -42,8 +42,8 @@ const initialFormData: HubFormData = {
   address: "",
   contactPhone: "",
   deliveryRadiusKm: 10,
-  latitude: 0,
-  longitude: 0,
+  latitude: 12.699821,
+  longitude: 74.947729,
   isActive: true,
 };
 
@@ -814,11 +814,19 @@ export function HubsManagementView({
                   initialLng={formData.longitude}
                   radiusKm={formData.deliveryRadiusKm}
                   onLocationSelect={(newLat, newLng, address) => {
+                    let detectedCity = "";
+                    if (address) {
+                      const parts = address.split(",").map((s) => s.trim());
+                      if (parts.length >= 3) {
+                        detectedCity = parts[parts.length - 4] || parts[parts.length - 3] || "";
+                      }
+                    }
                     setFormData((prev) => ({
                       ...prev,
                       latitude: newLat,
                       longitude: newLng,
                       address: address || prev.address,
+                      city: prev.city || detectedCity || prev.city,
                     }));
                   }}
                   onRadiusChange={(newRadius) => {

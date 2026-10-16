@@ -27,34 +27,68 @@ export class SmsService {
           return false;
         }
         const rawNumber = phone.replace("+91", "").replace("+", "").trim();
-        const route = this.configService.get<string>("sms.fast2smsRoute", "q");
-        const payload: any = {
-          numbers: rawNumber,
-        };
+        const preferredRoute = this.configService.get<string>("sms.fast2smsRoute", "otp");
 
-        if (route === "otp") {
-          payload.route = "otp";
-          payload.variables_values = otp;
-        } else {
-          payload.route = "q";
-          payload.message = `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`;
-          payload.language = "english";
-          payload.flash = 0;
-        }
+        // Prepare primary payload: route "otp" delivers to DND and non-DND via pre-approved template
+        const primaryPayload: any = preferredRoute === "q"
+          ? {
+              route: "q",
+              message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
+              language: "english",
+              flash: 0,
+              numbers: rawNumber,
+            }
+          : {
+              route: "otp",
+              variables_values: otp,
+              numbers: rawNumber,
+            };
 
-        const res = await axios.post(
+        let res = await axios.post(
           "https://www.fast2sms.com/dev/bulkV2",
-          payload,
+          primaryPayload,
           {
             headers: {
               authorization: apiKey,
               "Content-Type": "application/json",
               accept: "application/json",
             },
+            timeout: 8000,
           }
         );
+
         if (res.data?.return === false) {
-          this.logger.error(`❌ [Fast2SMS] Failed for ${rawNumber}: ${JSON.stringify(res.data?.message)}`);
+          this.logger.warn(`Fast2SMS primary route (${primaryPayload.route}) failed: ${JSON.stringify(res.data?.message)}. Trying alternate route...`);
+          const fallbackPayload: any = primaryPayload.route === "otp"
+            ? {
+                route: "q",
+                message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
+                language: "english",
+                flash: 0,
+                numbers: rawNumber,
+              }
+            : {
+                route: "otp",
+                variables_values: otp,
+                numbers: rawNumber,
+              };
+
+          res = await axios.post(
+            "https://www.fast2sms.com/dev/bulkV2",
+            fallbackPayload,
+            {
+              headers: {
+                authorization: apiKey,
+                "Content-Type": "application/json",
+                accept: "application/json",
+              },
+              timeout: 8000,
+            }
+          );
+        }
+
+        if (res.data?.return === false) {
+          this.logger.error(`❌ [Fast2SMS] Both routes failed for ${rawNumber}: ${JSON.stringify(res.data?.message)}`);
           return false;
         }
         this.logger.log(`📲 [Fast2SMS] Sent OTP successfully to ${rawNumber}: ${JSON.stringify(res.data?.message)}`);

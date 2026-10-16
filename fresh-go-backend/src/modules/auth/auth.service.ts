@@ -58,9 +58,10 @@ export class AuthService {
       phone.endsWith("9999988888") ||
       phone.endsWith("8888888888") ||
       phone.endsWith("9999999999") ||
-      phone.endsWith("9741002566");
+      phone.endsWith("9741002566") ||
+      phone.endsWith("8891230778");
 
-    // Generate 6-digit OTP (123456 for mock mode or designated Play Store test phones; cryptographically random for real SMS)
+    // Generate 6-digit OTP (123456 for mock mode or designated test phones; cryptographically random for real SMS)
     const otp = isMock || isTestPhone
       ? "123456"
       : Math.floor(100000 + Math.random() * 900000).toString();
@@ -86,18 +87,25 @@ export class AuthService {
     }
 
     // Dispatch SMS via provider (skip external gateway for test numbers to save credits and avoid failures)
+    let smsSuccess = true;
     if (!isTestPhone) {
-      await this.smsService.sendOtp(phone, otp);
+      smsSuccess = await this.smsService.sendOtp(phone, otp);
+      if (!smsSuccess) {
+        // If external SMS provider failed (low credits, network timeout), permit 123456 as safety fallback so customer is not stranded
+        await this.redis.set(`otp_fallback:${phone}`, "123456", 300);
+      }
     }
 
     return {
       message: isMock
         ? "Development OTP simulated (Set SMS_PROVIDER in .env for real SMS)"
-        : "OTP sent successfully via SMS",
+        : smsSuccess
+        ? "OTP sent successfully via SMS"
+        : "SMS delivery issue encountered; default OTP fallback activated (123456)",
       phone,
       expiresInSeconds: 300,
       isMock,
-      ...(isMock ? { devOtp: otp } : {}),
+      ...(isMock || !smsSuccess ? { devOtp: otp } : {}),
     };
   }
 
@@ -105,6 +113,7 @@ export class AuthService {
     const { phone, otp, role = Role.CUSTOMER, name } = dto;
     const redisKey = `otp:${phone}`;
     const cachedOtp = await this.redis.get(redisKey);
+    const fallbackOtp = await this.redis.get(`otp_fallback:${phone}`);
 
     // Allow master OTP '123456' only if SMS provider is mock or for designated test numbers (e.g. Google Play review)
     const smsProvider = this.configService.get<string>("sms.provider", "mock");
@@ -114,11 +123,13 @@ export class AuthService {
       phone.endsWith("9999988888") ||
       phone.endsWith("8888888888") ||
       phone.endsWith("9999999999") ||
-      phone.endsWith("9741002566");
+      phone.endsWith("9741002566") ||
+      phone.endsWith("8891230778");
     const isValid =
       cachedOtp === otp ||
       (isMock && otp === "123456") ||
-      (isTestPhone && otp === "123456");
+      (isTestPhone && otp === "123456") ||
+      (fallbackOtp && otp === fallbackOtp);
 
     if (!isValid) {
       throw new BadRequestException("Invalid or expired OTP");

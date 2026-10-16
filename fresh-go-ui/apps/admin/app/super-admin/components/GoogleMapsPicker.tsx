@@ -5,12 +5,16 @@ import {
   MapPin,
   Search,
   Navigation,
-  Compass,
-  Layers,
   ZoomIn,
   ZoomOut,
   Info,
+  Loader2,
+  Crosshair,
 } from "lucide-react";
+
+const LOCATIONIQ_KEY = "pk.1714d75230cfe1d776514cf91ec30ae3";
+const DEFAULT_LAT = 12.699821;
+const DEFAULT_LNG = 74.947729;
 
 type GoogleMapsPickerProps = {
   initialLat?: number;
@@ -28,133 +32,173 @@ export function GoogleMapsPicker({
   onRadiusChange,
 }: GoogleMapsPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [lat, setLat] = useState(initialLat || 10.8505);
-  const [lng, setLng] = useState(initialLng || 76.2711);
-  const [radius, setRadius] = useState(radiusKm);
+  const [lat, setLat] = useState(() => (initialLat && initialLat !== 0 ? initialLat : DEFAULT_LAT));
+  const [lng, setLng] = useState(() => (initialLng && initialLng !== 0 ? initialLng : DEFAULT_LNG));
+  const [radius, setRadius] = useState(radiusKm || 10);
   const [addressQuery, setAddressQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(12);
+  const [isLocating, setIsLocating] = useState(false);
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
 
-  const googleMapInstance = useRef<any>(null);
+  const mapInstance = useRef<any>(null);
   const markerInstance = useRef<any>(null);
   const circleInstance = useRef<any>(null);
 
-  // Sync internal state with props if they change
+  // Sync internal coordinates when initial props change
   useEffect(() => {
-    if (initialLat && initialLng) {
+    if (initialLat && initialLng && initialLat !== 0 && initialLng !== 0) {
       setLat(initialLat);
       setLng(initialLng);
+      if (markerInstance.current) {
+        markerInstance.current.setLatLng([initialLat, initialLng]);
+      }
+      if (circleInstance.current) {
+        circleInstance.current.setLatLng([initialLat, initialLng]);
+      }
+      if (mapInstance.current) {
+        mapInstance.current.setView([initialLat, initialLng]);
+      }
     }
   }, [initialLat, initialLng]);
 
   useEffect(() => {
     if (radiusKm) {
       setRadius(radiusKm);
+      if (circleInstance.current) {
+        circleInstance.current.setRadius(radiusKm * 1000);
+      }
     }
   }, [radiusKm]);
 
-  // Attempt to load Google Maps JS API if key exists in env
-  useEffect(() => {
-    const apiKey =
-      process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ||
-      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    if (typeof window === "undefined") return;
-
-    if ((window as any).google?.maps) {
-      setGoogleMapsLoaded(true);
-      return;
-    }
-
-    if (apiKey) {
-      const scriptId = "google-maps-script";
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement("script");
-        script.id = scriptId;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-          setGoogleMapsLoaded(true);
-        };
-        script.onerror = () => {
-          console.warn("Google Maps failed to load, using interactive fallback map.");
-        };
-        document.head.appendChild(script);
-      }
+  // Reverse geocoding helper using LocationIQ
+  const reverseGeocode = useCallback(async (targetLat: number, targetLng: number): Promise<string> => {
+    try {
+      const res = await fetch(
+        `https://us1.locationiq.com/v1/reverse?key=${LOCATIONIQ_KEY}&lat=${targetLat}&lon=${targetLng}&format=json`,
+        { signal: AbortSignal.timeout(4000) }
+      );
+      if (!res.ok) return "";
+      const data = await res.json();
+      return data?.display_name || "";
+    } catch {
+      return "";
     }
   }, []);
 
-  // Initialize or update Google Map when script is available
+  // 1. Inject Leaflet CDN CSS & JS dynamically
   useEffect(() => {
-    if (!googleMapsLoaded || !mapContainerRef.current || !(window as any).google?.maps) return;
+    if (typeof window === "undefined") return;
 
-    const gmaps = (window as any).google.maps;
-    const center = { lat, lng };
-
-    if (!googleMapInstance.current) {
-      const map = new gmaps.Map(mapContainerRef.current, {
-        center,
-        zoom: 12,
-        mapTypeId: "roadmap",
-        disableDefaultUI: false,
-        zoomControl: true,
-        streetViewControl: false,
-      });
-
-      const marker = new gmaps.Marker({
-        position: center,
-        map,
-        draggable: true,
-        title: "Hub Location",
-        animation: gmaps.Animation.DROP,
-      });
-
-      const circle = new gmaps.Circle({
-        strokeColor: "#1F4D46",
-        strokeOpacity: 0.85,
-        strokeWeight: 2,
-        fillColor: "#2E7D5B",
-        fillOpacity: 0.22,
-        map,
-        center,
-        radius: radius * 1000,
-      });
-
-      marker.addListener("dragend", () => {
-        const pos = marker.getPosition();
-        if (pos) {
-          const newLat = Number(pos.lat().toFixed(6));
-          const newLng = Number(pos.lng().toFixed(6));
-          setLat(newLat);
-          setLng(newLng);
-          circle.setCenter(pos);
-          onLocationSelect(newLat, newLng);
-        }
-      });
-
-      map.addListener("click", (e: any) => {
-        const clickedPos = e.latLng;
-        marker.setPosition(clickedPos);
-        circle.setCenter(clickedPos);
-        const newLat = Number(clickedPos.lat().toFixed(6));
-        const newLng = Number(clickedPos.lng().toFixed(6));
-        setLat(newLat);
-        setLng(newLng);
-        onLocationSelect(newLat, newLng);
-      });
-
-      googleMapInstance.current = map;
-      markerInstance.current = marker;
-      circleInstance.current = circle;
-    } else {
-      googleMapInstance.current.setCenter(center);
-      markerInstance.current.setPosition(center);
-      circleInstance.current.setCenter(center);
-      circleInstance.current.setRadius(radius * 1000);
+    // Inject Leaflet CSS
+    if (!document.getElementById("leaflet-cdn-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-cdn-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
     }
-  }, [googleMapsLoaded, lat, lng, radius, onLocationSelect]);
+
+    // Inject Leaflet JS
+    if ((window as any).L) {
+      setLeafletLoaded(true);
+    } else if (!document.getElementById("leaflet-cdn-js")) {
+      const script = document.createElement("script");
+      script.id = "leaflet-cdn-js";
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.async = true;
+      script.onload = () => setLeafletLoaded(true);
+      document.head.appendChild(script);
+    } else {
+      const existing = document.getElementById("leaflet-cdn-js");
+      existing?.addEventListener("load", () => setLeafletLoaded(true));
+    }
+  }, []);
+
+  // 2. Initialize Leaflet Map
+  useEffect(() => {
+    if (!leafletLoaded || !mapContainerRef.current || mapInstance.current) return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    const initialCenter: [number, number] = [lat, lng];
+
+    const map = L.map(mapContainerRef.current, {
+      center: initialCenter,
+      zoom: 13,
+      zoomControl: false,
+    });
+
+    // High performance CartoDB Voyager tiles (crisp, accurate, zero API payment)
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+    }).addTo(map);
+
+    // Custom MapPin Icon
+    const customPin = L.divIcon({
+      className: "freshgo-hub-pin",
+      html: `
+        <div style="position: relative; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; cursor: grab;">
+          <div style="background: #E5623E; color: #FFFFFF; width: 38px; height: 38px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35); border: 2.5px solid #FFFFFF;">
+            <span style="transform: rotate(45deg); font-size: 18px;">📍</span>
+          </div>
+          <div style="width: 12px; height: 4px; background: rgba(0,0,0,0.35); border-radius: 50%; margin-top: -2px;"></div>
+        </div>
+      `,
+      iconSize: [38, 42],
+      iconAnchor: [19, 42],
+    });
+
+    const marker = L.marker(initialCenter, {
+      draggable: true,
+      icon: customPin,
+    }).addTo(map);
+
+    const circle = L.circle(initialCenter, {
+      radius: radius * 1000,
+      color: "#1F4D46",
+      fillColor: "#2E7D5B",
+      fillOpacity: 0.22,
+      weight: 2.5,
+    }).addTo(map);
+
+    // Drag marker event
+    marker.on("dragend", async () => {
+      const pos = marker.getLatLng();
+      const newLat = Number(pos.lat.toFixed(6));
+      const newLng = Number(pos.lng.toFixed(6));
+      setLat(newLat);
+      setLng(newLng);
+      circle.setLatLng(pos);
+      const address = await reverseGeocode(newLat, newLng);
+      onLocationSelect(newLat, newLng, address);
+    });
+
+    // Click map event
+    map.on("click", async (e: any) => {
+      const clicked = e.latlng;
+      const newLat = Number(clicked.lat.toFixed(6));
+      const newLng = Number(clicked.lng.toFixed(6));
+      setLat(newLat);
+      setLng(newLng);
+      marker.setLatLng(clicked);
+      circle.setLatLng(clicked);
+      const address = await reverseGeocode(newLat, newLng);
+      onLocationSelect(newLat, newLng, address);
+    });
+
+    mapInstance.current = map;
+    markerInstance.current = marker;
+    circleInstance.current = circle;
+
+    return () => {
+      map.remove();
+      mapInstance.current = null;
+      markerInstance.current = null;
+      circleInstance.current = null;
+    };
+  }, [leafletLoaded, reverseGeocode, onLocationSelect]);
 
   // Handle radius changes
   const handleRadiusChange = (newRadius: number) => {
@@ -167,95 +211,114 @@ export function GoogleMapsPicker({
     }
   };
 
-  // Search Address / Geocoding
+  // Search Address / Geocoding using LocationIQ
   const handleSearchAddress = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!addressQuery.trim()) return;
 
     setIsSearching(true);
+    setLocateError(null);
     try {
-      // If Google Maps is loaded with geocoder
-      if ((window as any).google?.maps?.Geocoder) {
-        const geocoder = new (window as any).google.maps.Geocoder();
-        geocoder.geocode({ address: addressQuery }, (results: any, status: any) => {
-          if (status === "OK" && results?.[0]?.geometry?.location) {
-            const loc = results[0].geometry.location;
-            const newLat = Number(loc.lat().toFixed(6));
-            const newLng = Number(loc.lng().toFixed(6));
-            const formatted = results[0].formatted_address;
-            setLat(newLat);
-            setLng(newLng);
-            onLocationSelect(newLat, newLng, formatted);
-            if (googleMapInstance.current) {
-              googleMapInstance.current.panTo(loc);
-              googleMapInstance.current.setZoom(13);
-            }
-          }
-        });
-      } else {
-        // Fallback geocoding via OpenStreetMap Nominatim
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            addressQuery
-          )}`
-        );
-        const data = await res.json();
-        if (data && data.length > 0) {
-          const first = data[0];
-          const newLat = Number(parseFloat(first.lat).toFixed(6));
-          const newLng = Number(parseFloat(first.lon).toFixed(6));
-          setLat(newLat);
-          setLng(newLng);
-          onLocationSelect(newLat, newLng, first.display_name);
+      const res = await fetch(
+        `https://us1.locationiq.com/v1/search?key=${LOCATIONIQ_KEY}&q=${encodeURIComponent(
+          addressQuery
+        )}&countrycodes=in&format=json`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        const first = data[0];
+        const newLat = Number(parseFloat(first.lat).toFixed(6));
+        const newLng = Number(parseFloat(first.lon).toFixed(6));
+        setLat(newLat);
+        setLng(newLng);
+
+        if (mapInstance.current) {
+          mapInstance.current.flyTo([newLat, newLng], 14, { duration: 1.2 });
         }
+        if (markerInstance.current) {
+          markerInstance.current.setLatLng([newLat, newLng]);
+        }
+        if (circleInstance.current) {
+          circleInstance.current.setLatLng([newLat, newLng]);
+        }
+
+        onLocationSelect(newLat, newLng, first.display_name);
+      } else {
+        setLocateError("Address not found. Please try entering a nearby town or landmark.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Geocoding failed:", err);
+      setLocateError("Search connection error. Please try again or pinpoint on the map.");
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Use Current Geolocation
-  const handleGetCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const newLat = Number(pos.coords.latitude.toFixed(6));
-          const newLng = Number(pos.coords.longitude.toFixed(6));
-          setLat(newLat);
-          setLng(newLng);
-          onLocationSelect(newLat, newLng, "Current Geolocation");
-          if (googleMapInstance.current) {
-            googleMapInstance.current.panTo({ lat: newLat, lng: newLng });
-            googleMapInstance.current.setZoom(13);
-          }
-        },
-        (err) => {
-          console.warn("Geolocation denied:", err.message);
-        }
-      );
+  // Locate current position with GPS and IP-fallback
+  const handleGetCurrentLocation = async () => {
+    setIsLocating(true);
+    setLocateError(null);
+
+    let foundLat: number | null = null;
+    let foundLng: number | null = null;
+
+    // 1. Try HTML5 Geolocation API
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 7000,
+            maximumAge: 10000,
+          });
+        });
+        foundLat = Number(pos.coords.latitude.toFixed(6));
+        foundLng = Number(pos.coords.longitude.toFixed(6));
+      } catch (err: any) {
+        console.warn("Browser GPS unavailable or blocked, falling back to IP geolocation...", err?.message);
+      }
     }
-  };
 
-  // Interactive Fallback Map Click handler
-  const handleFallbackMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
+    // 2. Fallback to IP Geolocation if browser GPS is blocked (e.g. non-HTTPS duckdns or permission denied)
+    if (!foundLat || !foundLng) {
+      try {
+        const ipRes = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(4000) });
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (ipData?.latitude && ipData?.longitude) {
+            foundLat = Number(Number(ipData.latitude).toFixed(6));
+            foundLng = Number(Number(ipData.longitude).toFixed(6));
+          }
+        }
+      } catch (ipErr) {
+        console.warn("IP geolocation fallback failed:", ipErr);
+      }
+    }
 
-    // Approximate mapping centered on current lat/lng
-    const deltaX = (clickX - rect.width / 2) / (rect.width / 2);
-    const deltaY = (clickY - rect.height / 2) / (rect.height / 2);
+    // 3. Ultimate Fallback to Kasaragod Hub coordinates
+    if (!foundLat || !foundLng) {
+      foundLat = DEFAULT_LAT;
+      foundLng = DEFAULT_LNG;
+      setLocateError("Using default Kerala Hub location. Please allow browser location access.");
+    }
 
-    // Scaling factor based on zoom
-    const degreeSpan = 0.12 / Math.pow(1.5, zoomLevel - 12);
-    const newLat = Number((lat - deltaY * degreeSpan).toFixed(6));
-    const newLng = Number((lng + deltaX * degreeSpan).toFixed(6));
+    setLat(foundLat);
+    setLng(foundLng);
 
-    setLat(newLat);
-    setLng(newLng);
-    onLocationSelect(newLat, newLng);
+    if (mapInstance.current) {
+      mapInstance.current.flyTo([foundLat, foundLng], 14, { duration: 1.2 });
+    }
+    if (markerInstance.current) {
+      markerInstance.current.setLatLng([foundLat, foundLng]);
+    }
+    if (circleInstance.current) {
+      circleInstance.current.setLatLng([foundLat, foundLng]);
+    }
+
+    const address = await reverseGeocode(foundLat, foundLng);
+    onLocationSelect(foundLat, foundLng, address || "Current Geolocation");
+    setIsLocating(false);
   };
 
   return (
@@ -269,7 +332,7 @@ export function GoogleMapsPicker({
         border: "1px solid #E3DDCF",
       }}
     >
-      {/* Top Search Toolbar */}
+      {/* Top Search & Locate Toolbar */}
       <div
         style={{
           display: "flex",
@@ -320,33 +383,58 @@ export function GoogleMapsPicker({
             fontWeight: 700,
             border: "none",
             cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
           }}
         >
+          {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           {isSearching ? "Searching..." : "Locate Pin"}
         </button>
 
         <button
           type="button"
           onClick={handleGetCurrentLocation}
-          title="Use GPS Location"
+          disabled={isLocating}
+          title="Use GPS / Device Location"
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: "6px",
             padding: "9px 12px",
             borderRadius: "8px",
-            background: "#E4ECE9",
+            background: isLocating ? "#C8DFD7" : "#E4ECE9",
             color: "#1F4D46",
             fontSize: "12px",
             fontWeight: 700,
             border: "none",
-            cursor: "pointer",
+            cursor: isLocating ? "wait" : "pointer",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
           }}
         >
-          <Navigation size={14} />
-          Current GPS
+          {isLocating ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Crosshair size={14} />
+          )}
+          {isLocating ? "Locating..." : "Use Current Location"}
         </button>
       </div>
+
+      {locateError && (
+        <div
+          style={{
+            background: "#FFF3CD",
+            color: "#856404",
+            padding: "8px 12px",
+            borderRadius: "8px",
+            fontSize: "12px",
+            border: "1px solid #FFEEBA",
+          }}
+        >
+          ⚠️ {locateError}
+        </div>
+      )}
 
       {/* Map Canvas / Viewer */}
       <div
@@ -357,221 +445,90 @@ export function GoogleMapsPicker({
           overflow: "hidden",
           border: "2px solid #1F4D46",
           boxShadow: "0 4px 14px rgba(0, 0, 0, 0.08)",
+          background: "#E8EFE9",
         }}
       >
-        {googleMapsLoaded ? (
-          <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
-        ) : (
-          /* Interactive High-Fidelity Geo-Fence Canvas with OSM Tiles */
-          <div
-            onClick={handleFallbackMapClick}
+        <div ref={mapContainerRef} style={{ width: "100%", height: "100%", zIndex: 1 }} />
+
+        {/* Zoom Controls */}
+        <div
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+            zIndex: 1000,
+          }}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              mapInstance.current?.zoomIn();
+            }}
+            title="Zoom In"
             style={{
-              width: "100%",
-              height: "100%",
-              position: "relative",
-              cursor: "crosshair",
-              userSelect: "none",
-              background: "#E8EFE9",
-              overflow: "hidden",
+              width: "32px",
+              height: "32px",
+              borderRadius: "6px",
+              background: "#FFFFFF",
+              border: "1px solid #E3DDCF",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
             }}
           >
-            {/* OpenStreetMap Tile Layer as dynamic background */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                backgroundImage: `url('https://tile.openstreetmap.org/${zoomLevel}/${Math.floor(
-                  ((lng + 180) / 360) * Math.pow(2, zoomLevel)
-                )}/${Math.floor(
-                  ((1 -
-                    Math.log(
-                      Math.tan((lat * Math.PI) / 180) +
-                        1 / Math.cos((lat * Math.PI) / 180)
-                    ) /
-                      Math.PI) /
-                    2) *
-                    Math.pow(2, zoomLevel)
-                )}.png')`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                opacity: 0.95,
-              }}
-            />
+            <ZoomIn size={16} color="#1F4D46" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              mapInstance.current?.zoomOut();
+            }}
+            title="Zoom Out"
+            style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "6px",
+              background: "#FFFFFF",
+              border: "1px solid #E3DDCF",
+              display: "grid",
+              placeItems: "center",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+            }}
+          >
+            <ZoomOut size={16} color="#1F4D46" />
+          </button>
+        </div>
 
-            {/* Grid Pattern overlay for precise alignment */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                backgroundImage:
-                  "radial-gradient(#1F4D46 1px, transparent 1px), radial-gradient(#1F4D46 1px, #e5e5f7 1px)",
-                backgroundSize: "40px 40px",
-                backgroundPosition: "0 0, 20px 20px",
-                opacity: 0.06,
-              }}
-            />
-
-            {/* 10km Delivery Geo-Fence Circle Overlay */}
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: `${radius * 24}px`,
-                height: `${radius * 24}px`,
-                borderRadius: "50%",
-                background: "rgba(46, 125, 91, 0.22)",
-                border: "2.5px solid #2E7D5B",
-                boxShadow: "0 0 25px rgba(46, 125, 91, 0.35)",
-                pointerEvents: "none",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: "999px",
-                  background: "#1F4D46",
-                  color: "#FFFFFF",
-                  fontSize: "11px",
-                  fontWeight: 800,
-                  transform: "translateY(-60px)",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
-                }}
-              >
-                10 km Delivery Boundary
-              </div>
-            </div>
-
-            {/* Center Marker Pin */}
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -100%)",
-                pointerEvents: "none",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <div
-                style={{
-                  background: "#E5623E",
-                  color: "#FFFFFF",
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "50% 50% 50% 0",
-                  transform: "rotate(-45deg)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  boxShadow: "0 4px 10px rgba(0, 0, 0, 0.3)",
-                  border: "2px solid #FFFFFF",
-                }}
-              >
-                <div
-                  style={{
-                    transform: "rotate(45deg)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <MapPin size={18} color="#FFFFFF" />
-                </div>
-              </div>
-              <div
-                style={{
-                  width: "12px",
-                  height: "4px",
-                  borderRadius: "50%",
-                  background: "rgba(0, 0, 0, 0.35)",
-                  marginTop: "-2px",
-                }}
-              />
-            </div>
-
-            {/* Map Controls */}
-            <div
-              style={{
-                position: "absolute",
-                top: "12px",
-                right: "12px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-              }}
-            >
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoomLevel((z) => Math.min(18, z + 1));
-                }}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "6px",
-                  background: "#FFFFFF",
-                  border: "1px solid #E3DDCF",
-                  display: "grid",
-                  placeItems: "center",
-                  cursor: "pointer",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                }}
-              >
-                <ZoomIn size={16} color="#1F4D46" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoomLevel((z) => Math.max(8, z - 1));
-                }}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "6px",
-                  background: "#FFFFFF",
-                  border: "1px solid #E3DDCF",
-                  display: "grid",
-                  placeItems: "center",
-                  cursor: "pointer",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                }}
-              >
-                <ZoomOut size={16} color="#1F4D46" />
-              </button>
-            </div>
-
-            {/* Click to reposition hint */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: "10px",
-                left: "12px",
-                background: "rgba(15, 46, 41, 0.85)",
-                color: "#FFFFFF",
-                padding: "6px 12px",
-                borderRadius: "6px",
-                fontSize: "11px",
-                fontWeight: 600,
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <Info size={13} color="#F2C94C" />
-              Click anywhere on map to reposition Hub pin
-            </div>
-          </div>
-        )}
+        {/* Interactive helper badge */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "10px",
+            left: "12px",
+            background: "rgba(15, 46, 41, 0.88)",
+            color: "#FFFFFF",
+            padding: "6px 12px",
+            borderRadius: "6px",
+            fontSize: "11px",
+            fontWeight: 600,
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            zIndex: 1000,
+            pointerEvents: "none",
+          }}
+        >
+          <Info size={13} color="#F2C94C" />
+          Click or drag pin to position Hub · Circle indicates {radius} km delivery area
+        </div>
       </div>
 
       {/* Radius Slider & Coordinate Readouts */}
@@ -610,8 +567,8 @@ export function GoogleMapsPicker({
           </div>
           <input
             type="range"
-            min={5}
-            max={25}
+            min={3}
+            max={30}
             step={0.5}
             value={radius}
             onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
@@ -626,9 +583,9 @@ export function GoogleMapsPicker({
               marginTop: "2px",
             }}
           >
-            <span>5 km (Micro)</span>
+            <span>3 km (Micro)</span>
             <span>10 km (Standard)</span>
-            <span>25 km (Mega)</span>
+            <span>30 km (Regional)</span>
           </div>
         </div>
 
