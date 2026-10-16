@@ -133,7 +133,7 @@ export default function App() {
   // Restore saved location or auto-acquire real device GPS on launch
   useEffect(() => {
     const stored = getStoredLocation();
-    if (stored && Number.isFinite(stored.lat) && Number.isFinite(stored.lng) && (stored.lat !== 0 || stored.lng !== 0)) {
+    if (stored && Number.isFinite(stored.lat) && Number.isFinite(stored.lng) && stored.lat >= 9.5) {
       setCustomerCoords({ lat: stored.lat, lng: stored.lng });
       if (stored.address) {
         setCustomerAddress(stored.address);
@@ -145,7 +145,7 @@ export default function App() {
 
     acquireAccurateLocation({ forcePrompt: false })
       .then(async (loc) => {
-        if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && (loc.lat !== 0 || loc.lng !== 0)) {
+        if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && loc.lat >= 9.5) {
           setCustomerCoords({ lat: loc.lat, lng: loc.lng });
           const geo = await reverseGeocodeLocation(loc.lat, loc.lng);
           const formatted = geo.address || [geo.area, geo.city].filter(Boolean).join(", ");

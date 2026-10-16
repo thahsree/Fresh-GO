@@ -69,6 +69,17 @@ const LOCATIONIQ_KEY =
 // Real fallback hubs (Kozhikode Central & Kannur City)
 const DEFAULT_HUBS: BackendHub[] = [
   {
+    id: "4c52f8f7-29db-49ec-9d94-5e199e790651",
+    name: "Chigrupade Hub (Kasaragod)",
+    code: "HUB-KSD-01-9194",
+    address: "Manjeshwar, Kasaragod, Kerala",
+    city: "Manjeshwar",
+    latitude: 12.699821,
+    longitude: 74.947729,
+    deliveryRadiusKm: 10,
+    isActive: true,
+  },
+  {
     id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
     name: "FreshGo Central Hub (Mavoor Road)",
     code: "HUB-CLT-01",
@@ -496,7 +507,7 @@ export function CustomerLocationModal({
     setIsAutoDetecting(true);
     try {
       const loc = await acquireAccurateLocation({ forcePrompt: false });
-      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && loc.lat >= 9.5) {
         setPinLat(loc.lat);
         setPinLng(loc.lng);
         setInitialMapCoords({ lat: loc.lat, lng: loc.lng });
@@ -520,11 +531,12 @@ export function CustomerLocationModal({
       setIsLoadingSuggestions(false);
       setIsLocatingGPS(false);
       setIsDraggingMap(false);
-      const firstHub = (hubs && hubs.length > 0 ? hubs[0] : null) || (activeHubs && activeHubs.length > 0 ? activeHubs[0] : null);
-      const fallbackLat = firstHub?.latitude || 0;
-      const fallbackLng = firstHub?.longitude || 0;
+      const firstHub = (hubs && hubs.length > 0 ? hubs[0] : null) || (activeHubs && activeHubs.length > 0 ? activeHubs[0] : null) || DEFAULT_HUBS[0];
+      const fallbackLat = firstHub?.latitude || 12.699821;
+      const fallbackLng = firstHub?.longitude || 74.947729;
 
-      const safeLat = (Number.isFinite(currentCoords?.lat) && currentCoords.lat !== 0)
+      // Discard invalid/zero or Trivandrum IP gateway coordinates (< 9.5° N)
+      const safeLat = (Number.isFinite(currentCoords?.lat) && currentCoords.lat >= 9.5)
         ? currentCoords.lat
         : fallbackLat;
       const safeLng = (Number.isFinite(currentCoords?.lng) && currentCoords.lng !== 0)
@@ -537,7 +549,7 @@ export function CustomerLocationModal({
       setZoomLevel(16);
 
       // If address is not confirmed, detect current device location first!
-      if (!currentAddress || (currentCoords?.lat === 0 && currentCoords?.lng === 0)) {
+      if (!currentAddress || (currentCoords?.lat < 9.5)) {
         detectDeviceLocationOnOpen();
       }
 
@@ -1020,7 +1032,7 @@ export function CustomerLocationModal({
     setIsLocatingGPS(true);
     try {
       const loc = await acquireAccurateLocation({ forcePrompt: true });
-      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+      if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && loc.lat >= 9.5) {
         const lat = loc.lat;
         const lng = loc.lng;
 
@@ -1049,8 +1061,8 @@ export function CustomerLocationModal({
           });
       } else {
         Alert.alert(
-          "Location Permission",
-          "Could not detect exact GPS coordinates. Please enable device GPS permissions or choose your nearest delivery hub from the list below.",
+          "Location / GPS Required",
+          "Could not detect your exact device GPS coordinates. Please make sure Location / GPS is turned ON in your phone's quick settings, or search your area / choose your delivery hub below.",
           [{ text: "OK" }]
         );
       }
