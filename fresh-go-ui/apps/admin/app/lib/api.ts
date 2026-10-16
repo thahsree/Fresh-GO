@@ -1,23 +1,25 @@
 "use client";
 
 export function getAdminApiBase(): string {
+  // 1. Explicit env var (inlined by Next.js if NEXT_PUBLIC_API_URL is configured)
+  if (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_API_URL) {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
+    if (envUrl.length > 0) return envUrl;
+  }
+
+  // 2. Browser runtime host inspection for local development
   if (typeof window !== "undefined" && window.location) {
     const host = window.location.hostname;
-    if (host === "127.0.0.1") {
-      return "http://127.0.0.1:4000/api/v1";
-    }
-    if (host === "localhost") {
+    if (host === "127.0.0.1" || host === "localhost") {
       return "http://localhost:4000/api/v1";
     }
     if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
       return `http://${host}:4000/api/v1`;
     }
   }
-  if (typeof process !== "undefined" && process?.env?.NEXT_PUBLIC_API_URL) {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
-    if (envUrl.length > 0) return envUrl;
-  }
-  return "http://localhost:4000/api/v1";
+
+  // 3. Default to production backend for all deployed environments (Vercel, custom domain)
+  return "https://fresh-go.duckdns.org/api/v1";
 }
 
 export const API_BASE = getAdminApiBase();
