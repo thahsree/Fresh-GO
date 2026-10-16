@@ -189,10 +189,10 @@ function getMobileLeafletHtml(
 
 export function CustomerLocationModal({
   visible = false,
-  onClose = () => {},
+  onClose = () => { },
   currentAddress = "",
-  currentCoords = { lat: 11.2588, lng: 75.7804 },
-  onLocationConfirm = () => {},
+  currentCoords = { lat: 0, lng: 0 },
+  onLocationConfirm = () => { },
   nearestHubName,
   nearestHubCoords,
   hubs,
@@ -210,7 +210,7 @@ export function CustomerLocationModal({
         if (Array.isArray(res) && res.length > 0) {
           setActiveHubs(res);
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [hubs, visible]);
 
@@ -227,10 +227,10 @@ export function CustomerLocationModal({
 
   // Exact Pin-on-Map state (Swiggy style)
   const [pinLat, setPinLat] = useState(() =>
-    Number.isFinite(currentCoords?.lat) ? currentCoords.lat : 11.2588
+    Number.isFinite(currentCoords?.lat) && currentCoords.lat !== 0 ? currentCoords.lat : 0
   );
   const [pinLng, setPinLng] = useState(() =>
-    Number.isFinite(currentCoords?.lng) ? currentCoords.lng : 75.7804
+    Number.isFinite(currentCoords?.lng) && currentCoords.lng !== 0 ? currentCoords.lng : 0
   );
   const [pinAddress, setPinAddress] = useState(
     currentAddress || "Choose your location"
@@ -247,8 +247,8 @@ export function CustomerLocationModal({
   const mobileWebViewRef = useRef<any>(null);
   const isInternalMapMoveRef = useRef(false);
   const [initialMapCoords, setInitialMapCoords] = useState<{ lat: number; lng: number }>({
-    lat: Number.isFinite(currentCoords?.lat) ? currentCoords.lat : 11.2588,
-    lng: Number.isFinite(currentCoords?.lng) ? currentCoords.lng : 75.7804,
+    lat: Number.isFinite(currentCoords?.lat) && currentCoords.lat !== 0 ? currentCoords.lat : 0,
+    lng: Number.isFinite(currentCoords?.lng) && currentCoords.lng !== 0 ? currentCoords.lng : 0,
   });
 
   const handleWebViewMessage = (event: any) => {
@@ -321,8 +321,12 @@ export function CustomerLocationModal({
         lng: nearestHubData.closestHub.longitude,
       };
     }
-    return { lat: 11.2588, lng: 75.7804 };
-  }, [nearestHubCoords, nearestHubData]);
+    const firstActive = activeHubs && activeHubs.length > 0 ? activeHubs[0] : null;
+    if (firstActive?.latitude && firstActive?.longitude) {
+      return { lat: firstActive.latitude, lng: firstActive.longitude };
+    }
+    return { lat: 0, lng: 0 };
+  }, [nearestHubCoords, nearestHubData, activeHubs]);
 
   const geocodeTimerRef = useRef<any>(null);
 
@@ -516,23 +520,24 @@ export function CustomerLocationModal({
       setIsLoadingSuggestions(false);
       setIsLocatingGPS(false);
       setIsDraggingMap(false);
-      const safeLat = Number.isFinite(currentCoords?.lat)
+      const firstHub = (hubs && hubs.length > 0 ? hubs[0] : null) || (activeHubs && activeHubs.length > 0 ? activeHubs[0] : null);
+      const fallbackLat = firstHub?.latitude || 0;
+      const fallbackLng = firstHub?.longitude || 0;
+
+      const safeLat = (Number.isFinite(currentCoords?.lat) && currentCoords.lat !== 0)
         ? currentCoords.lat
-        : 11.2588;
-      const safeLng = Number.isFinite(currentCoords?.lng)
+        : fallbackLat;
+      const safeLng = (Number.isFinite(currentCoords?.lng) && currentCoords.lng !== 0)
         ? currentCoords.lng
-        : 75.7804;
+        : fallbackLng;
       setPinLat(safeLat);
       setPinLng(safeLng);
       setInitialMapCoords({ lat: safeLat, lng: safeLng });
       setPinAddress(currentAddress || "Pinpoint your delivery location");
       setZoomLevel(16);
 
-      // If coordinates are default Kozhikode or address is not confirmed, detect current location first!
-      const isDefaultCoords =
-        (Math.abs(safeLat - 11.2588) < 0.001 && Math.abs(safeLng - 75.7804) < 0.001) ||
-        !currentAddress;
-      if (isDefaultCoords) {
+      // If address is not confirmed, detect current device location first!
+      if (!currentAddress || (currentCoords?.lat === 0 && currentCoords?.lng === 0)) {
         detectDeviceLocationOnOpen();
       }
 
@@ -540,7 +545,7 @@ export function CustomerLocationModal({
         setTimeout(() => {
           try {
             searchInputRef.current?.focus?.();
-          } catch {}
+          } catch { }
         }, 150);
       }
     }
@@ -554,7 +559,7 @@ export function CustomerLocationModal({
       if (Number.isFinite(pinLat) && Number.isFinite(pinLng)) {
         try {
           leafletMapRef.current.setView([pinLat, pinLng], 16);
-        } catch {}
+        } catch { }
       }
     } else if (Platform.OS !== "web" && mobileWebViewRef.current) {
       if (!isInternalMapMoveRef.current && Number.isFinite(pinLat) && Number.isFinite(pinLng)) {
@@ -584,12 +589,13 @@ export function CustomerLocationModal({
     if (leafletMapRef.current) {
       try {
         leafletMapRef.current.remove();
-      } catch {}
+      } catch { }
       leafletMapRef.current = null;
     }
 
-    const safeLat = Number.isFinite(pinLat) ? pinLat : 11.2588;
-    const safeLng = Number.isFinite(pinLng) ? pinLng : 75.7804;
+    const firstActive = activeHubs && activeHubs.length > 0 ? activeHubs[0] : null;
+    const safeLat = Number.isFinite(pinLat) && pinLat !== 0 ? pinLat : (firstActive?.latitude || 0);
+    const safeLng = Number.isFinite(pinLng) && pinLng !== 0 ? pinLng : (firstActive?.longitude || 0);
 
     const map = L.map(mapContainerRef.current, {
       center: [safeLat, safeLng],
@@ -653,7 +659,7 @@ export function CustomerLocationModal({
       if (leafletMapRef.current) {
         try {
           leafletMapRef.current.invalidateSize({ animate: false });
-        } catch {}
+        } catch { }
       }
     };
     requestAnimationFrame(invalidate);
@@ -668,7 +674,7 @@ export function CustomerLocationModal({
       if (leafletMapRef.current) {
         try {
           leafletMapRef.current.remove();
-        } catch {}
+        } catch { }
         leafletMapRef.current = null;
       }
     };
@@ -709,7 +715,7 @@ export function CustomerLocationModal({
             data.display_place;
           const road = addr.road || addr.street;
           const neighbourhood = addr.neighbourhood || addr.suburb || addr.quarter;
-          const city = addr.city || addr.town || addr.county || "Kozhikode";
+          const city = addr.city || addr.town || addr.county || addr.state_district || addr.state || "";
 
           const cleanParts = [poi, road, neighbourhood, city]
             .filter(Boolean)
@@ -719,8 +725,8 @@ export function CustomerLocationModal({
             cleanParts.length >= 2
               ? cleanParts.slice(0, 3).join(", ")
               : data.display_name
-              ? data.display_name.split(",").slice(0, 3).join(",").trim()
-              : `Doorstep Pin (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+                ? data.display_name.split(",").slice(0, 3).join(",").trim()
+                : `Doorstep Pin (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
 
           const rawPincode = (data.address?.postcode || "").replace(/\D/g, "");
           if (rawPincode && rawPincode.length === 6) {
@@ -813,7 +819,7 @@ export function CustomerLocationModal({
         const mapped: LocationSuggestion[] = photonData.features.map(
           (feat: any, idx: number) => {
             const props = feat.properties || {};
-            const coords = feat.geometry?.coordinates || [75.7804, 11.2588];
+            const coords = feat.geometry?.coordinates || [hubCoords.lng, hubCoords.lat];
             const lng = coords[0];
             const lat = coords[1];
             const name = props.name || props.street || "Location";
@@ -1026,7 +1032,7 @@ export function CustomerLocationModal({
         if (Platform.OS === "web" && leafletMapRef.current) {
           try {
             leafletMapRef.current.setView([lat, lng], 16);
-          } catch {}
+          } catch { }
         } else if (Platform.OS !== "web" && mobileWebViewRef.current) {
           mobileWebViewRef.current.injectJavaScript(
             `if (window.leafletMap) { window.leafletMap.setView([${lat}, ${lng}], 16); } true;`
@@ -1070,7 +1076,7 @@ export function CustomerLocationModal({
         if (Platform.OS === "web" && leafletMapRef.current) {
           try {
             leafletMapRef.current.flyTo([loc.lat, loc.lng], 16);
-          } catch {}
+          } catch { }
         } else if (Platform.OS !== "web" && mobileWebViewRef.current) {
           mobileWebViewRef.current.injectJavaScript(
             `if (window.leafletMap) { window.leafletMap.flyTo([${loc.lat}, ${loc.lng}], 16); } true;`
@@ -1177,7 +1183,7 @@ export function CustomerLocationModal({
     if (Platform.OS === "web" && leafletMapRef.current) {
       try {
         leafletMapRef.current.setView([hub.latitude, hub.longitude], 16);
-      } catch {}
+      } catch { }
     } else if (Platform.OS !== "web" && mobileWebViewRef.current) {
       mobileWebViewRef.current.injectJavaScript(
         `if (window.leafletMap) { window.leafletMap.setView([${hub.latitude}, ${hub.longitude}], 16); } true;`
@@ -1187,8 +1193,9 @@ export function CustomerLocationModal({
 
   // Final Confirmation: Save location & close modal
   const handleConfirmLocation = () => {
-    const finalLat = Number.isFinite(pinLat) ? pinLat : 11.2588;
-    const finalLng = Number.isFinite(pinLng) ? pinLng : 75.7804;
+    const firstActive = activeHubs && activeHubs.length > 0 ? activeHubs[0] : null;
+    const finalLat = Number.isFinite(pinLat) && pinLat !== 0 ? pinLat : (firstActive?.latitude || 0);
+    const finalLng = Number.isFinite(pinLng) && pinLng !== 0 ? pinLng : (firstActive?.longitude || 0);
     onLocationConfirm({ lat: finalLat, lng: finalLng }, pinAddress, pinPincode);
     onClose();
   };
@@ -1273,8 +1280,8 @@ export function CustomerLocationModal({
                           {LOCATIONIQ_KEY
                             ? "LOCATIONIQ LIVE SUGGESTIONS"
                             : googleMapsReady
-                            ? "GOOGLE MAPS SUGGESTIONS"
-                            : "MATCHING LOCATIONS"}
+                              ? "GOOGLE MAPS SUGGESTIONS"
+                              : "MATCHING LOCATIONS"}
                         </Text>
                       </View>
                       <Text style={styles.suggestionCount}>
@@ -1289,8 +1296,7 @@ export function CustomerLocationModal({
                           No locations found for "{searchQuery}"
                         </Text>
                         <Text style={styles.emptyStateDesc}>
-                          Try typing a landmark, beach, or neighborhood (e.g.,
-                          Kozhikode, Mavoor, Beach, HiLITE, Palayam).
+                          Try typing a landmark, street, or neighborhood name.
                         </Text>
                       </View>
                     ) : (

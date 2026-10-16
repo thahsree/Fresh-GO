@@ -206,7 +206,7 @@ export function ReportIssueView({
           </div>
           <h2>Ticket #{submittedTicket.id} Submitted!</h2>
           <p className="success-sub">
-            Your incident has been routed to the <strong>Kozhikode Dispatch Operations Desk</strong>.
+            Your incident has been routed to the <strong>Dispatch Operations Desk</strong>.
           </p>
 
           <div className="ticket-summary-box">

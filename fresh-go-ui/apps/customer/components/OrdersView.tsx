@@ -1,5 +1,6 @@
 import { colors } from "@fresh-food/design-tokens";
 import {
+  AlertCircle,
   Check,
   CheckCircle2,
   ChevronRight,
@@ -25,7 +26,8 @@ import type { Product } from "../models/catalog";
 export type CustomerOrder = {
   id: string;
   date: string;
-  status: "placed" | "preparing" | "out_for_delivery" | "delivered";
+  status: "placed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
+  cancelReason?: string;
   items: {
     product: Product;
     quantity: number;
@@ -63,8 +65,12 @@ export function OrdersView({
 }: OrdersViewProps) {
   const [selectedTab, setSelectedTab] = useState<"active" | "past">("active");
 
-  const activeOrders = orders.filter((o) => o.status !== "delivered");
-  const pastOrders = orders.filter((o) => o.status === "delivered");
+  const activeOrders = orders.filter(
+    (o) => o.status !== "delivered" && o.status !== "cancelled"
+  );
+  const pastOrders = orders.filter(
+    (o) => o.status === "delivered" || o.status === "cancelled"
+  );
 
   const displayOrders = selectedTab === "active" ? activeOrders : pastOrders;
 
@@ -78,6 +84,8 @@ export function OrdersView({
         return { label: "Out for Delivery", color: colors.primary, bg: colors.primaryTint };
       case "delivered":
         return { label: "Delivered", color: colors.success, bg: colors.successTint };
+      case "cancelled":
+        return { label: "Cancelled", color: colors.error, bg: colors.errorTint };
     }
   };
 
@@ -152,6 +160,8 @@ export function OrdersView({
           {displayOrders.map((order) => {
             const statusInfo = getStatusDetails(order.status);
             const isDelivered = order.status === "delivered";
+            const isCancelled = order.status === "cancelled";
+            const isPast = isDelivered || isCancelled;
 
             return (
               <View key={order.id} style={styles.orderCard}>
@@ -175,8 +185,23 @@ export function OrdersView({
                   </View>
                 </View>
 
-                {/* Live Progress Tracker (for active orders) */}
-                {!isDelivered && (
+                {/* Cancelled Alert Banner */}
+                {isCancelled && (
+                  <View style={styles.cancelledBanner}>
+                    <View style={styles.cancelledHeader}>
+                      <AlertCircle size={14} color={colors.error} />
+                      <Text style={styles.cancelledTitle}>Order Cancelled</Text>
+                    </View>
+                    <Text style={styles.cancelledReason}>
+                      {order.cancelReason
+                        ? `Reason: ${order.cancelReason}`
+                        : "This order was cancelled by the store/support team."}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Live Progress Tracker (for active orders only) */}
+                {!isPast && (
                   <View style={styles.timelineContainer}>
                     <View style={styles.timelineStep}>
                       <View
@@ -243,7 +268,7 @@ export function OrdersView({
                 )}
 
                 {/* Delivery Rider Banner */}
-                {!isDelivered && order.riderName && (
+                {!isPast && order.riderName && (
                   <View style={styles.riderBanner}>
                     <View style={styles.riderInfo}>
                       <Truck size={16} color={colors.primary} />
@@ -321,7 +346,7 @@ export function OrdersView({
                   </View>
 
                   <View style={styles.footerActionRow}>
-                    {isDelivered && onDeleteOrder && (
+                    {isPast && onDeleteOrder && (
                       <Pressable
                         style={styles.deleteOrderFooterBtn}
                         onPress={() => onDeleteOrder(order.id)}
@@ -336,7 +361,7 @@ export function OrdersView({
                       </Pressable>
                     )}
 
-                    {isDelivered ? (
+                    {isPast ? (
                       <Pressable
                         style={styles.reorderBtn}
                         onPress={() => onReorder(order.items)}
@@ -671,5 +696,32 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 11,
     fontWeight: "800",
+  },
+  cancelledBanner: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  cancelledHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 3,
+  },
+  cancelledTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#DC2626",
+    textTransform: "uppercase",
+  },
+  cancelledReason: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#7F1D1D",
+    lineHeight: 16,
   },
 });

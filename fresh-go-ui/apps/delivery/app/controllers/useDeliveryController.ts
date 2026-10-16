@@ -45,7 +45,14 @@ export function useDeliveryController() {
   // Real backend orders and trip state
   const [availableOrders, setAvailableOrders] = useState<BackendOrder[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
+  const [cancelledTripInfo, setCancelledTripInfo] = useState<{
+    orderId: string;
+    orderNumber: string;
+    cancelReason: string;
+  } | null>(null);
   const [todayEarnings, setTodayEarnings] = useState<number>(0);
+  const [codCashInHand, setCodCashInHand] = useState<number>(0);
+  const [codLimitExceeded, setCodLimitExceeded] = useState<boolean>(false);
   const [recentDeliveries, setRecentDeliveries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -83,6 +90,7 @@ export function useDeliveryController() {
 
   const prevOrderIdsRef = useRef<Set<string>>(new Set());
   const hasInitialLoadedOrdersRef = useRef<boolean>(false);
+  const dismissedCancelledIdsRef = useRef<Set<string>>(new Set());
 
   // Whether an unassigned order is waiting for this rider to accept
   const hasPendingOrderToAccept = Boolean(
@@ -133,7 +141,18 @@ export function useDeliveryController() {
         setIsOnlineState(data.profile.isOnline);
         setActiveTrip(data.activeTrip);
         setTodayEarnings(data.todayEarnings || 0);
+        setCodCashInHand(data.profile.codCashInHand || 0);
+        setCodLimitExceeded(Boolean(data.profile.codLimitExceeded));
         setRecentDeliveries(data.recentDeliveries || []);
+
+        if (data.cancelledTrip) {
+          if (!dismissedCancelledIdsRef.current.has(data.cancelledTrip.orderId)) {
+            setCancelledTripInfo(data.cancelledTrip);
+          }
+          if (activeTripRef.current?.orderId === data.cancelledTrip.orderId) {
+            setActiveTrip(null);
+          }
+        }
       }
     } catch (err) {
       console.warn("[delivery] Failed to load dashboard:", err);
@@ -194,7 +213,36 @@ export function useDeliveryController() {
           }
           loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
         },
-        onOrderStatusChanged: () => {
+        onOrderStatusChanged: (data: any) => {
+          console.log("[delivery] Real-time order status changed via socket:", data);
+          if (data?.status === "CANCELLED") {
+            const isMyActive =
+              activeTripRef.current?.orderId === data.orderId ||
+              activeTripRef.current?.order?.orderNumber === data.orderNumber;
+
+            if (isMyActive) {
+              if (!dismissedCancelledIdsRef.current.has(data.orderId)) {
+                setCancelledTripInfo({
+                  orderId: data.orderId,
+                  orderNumber: data.orderNumber || activeTripRef.current?.order?.orderNumber || data.orderId,
+                  cancelReason: data.cancelReason || data.note || "Cancelled by store/admin",
+                });
+              }
+              setActiveTrip(null);
+            }
+
+            // Remove from available orders list if cancelled
+            setAvailableOrders((prev) => {
+              const remaining = prev.filter(
+                (o) => o.id !== data.orderId && o.orderNumber !== data.orderNumber
+              );
+              if (remaining.length === 0) {
+                stopOrderAlertLoop();
+              }
+              return remaining;
+            });
+          }
+
           loadDashboard();
           loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
         },
@@ -214,14 +262,15 @@ export function useDeliveryController() {
     };
   }, [loadDashboard, loadAvailableOrders]);
 
-  // --- Periodic Polling (Every 10s when online to catch all incoming orders) ---
+  // --- Periodic Polling (Every 5s when online to catch all order updates and cancellations) ---
   useEffect(() => {
     if (!user || !isOnline) return;
     const interval = setInterval(() => {
       loadAvailableOrders(selectedHub?.id || deliveryApi.getSelectedHub()?.id);
-    }, 10000);
+      loadDashboard();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [user, isOnline, selectedHub, loadAvailableOrders]);
+  }, [user, isOnline, selectedHub, loadAvailableOrders, loadDashboard]);
 
   // --- Hub Selection ---
   const changeHub = (hub: DeliveryHub) => {
@@ -251,7 +300,23 @@ export function useDeliveryController() {
           }
           loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
         },
-        onOrderStatusChanged: () => {
+        onOrderStatusChanged: (data: any) => {
+          if (data?.status === "CANCELLED") {
+            const isMyActive =
+              activeTripRef.current?.orderId === data.orderId ||
+              activeTripRef.current?.order?.orderNumber === data.orderNumber;
+
+            if (isMyActive) {
+              if (!dismissedCancelledIdsRef.current.has(data.orderId)) {
+                setCancelledTripInfo({
+                  orderId: data.orderId,
+                  orderNumber: data.orderNumber || activeTripRef.current?.order?.orderNumber || data.orderId,
+                  cancelReason: data.cancelReason || data.note || "Cancelled by store/admin",
+                });
+              }
+              setActiveTrip(null);
+            }
+          }
           loadDashboard();
           loadAvailableOrders(deliveryApi.getSelectedHub()?.id);
         },
@@ -393,31 +458,72 @@ export function useDeliveryController() {
     }
   };
 
+  const acknowledgeCancellation = () => {
+    if (cancelledTripInfo?.orderId) {
+      dismissedCancelledIdsRef.current.add(cancelledTripInfo.orderId);
+    }
+    setCancelledTripInfo(null);
+    setTab("dashboard");
+    stopOrderAlertLoop();
+    loadDashboard();
+    loadAvailableOrders(selectedHub?.id || deliveryApi.getSelectedHub()?.id);
+  };
+
+  const parseDropCoords = (order: any) => {
+    try {
+      if (order?.deliveryAddressSnapshotJson) {
+        const parsed = JSON.parse(order.deliveryAddressSnapshotJson);
+        if (parsed.latitude && parsed.longitude) {
+          return { lat: Number(parsed.latitude), lng: Number(parsed.longitude) };
+        }
+      }
+    } catch {}
+    if (order?.zone?.centerLat && order?.zone?.centerLng) {
+      return { lat: Number(order.zone.centerLat), lng: Number(order.zone.centerLng) };
+    }
+    const hLat = order?.hub?.latitude || selectedHub?.latitude;
+    const hLng = order?.hub?.longitude || selectedHub?.longitude;
+    if (hLat && hLng) {
+      return { lat: Number(hLat) + 0.008, lng: Number(hLng) + 0.008 };
+    }
+    return undefined;
+  };
+
   // Map Backend Order to UI DeliveryRequest
-  const currentRequest: DeliveryRequest | null = availableOrders.length > 0
+  const firstOrder = availableOrders[0];
+  const firstDropCoords = firstOrder ? parseDropCoords(firstOrder) : null;
+
+  const currentRequest: DeliveryRequest | null = firstOrder
     ? {
-        id: availableOrders[0].id,
-        orderNumber: availableOrders[0].orderNumber,
-        customer: availableOrders[0].customer?.name || "Customer",
-        customerPhone: availableOrders[0].customer?.phone,
-        pickup: availableOrders[0].hub?.name || selectedHub?.name || "FreshGo Hub",
-        pickupAddress: availableOrders[0].hub?.address || selectedHub?.address || "Hub Center",
+        id: firstOrder.id,
+        orderNumber: firstOrder.orderNumber,
+        customer: firstOrder.customer?.name || "Customer",
+        customerPhone: firstOrder.customer?.phone,
+        pickup: firstOrder.hub?.name || selectedHub?.name || "FreshGo Hub",
+        pickupAddress: firstOrder.hub?.address || selectedHub?.address || "Hub Center",
         dropAddress:
-          availableOrders[0].deliveryAddress ||
-          availableOrders[0].dropAddress ||
+          firstOrder.deliveryAddress ||
+          firstOrder.dropAddress ||
           "Doorstep Delivery Point",
+        hubLat: firstOrder.hub?.latitude || selectedHub?.latitude,
+        hubLng: firstOrder.hub?.longitude || selectedHub?.longitude,
+        dropLat: firstDropCoords?.lat,
+        dropLng: firstDropCoords?.lng,
         instructions: "Fresh cold-chain delivery · Handle with care",
-        payment: `${availableOrders[0].paymentMethod || "COD"} · ₹${availableOrders[0].totalAmount}`,
+        payment: `${firstOrder.paymentMethod || "COD"} · ₹${firstOrder.totalAmount}`,
+        paymentMethod: firstOrder.paymentMethod || "COD",
+        totalAmount: firstOrder.totalAmount || 0,
         distance: "3.5 km",
         distanceKm: 3.5,
         eta: "15-20 min",
         earnings: Math.round(45 + 3.5 * 12), // ₹45 base + ₹12/km
-        items: availableOrders[0].items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1,
-        itemsSummary: availableOrders[0].items?.map((i) => `${i.product?.name} x${i.quantity}`).join(", "),
+        items: firstOrder.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1,
+        itemsSummary: firstOrder.items?.map((i) => `${i.product?.name} x${i.quantity}`).join(", "),
       }
     : null;
 
   // Map ActiveTrip to UI ActiveDelivery
+  const activeDropCoords = activeTrip ? parseDropCoords(activeTrip.order) : null;
   const currentActiveDelivery: ActiveDelivery | null = activeTrip
     ? {
         id: activeTrip.order?.orderNumber || activeTrip.orderId,
@@ -431,8 +537,14 @@ export function useDeliveryController() {
           activeTrip.order?.deliveryAddress ||
           activeTrip.order?.dropAddress ||
           "Doorstep Delivery Point",
+        hubLat: activeTrip.order?.hub?.latitude || selectedHub?.latitude,
+        hubLng: activeTrip.order?.hub?.longitude || selectedHub?.longitude,
+        dropLat: activeDropCoords?.lat,
+        dropLng: activeDropCoords?.lng,
         instructions: "Cold-chain vacuum packed · 15-min express delivery",
         payment: `${activeTrip.order?.paymentMethod || "COD"} · ₹${activeTrip.order?.totalAmount}`,
+        paymentMethod: activeTrip.order?.paymentMethod || "COD",
+        totalAmount: activeTrip.order?.totalAmount || 0,
         distance: `${activeTrip.distanceKm || 3.5} km`,
         distanceKm: activeTrip.distanceKm || 3.5,
         eta: "14 min",
@@ -442,17 +554,46 @@ export function useDeliveryController() {
       }
     : null;
 
-  // Map Recent Deliveries to UI DeliveryHistoryItem
-  const historyItems: DeliveryHistoryItem[] = recentDeliveries.map((item) => ({
-    id: item.order?.orderNumber || item.id,
-    orderNumber: item.order?.orderNumber,
-    customer: "FreshGo Customer",
-    area: item.order?.hub?.name || selectedHub?.name || "Kozhikode",
-    completedAt: item.completedAt ? new Date(item.completedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Recently",
-    distance: `${item.distanceKm || 3.2} km`,
-    earnings: Math.round(45 + (item.distanceKm || 3.2) * 12),
-    status: item.phase === "DELIVERED" ? "Delivered" : "Cancelled",
-  }));
+  // Map Recent Deliveries to UI DeliveryHistoryItem (deduplicated by order)
+  const seenOrderIdsInHistory = new Set<string>();
+  const historyItems: DeliveryHistoryItem[] = [];
+
+  for (const item of recentDeliveries) {
+    const uniqueKey = item.order?.orderNumber || item.orderId || item.id;
+    if (seenOrderIdsInHistory.has(uniqueKey)) continue;
+    seenOrderIdsInHistory.add(uniqueKey);
+
+    let customerArea = item.order?.hub?.name || selectedHub?.name || "Delivery Area";
+    if (item.order?.deliveryAddressSnapshotJson) {
+      try {
+        const snap = typeof item.order.deliveryAddressSnapshotJson === "string"
+          ? JSON.parse(item.order.deliveryAddressSnapshotJson)
+          : item.order.deliveryAddressSnapshotJson;
+        if (snap?.area || snap?.street || snap?.city) {
+          customerArea = [snap.area || snap.street, snap.city].filter(Boolean).join(", ");
+        }
+      } catch {}
+    }
+    const isCancelled = item.phase === "CANCELLED" || item.order?.status === "CANCELLED";
+    const dateToFormat = item.completedAt || item.acceptedAt;
+
+    historyItems.push({
+      id: item.order?.orderNumber || item.id,
+      tripId: item.id,
+      orderNumber: item.order?.orderNumber,
+      customer: "FreshGo Customer",
+      area: customerArea,
+      completedAt: dateToFormat
+        ? new Date(dateToFormat).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : "Recently",
+      distance: `${item.distanceKm || 3.2} km`,
+      earnings: isCancelled ? 0 : Math.round(45 + (item.distanceKm || 3.2) * 12),
+      status: isCancelled ? "Cancelled" : "Delivered",
+      cancelReason: isCancelled
+        ? item.order?.cancelReason || item.order?.notes || "Cancelled from Admin Control Tower"
+        : undefined,
+    });
+  }
 
   const updateSettings = (update: Partial<DeliverySettings>) => {
     unlockAudioContext();
@@ -531,11 +672,16 @@ export function useDeliveryController() {
     request: currentRequest,
     availableOrders,
     activeDelivery: currentActiveDelivery,
+    cancelledTripInfo,
+    acknowledgeCancellation,
     acceptRequest,
+
     declineRequest,
     advanceDelivery,
     history: historyItems,
     todayEarnings,
+    codCashInHand,
+    codLimitExceeded,
     settings,
     updateSettings,
     testSoundAlert,

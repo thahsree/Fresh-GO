@@ -51,6 +51,12 @@ export default function AdminPage() {
       setCurrentUser(adminUser);
       setIsAuthChecking(false);
     }
+
+    api.ensureAdminAuth().then((freshUser) => {
+      if (freshUser) {
+        setCurrentUser(freshUser);
+      }
+    });
   }, [router]);
 
   const showToast = (
@@ -77,8 +83,12 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, status: string) => {
-    const res = await dispatchController.updateOrderStatus(orderId, status);
+  const handleUpdateStatus = async (
+    orderId: string,
+    status: string,
+    note?: string
+  ) => {
+    const res = await dispatchController.updateOrderStatus(orderId, status, note);
     if (res?.success) {
       showToast(res.message || `Order status updated to ${status}`, "success");
     } else {
@@ -406,6 +416,7 @@ export default function AdminPage() {
             orders={dispatchController.orders}
             products={productController.products}
             partners={dispatchController.partners}
+            currentUser={currentUser}
           />
         )}
 
@@ -492,6 +503,7 @@ export default function AdminPage() {
           <DispatchView
             assigned={assigned}
             onAssign={assign}
+            onUpdateStatus={handleUpdateStatus}
             orders={dispatchController.orders}
             partners={dispatchController.partners}
             currentUser={currentUser}

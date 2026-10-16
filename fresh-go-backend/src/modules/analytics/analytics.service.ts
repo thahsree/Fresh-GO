@@ -111,7 +111,7 @@ export class AnalyticsService {
           hubId: hId,
           hubName: o.hub?.name || "Main Hub",
           hubCode: o.hub?.code || "HUB-MAIN",
-          city: o.hub?.city || "Kozhikode",
+          city: o.hub?.city || o.hub?.name || "Hub City",
           totalOrders: 0,
           deliveredOrders: 0,
           cancelledOrders: 0,

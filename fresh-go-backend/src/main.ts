@@ -11,9 +11,14 @@ import helmet from "helmet";
 import * as express from "express";
 import * as path from "path";
 import * as fs from "fs";
+import { ensureLocalRedis } from "./common/redis/local-redis";
 
 async function bootstrap() {
   const logger = new Logger("FreshGoBootstrap");
+
+  // Automatically start local Redis server if not already running (zero separate commands required)
+  await ensureLocalRedis(6379, "127.0.0.1", logger);
+
   const app = await NestFactory.create(AppModule);
 
   const configService = app.get(ConfigService);
@@ -446,6 +451,7 @@ async function bootstrap() {
 </html>`);
   });
 
+  app.enableShutdownHooks();
   await app.listen(port);
   logger.log(`🚀 FreshGo Server listening on: http://localhost:${port}/api/v1`);
   logger.log(

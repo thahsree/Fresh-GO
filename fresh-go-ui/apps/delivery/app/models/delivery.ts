@@ -21,15 +21,23 @@ export type DeliveryRequest = {
   dropAddress: string;
   instructions: string;
   payment: string;
+  paymentMethod?: string;
+  totalAmount?: number;
   distance: string;
   distanceKm?: number;
   eta: string;
   earnings: number;
   items: number;
   hubId?: string;
+  hubLat?: number;
+  hubLng?: number;
+  dropLat?: number;
+  dropLng?: number;
   status?: string;
   itemsSummary?: string;
+  cancelReason?: string;
 };
+
 
 export type ActiveDelivery = DeliveryRequest & {
   phase: DeliveryPhase;
@@ -38,6 +46,7 @@ export type ActiveDelivery = DeliveryRequest & {
 
 export type DeliveryHistoryItem = {
   id: string;
+  tripId?: string;
   orderNumber?: string;
   customer: string;
   area: string;
@@ -45,6 +54,7 @@ export type DeliveryHistoryItem = {
   distance: string;
   earnings: number;
   status: HistoryStatus;
+  cancelReason?: string;
 };
 
 export type AlertSoundType =
@@ -64,7 +74,7 @@ export type DeliverySettings = {
 
 export const defaultSettings: DeliverySettings = {
   vehicle: "Bike",
-  preferredZone: "Kozhikode Central",
+  preferredZone: "All Zones",
   soundAlerts: true,
   alertSound: "chime",
 };

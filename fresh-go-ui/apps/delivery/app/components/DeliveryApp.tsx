@@ -9,6 +9,7 @@ import { DeliveryNavigation } from "./DeliveryNavigation";
 import { EarningsView } from "./EarningsView";
 import { HelpCenterView } from "./HelpCenterView";
 import { HistoryView } from "./HistoryView";
+import { OrderCancelledModal } from "./OrderCancelledModal";
 import { ReportIssueView } from "./ReportIssueView";
 import { SafetyToolkitView } from "./SafetyToolkitView";
 import { SettingsView } from "./SettingsView";
@@ -34,8 +35,10 @@ export function DeliveryApp() {
           isOnline={delivery.isOnline}
           onOpenSafety={delivery.openSafety}
           partnerName={delivery.user.name}
-          hubName={delivery.selectedHub?.name || "Kozhikode Hub"}
+          hubName={delivery.selectedHub?.name || "Fulfillment Hub"}
           vehicleType={delivery.settings.vehicle}
+          codCashInHand={delivery.codCashInHand}
+          codLimitExceeded={delivery.codLimitExceeded}
         />
 
         <section className="delivery-content">
@@ -46,6 +49,8 @@ export function DeliveryApp() {
               availableOrdersCount={delivery.availableOrders.length}
               todayEarnings={delivery.todayEarnings}
               selectedHub={delivery.selectedHub}
+              codCashInHand={delivery.codCashInHand}
+              codLimitExceeded={delivery.codLimitExceeded}
               onAccept={delivery.acceptRequest}
               onDecline={delivery.declineRequest}
               onSilenceAlert={delivery.stopSoundAlert}
@@ -63,6 +68,7 @@ export function DeliveryApp() {
               onOpenSafety={delivery.openSafety}
             />
           )}
+
 
           {/* Earnings tab commented out
           {delivery.tab === "earnings" && (
@@ -122,6 +128,13 @@ export function DeliveryApp() {
 
         <DeliveryNavigation activeTab={delivery.tab} onTabChange={delivery.setTab} />
       </main>
+
+      {delivery.cancelledTripInfo && (
+        <OrderCancelledModal
+          cancelledDelivery={delivery.cancelledTripInfo}
+          onViewAvailableOrders={delivery.acknowledgeCancellation}
+        />
+      )}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { colors, radius, spacing } from "@fresh-food/design-tokens";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
   Image,
   Pressable,
   StyleProp,
@@ -9,6 +10,7 @@ import {
   View,
   ViewStyle,
 } from "react-native";
+
 
 export type ProductCardData = {
   id: string;
@@ -34,6 +36,9 @@ export type ProductCardProps = {
   favoriteIcon?: React.ReactNode;
   addIcon?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  quantity?: number;
+  onIncrement?: () => void;
+  onDecrement?: () => void;
 };
 
 export function ProductCard({
@@ -45,6 +50,9 @@ export function ProductCard({
   favoriteIcon,
   addIcon,
   style,
+  quantity = 0,
+  onIncrement,
+  onDecrement,
 }: ProductCardProps) {
   const isOutOfStock =
     product.isInStock === false ||
@@ -55,6 +63,23 @@ export function ProductCard({
     product.availableStockKg !== undefined &&
     product.availableStockKg > 0 &&
     product.availableStockKg <= 5;
+
+  const isAdded = Boolean(quantity && quantity > 0);
+  const animVal = useRef(new Animated.Value(isAdded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(animVal, {
+      toValue: isAdded ? 1 : 0,
+      friction: 8,
+      tension: 85,
+      useNativeDriver: false,
+    }).start();
+  }, [isAdded]);
+
+  const buttonWidth = animVal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [24, 52],
+  });
 
   return (
     <View style={[styles.card, style]}>
@@ -139,24 +164,55 @@ export function ProductCard({
             </Text>
           </Pressable>
 
-          {onAdd && !isOutOfStock && (
-            <Pressable
-              accessibilityLabel={`Add ${product.name} to cart`}
-              accessibilityRole="button"
-              onPress={onAdd}
-              style={({ pressed }) => [
-                styles.addButton,
-                pressed && styles.addButtonPressed,
-              ]}
-            >
-              {addIcon || <Text style={styles.addIconText}>+</Text>}
-            </Pressable>
-          )}
-          {isOutOfStock && (
+          {!isOutOfStock ? (
+            <Animated.View style={[styles.actionWrapper, { width: buttonWidth }]}>
+              {isAdded ? (
+                <View style={styles.stepperContainer}>
+                  <Pressable
+                    accessibilityLabel={`Decrease quantity of ${product.name}`}
+                    accessibilityRole="button"
+                    onPress={onDecrement}
+                    style={({ pressed }) => [
+                      styles.stepperButton,
+                      pressed && styles.stepperButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.stepperIconText}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepperValueText}>{quantity}</Text>
+                  <Pressable
+                    accessibilityLabel={`Increase quantity of ${product.name}`}
+                    accessibilityRole="button"
+                    onPress={onIncrement || onAdd}
+                    style={({ pressed }) => [
+                      styles.stepperButton,
+                      pressed && styles.stepperButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.stepperIconText}>+</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                onAdd && (
+                  <Pressable
+                    accessibilityLabel={`Add ${product.name} to cart`}
+                    accessibilityRole="button"
+                    onPress={onAdd}
+                    style={({ pressed }) => [
+                      styles.addButton,
+                      pressed && styles.addButtonPressed,
+                    ]}
+                  >
+                    {addIcon || <Text style={styles.addIconText}>+</Text>}
+                  </Pressable>
+                )
+              )}
+            </Animated.View>
+          ) : (
             <View
               style={[
-                styles.addButton,
-                { backgroundColor: "#E2E8F0", borderColor: "#CBD5E1" },
+                styles.actionWrapper,
+                { width: 24, backgroundColor: "#E2E8F0", borderColor: "#CBD5E1" },
               ]}
             >
               <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "800" }}>✕</Text>
@@ -263,11 +319,17 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: "600",
   },
-  addButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  actionWrapper: {
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.primary,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addButton: {
+    width: "100%",
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -276,8 +338,39 @@ const styles = StyleSheet.create({
   },
   addIconText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
-    lineHeight: 18,
+    lineHeight: 16,
+  },
+  stepperContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    height: "100%",
+    paddingHorizontal: 2,
+  },
+  stepperButton: {
+    width: 17,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperButtonPressed: {
+    opacity: 0.6,
+  },
+  stepperIconText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 14,
+  },
+  stepperValueText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    minWidth: 12,
+    textAlign: "center",
   },
 });
+

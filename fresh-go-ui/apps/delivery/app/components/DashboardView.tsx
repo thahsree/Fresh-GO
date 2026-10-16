@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@fresh-food/ui";
-import { Bell, CheckCircle2, CircleDollarSign, MapPin, PackageCheck, Radio, VolumeX, X } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle2, CircleDollarSign, MapPin, PackageCheck, Radio, VolumeX, X } from "lucide-react";
 import { DeliveryRequest } from "../models/delivery";
 import { DeliveryHub } from "../lib/api";
 
@@ -15,6 +15,8 @@ type DashboardViewProps = {
   todayEarnings: number;
   selectedHub: DeliveryHub | null;
   onOpenSettings?: () => void;
+  codCashInHand?: number;
+  codLimitExceeded?: boolean;
 };
 
 export function DashboardView({
@@ -28,6 +30,8 @@ export function DashboardView({
   todayEarnings,
   selectedHub,
   onOpenSettings,
+  codCashInHand = 0,
+  codLimitExceeded = false,
 }: DashboardViewProps) {
   const [isAlertMuted, setIsAlertMuted] = useState(false);
 
@@ -70,14 +74,63 @@ export function DashboardView({
           <strong>{request ? "1" : "0"}</strong>
           <span>Ready to accept</span>
         </div>
-        {/* Earnings metric card commented out
-        <div className="metric-card highlight">
-          <CircleDollarSign size={18} />
-          <strong>₹{todayEarnings.toLocaleString()}</strong>
-          <span>Earned today</span>
+        <div
+          className={`metric-card ${codCashInHand > 0 ? "highlight" : ""}`}
+          style={
+            codLimitExceeded
+              ? { borderColor: "#EF4444", background: "#FEF2F2" }
+              : codCashInHand > 0
+              ? { borderColor: "#F59E0B", background: "#FFFBEB" }
+              : undefined
+          }
+        >
+          <CircleDollarSign
+            size={18}
+            color={
+              codLimitExceeded
+                ? "#DC2626"
+                : codCashInHand > 0
+                ? "#D97706"
+                : undefined
+            }
+          />
+          <strong
+            style={{
+              color:
+                codLimitExceeded
+                  ? "#DC2626"
+                  : codCashInHand > 0
+                  ? "#B45309"
+                  : undefined,
+            }}
+          >
+            ₹{codCashInHand.toLocaleString("en-IN")}
+          </strong>
+          <span>Cash in Hand (COD)</span>
         </div>
-        */}
       </section>
+
+      {codLimitExceeded && (
+        <div
+          style={{
+            margin: "0 0 16px",
+            padding: "12px 14px",
+            borderRadius: "10px",
+            background: "#FEF2F2",
+            border: "1px solid #F87171",
+            color: "#991B1B",
+            fontSize: "12.5px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
+          <span>
+            <strong>Cash Limit Reached:</strong> You hold ₹{codCashInHand.toLocaleString("en-IN")} in COD cash. Please visit your hub manager to deposit collected cash.
+          </span>
+        </div>
+      )}
 
       {request ? (
         <section className="card request-card" style={{ borderColor: "#1f4d46", borderWidth: 2 }}>

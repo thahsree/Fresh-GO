@@ -47,7 +47,7 @@ export function SafetyToolkitView({
   const [showHospitals, setShowHospitals] = useState(false);
 
   const hospitalsList = [
-    { name: "Baby Memorial Hospital", distance: "2.4 km", area: "Indira Gandhi Road, Kozhikode", phone: "0495-2777777" },
+    { name: "City Care Hospital", distance: "2.4 km", area: "Central Medical District", phone: "1800-419-0120" },
     { name: "Aster MIMS Hospital", distance: "4.8 km", area: "Mini Bypass Road, Govindapuram", phone: "0495-2488000" },
     { name: "Govt Medical College Hospital", distance: "6.1 km", area: "Medical College PO", phone: "0495-2350216" },
   ];
@@ -90,7 +90,7 @@ export function SafetyToolkitView({
           <span className="sos-live-pill">
             <span className="pulsing-dot" /> Live GPS Monitoring
           </span>
-          <span className="zone-label">Zone 1 · Kozhikode</span>
+          <span className="zone-label">Active Hub Network</span>
         </div>
         <div className="sos-main">
           <div>
@@ -121,7 +121,7 @@ export function SafetyToolkitView({
               </div>
               <div>
                 <h3>Emergency SOS Activation</h3>
-                <p>Location: Mavoor Road, Kozhikode (11.2588° N, 75.7804° E)</p>
+                <p>Location: Live GPS Coordinates Shared</p>
               </div>
               <button
                 type="button"
@@ -289,7 +289,7 @@ export function SafetyToolkitView({
               </div>
               <div>
                 <h3>Two-Wheeler Breakdown Assist</h3>
-                <p>Kozhikode Partner Assistance Fleet</p>
+                <p>Partner Roadside Assistance Fleet</p>
               </div>
               <button
                 type="button"
@@ -365,7 +365,7 @@ export function SafetyToolkitView({
           <div className="metric-box">
             <span>Cashless Hospitals</span>
             <strong>{initialInsurancePolicy.cashlessHospitalCount}</strong>
-            <small>Kozhikode Network</small>
+            <small>Active Network</small>
           </div>
         </div>
 
@@ -393,7 +393,7 @@ export function SafetyToolkitView({
 
         {showHospitals && (
           <div className="cashless-hospitals-drawer">
-            <h4>Network Hospitals in Kozhikode</h4>
+            <h4>Network Hospitals Nearby</h4>
             {hospitalsList.map((hospital) => (
               <div key={hospital.name} className="hospital-item">
                 <div>

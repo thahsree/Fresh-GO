@@ -21,15 +21,15 @@ type GoogleMapsPickerProps = {
 };
 
 export function GoogleMapsPicker({
-  initialLat = 11.2588,
-  initialLng = 75.7804,
+  initialLat,
+  initialLng,
   radiusKm = 10,
   onLocationSelect,
   onRadiusChange,
 }: GoogleMapsPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [lat, setLat] = useState(initialLat);
-  const [lng, setLng] = useState(initialLng);
+  const [lat, setLat] = useState(initialLat || 10.8505);
+  const [lng, setLng] = useState(initialLng || 76.2711);
   const [radius, setRadius] = useState(radiusKm);
   const [addressQuery, setAddressQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -294,7 +294,7 @@ export function GoogleMapsPicker({
             value={addressQuery}
             onChange={(e) => setAddressQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearchAddress()}
-            placeholder="Search address or area in Kerala (e.g. Kozhikode Beach, Calicut)..."
+            placeholder="Search address, landmark or area in Kerala..."
             style={{
               width: "100%",
               padding: "9px 12px 9px 36px",

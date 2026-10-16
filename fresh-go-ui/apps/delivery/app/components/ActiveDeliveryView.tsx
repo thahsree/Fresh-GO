@@ -1,5 +1,8 @@
-import { AlertCircle, Check, ChevronRight, MapPin, Navigation, Phone, ShieldAlert } from "lucide-react";
+"use client";
+
+import { AlertCircle, Check, ChevronRight, Navigation, Phone, ShieldAlert, XCircle } from "lucide-react";
 import { ActiveDelivery, DeliveryPhase } from "../models/delivery";
+import { DeliveryRouteMap } from "./DeliveryRouteMap";
 
 type ActiveDeliveryViewProps = {
   delivery: ActiveDelivery | null;
@@ -37,6 +40,7 @@ export function ActiveDeliveryView({
   onOpenReport,
   onOpenSafety,
 }: ActiveDeliveryViewProps) {
+  // 1. No Active Delivery Empty State
   if (!delivery) {
     return (
       <section className="empty-state active-empty">
@@ -85,16 +89,18 @@ export function ActiveDeliveryView({
         ))}
       </div>
 
-      <section className="route-map">
-        <div className="route-line" />
-        <div className="map-location map-start">
-          <MapPin size={18} />
-        </div>
-        <div className="map-location map-end">
-          <MapPin size={18} />
-        </div>
-        <span>Live Route · {delivery.eta}</span>
-      </section>
+      {/* Real Live OpenStreetMap & OSRM Routing Map */}
+      <DeliveryRouteMap
+        pickupAddress={delivery.pickupAddress}
+        dropAddress={delivery.dropAddress}
+        hubLat={delivery.hubLat}
+        hubLng={delivery.hubLng}
+        dropLat={delivery.dropLat}
+        dropLng={delivery.dropLng}
+        phase={delivery.phase}
+        eta={delivery.eta}
+        distance={delivery.distance}
+      />
 
       <section className="card active-card">
         <div className="card-heading">
@@ -104,11 +110,6 @@ export function ActiveDeliveryView({
             </span>
             <h2>{delivery.phase === "on-the-way" ? delivery.customer : delivery.pickup}</h2>
           </div>
-          {/* Earnings on active order section commented out
-          <span className="earnings-chip" style={{ background: "#e4ece9", color: "#1f4d46" }}>
-            Earn ₹{delivery.earnings}
-          </span>
-          */}
         </div>
 
         <p className="address">{targetAddress}</p>
@@ -156,6 +157,44 @@ export function ActiveDeliveryView({
           )}
         </div>
       </section>
+
+      {delivery.phase === "on-the-way" && (delivery.paymentMethod === "COD" || delivery.payment?.includes("COD")) && (
+        <div
+          style={{
+            margin: "14px 0",
+            padding: "14px 16px",
+            borderRadius: "12px",
+            background: "#FEF3C7",
+            border: "1.5px solid #F59E0B",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            boxShadow: "0 2px 6px rgba(245, 158, 11, 0.15)",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "12px",
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                color: "#92400E",
+              }}
+            >
+              💵 Cash on Delivery (COD)
+            </div>
+            <div style={{ fontSize: "12.5px", color: "#78350F", marginTop: "2px" }}>
+              Collect physical cash from customer before hand-off
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ fontSize: "19px", fontWeight: 900, color: "#92400E" }}>
+              ₹{delivery.totalAmount || delivery.payment?.replace(/[^0-9]/g, "") || "0"}
+            </span>
+          </div>
+        </div>
+      )}
 
       <button
         className="button button-primary delivery-advance"

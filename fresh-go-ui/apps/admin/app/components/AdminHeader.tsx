@@ -7,18 +7,17 @@ import { MapPin, LogOut } from "lucide-react";
 
 type AdminHeaderProps = {
   section: AdminSection;
-  onViewOrders: () => void;
+  onViewOrders?: () => void;
   isBackendConnected?: boolean;
 };
 
 export function AdminHeader({
   section,
-  onViewOrders,
   isBackendConnected = false,
 }: AdminHeaderProps) {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [dateStr, setDateStr] = useState("Kozhikode Central Hub");
+  const [dateStr, setDateStr] = useState("Today");
 
   useEffect(() => {
     setMounted(true);
@@ -110,10 +109,6 @@ export function AdminHeader({
             {adminUser.role}: {adminUser.phone}
           </span>
         )}
-
-        <button className="primary" onClick={onViewOrders}>
-          View order queue
-        </button>
 
         <button
           onClick={handleLogout}

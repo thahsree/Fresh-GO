@@ -15,15 +15,17 @@ import {
   Store,
   Receipt,
   Eye,
+  AlertCircle,
 } from "lucide-react";
 import { QueueOrder } from "../lib/api";
 import { CustomDropdown } from "./CustomDropdown";
+import { CancelOrderModal } from "./CancelOrderModal";
 
 type OrdersViewProps = {
   assigned?: string[];
   onAssign?: (id: string) => void;
   liveOrders?: QueueOrder[];
-  onUpdateStatus?: (id: string, status: string) => void;
+  onUpdateStatus?: (id: string, status: string, note?: string) => Promise<void> | void;
   isLoading?: boolean;
 };
 
@@ -93,6 +95,12 @@ export function OrdersView({
 }: OrdersViewProps) {
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<QueueOrder | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<{
+    id: string;
+    orderNumber?: string;
+    customerName?: string;
+    totalAmount?: number;
+  } | null>(null);
 
   const hasLiveOrders = liveOrders && liveOrders.length > 0;
 
@@ -120,7 +128,7 @@ export function OrdersView({
           amount: o.totalAmount,
           rawStatus: o.status,
           statusObj: formatStatus(o.status),
-          zone: o.deliveryAddress?.zoneName || (o as any).hub?.name || "Kozhikode Central",
+          zone: o.deliveryAddress?.zoneName || (o as any).hub?.name || "Delivery Zone",
           isAssigned: Boolean(
             o.deliveryPartner ||
               o.status === "ASSIGNED" ||
@@ -348,6 +356,29 @@ export function OrdersView({
                             Ready
                           </button>
                         )}
+                        {onUpdateStatus &&
+                          order.rawStatus !== "DELIVERED" &&
+                          order.rawStatus !== "CANCELLED" && (
+                            <button
+                              type="button"
+                              className="assign"
+                              style={{
+                                background: "#BE4436",
+                                color: "#FFFFFF",
+                                border: "none",
+                              }}
+                              onClick={() => {
+                                setOrderToCancel({
+                                  id: order.id,
+                                  orderNumber: order.displayId,
+                                  customerName: order.customer,
+                                  totalAmount: order.amount,
+                                });
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -529,10 +560,226 @@ export function OrdersView({
               </button>
             </div>
 
+            {/* Top Status & Action Workflow Bar */}
+            {onUpdateStatus && (
+              <div
+                style={{
+                  background: "#F8FAF9",
+                  borderBottom: "1px solid var(--border)",
+                  padding: "14px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "12px", fontWeight: "800", color: "var(--dark)" }}>
+                    Update Order Status:
+                  </span>
+
+                  {/* Contextual Action Buttons */}
+                  {selectedOrder.status === "PLACED" && (
+                    <>
+                      <button
+                        type="button"
+                        className="assign"
+                        style={{ background: "#0F2E29", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                        onClick={async () => {
+                          await onUpdateStatus(selectedOrder.id, "CONFIRMED");
+                          setSelectedOrder((prev) => prev ? { ...prev, status: "CONFIRMED" } : null);
+                        }}
+                      >
+                        ✓ Confirm Order
+                      </button>
+                      <button
+                        type="button"
+                        className="assign"
+                        style={{ background: "#2E7D5B", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                        onClick={async () => {
+                          await onUpdateStatus(selectedOrder.id, "CUTTING_PREPARING");
+                          setSelectedOrder((prev) => prev ? { ...prev, status: "CUTTING_PREPARING" } : null);
+                        }}
+                      >
+                        🔪 Cut / Prep
+                      </button>
+                    </>
+                  )}
+
+                  {selectedOrder.status === "CONFIRMED" && (
+                    <>
+                      <button
+                        type="button"
+                        className="assign"
+                        style={{ background: "#0F2E29", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                        onClick={async () => {
+                          await onUpdateStatus(selectedOrder.id, "CUTTING_PREPARING");
+                          setSelectedOrder((prev) => prev ? { ...prev, status: "CUTTING_PREPARING" } : null);
+                        }}
+                      >
+                        🔪 Move to Cutting / Prep
+                      </button>
+                      <button
+                        type="button"
+                        className="assign"
+                        style={{ background: "#2E7D5B", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                        onClick={async () => {
+                          await onUpdateStatus(selectedOrder.id, "PACKED");
+                          setSelectedOrder((prev) => prev ? { ...prev, status: "PACKED" } : null);
+                        }}
+                      >
+                        📦 Mark Packed
+                      </button>
+                    </>
+                  )}
+
+                  {selectedOrder.status === "CUTTING_PREPARING" && (
+                    <>
+                      <button
+                        type="button"
+                        className="assign"
+                        style={{ background: "#2E7D5B", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                        onClick={async () => {
+                          await onUpdateStatus(selectedOrder.id, "PACKED");
+                          setSelectedOrder((prev) => prev ? { ...prev, status: "PACKED" } : null);
+                        }}
+                      >
+                        📦 Mark Packed
+                      </button>
+                      <button
+                        type="button"
+                        className="assign"
+                        style={{ background: "#1F4D46", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                        onClick={async () => {
+                          await onUpdateStatus(selectedOrder.id, "DISPATCH_READY");
+                          setSelectedOrder((prev) => prev ? { ...prev, status: "DISPATCH_READY" } : null);
+                        }}
+                      >
+                        🚀 Ready for Dispatch
+                      </button>
+                    </>
+                  )}
+
+                  {selectedOrder.status === "PACKED" && (
+                    <button
+                      type="button"
+                      className="assign"
+                      style={{ background: "#1F4D46", color: "#FFF", padding: "8px 14px", fontSize: "12px", borderRadius: "8px" }}
+                      onClick={async () => {
+                        await onUpdateStatus(selectedOrder.id, "DISPATCH_READY");
+                        setSelectedOrder((prev) => prev ? { ...prev, status: "DISPATCH_READY" } : null);
+                      }}
+                    >
+                      🚀 Ready for Dispatch
+                    </button>
+                  )}
+
+                  {selectedOrder.status !== "DELIVERED" && selectedOrder.status !== "CANCELLED" && (
+                    <button
+                      type="button"
+                      style={{
+                        background: "#FBE7E3",
+                        color: "#BE4436",
+                        border: "1px solid rgba(190, 68, 54, 0.3)",
+                        padding: "8px 14px",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        setOrderToCancel({
+                          id: selectedOrder.id,
+                          orderNumber: selectedOrder.orderNumber || selectedOrder.id.slice(0, 8),
+                          customerName: selectedOrder.customer?.name || selectedOrder.customer?.phone,
+                          totalAmount: selectedOrder.totalAmount,
+                        });
+                      }}
+                    >
+                      ✕ Cancel Order
+                    </button>
+                  )}
+                </div>
+
+                {/* Direct Dropdown to set any status */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <CustomDropdown
+                    value={selectedOrder.status}
+                    onChange={async (nextStatus) => {
+                      if (nextStatus === "CANCELLED") {
+                        setOrderToCancel({
+                          id: selectedOrder.id,
+                          orderNumber: selectedOrder.orderNumber || selectedOrder.id.slice(0, 8),
+                          customerName: selectedOrder.customer?.name || selectedOrder.customer?.phone,
+                          totalAmount: selectedOrder.totalAmount,
+                        });
+                      } else {
+                        await onUpdateStatus(selectedOrder.id, nextStatus);
+                        setSelectedOrder((prev) => prev ? { ...prev, status: nextStatus } : null);
+                      }
+                    }}
+                    options={[
+                      { value: "PLACED", label: "Placed / New" },
+                      { value: "CONFIRMED", label: "Confirmed" },
+                      { value: "CUTTING_PREPARING", label: "Cutting / Prep" },
+                      { value: "PACKED", label: "Packed" },
+                      { value: "DISPATCH_READY", label: "Ready for Dispatch" },
+                      { value: "ASSIGNED", label: "Assigned" },
+                      { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
+                      { value: "DELIVERED", label: "Delivered" },
+                      { value: "CANCELLED", label: "Cancelled" },
+                    ]}
+                    size="sm"
+                    style={{ minWidth: "165px" }}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Body */}
             <div className="order-drawer-body">
               {/* Left Column: Items & Cutting Preparations */}
               <div>
+                {selectedOrder.status === "CANCELLED" && (
+                  <div
+                    style={{
+                      background: "#FEF2F2",
+                      border: "1px solid #FECACA",
+                      borderRadius: 12,
+                      padding: "12px 16px",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        color: "#DC2626",
+                        fontWeight: 800,
+                        fontSize: 13,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <AlertCircle size={15} />
+                      Order Cancelled
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12.5,
+                        color: "#7F1D1D",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Reason:{" "}
+                      {(selectedOrder as any).cancelReason ||
+                        selectedOrder.notes ||
+                        "Cancelled by store/admin"}
+                    </p>
+                  </div>
+                )}
                 <div
                   style={{
                     display: "flex",
@@ -1054,113 +1301,31 @@ export function OrdersView({
                     </div>
                   </div>
                 </div>
-
-                {/* Status Update Quick Buttons */}
-                {onUpdateStatus && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                    {(selectedOrder.status === "CONFIRMED" ||
-                      selectedOrder.status === "PLACED") && (
-                      <button
-                        type="button"
-                        className="primary"
-                        style={{
-                          flex: 1,
-                          padding: "10px",
-                          fontSize: 12,
-                          borderRadius: 8,
-                        }}
-                        onClick={() => {
-                          onUpdateStatus(
-                            selectedOrder.id,
-                            "CUTTING_PREPARING"
-                          );
-                          setSelectedOrder((prev) =>
-                            prev ? { ...prev, status: "CUTTING_PREPARING" } : null
-                          );
-                        }}
-                      >
-                        🔪 Move to Cutting / Prep
-                      </button>
-                    )}
-                    {selectedOrder.status === "CUTTING_PREPARING" && (
-                      <button
-                        type="button"
-                        className="primary"
-                        style={{
-                          flex: 1,
-                          padding: "10px",
-                          fontSize: 12,
-                          borderRadius: 8,
-                          background: "#2E7D5B",
-                        }}
-                        onClick={() => {
-                          onUpdateStatus(selectedOrder.id, "PACKED");
-                          setSelectedOrder((prev) =>
-                            prev ? { ...prev, status: "PACKED" } : null
-                          );
-                        }}
-                      >
-                        📦 Mark as Packed
-                      </button>
-                    )}
-                    {selectedOrder.status === "PACKED" && (
-                      <button
-                        type="button"
-                        className="primary"
-                        style={{
-                          flex: 1,
-                          padding: "10px",
-                          fontSize: 12,
-                          borderRadius: 8,
-                          background: "#1F4D46",
-                        }}
-                        onClick={() => {
-                          onUpdateStatus(selectedOrder.id, "DISPATCH_READY");
-                          setSelectedOrder((prev) =>
-                            prev ? { ...prev, status: "DISPATCH_READY" } : null
-                          );
-                        }}
-                      >
-                        🚀 Ready for Dispatch
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Direct Status Selector */}
-                {onUpdateStatus && (
-                  <div style={{ marginTop: 10 }}>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: 4 }}>
-                      Update Status:
-                    </label>
-                    <CustomDropdown
-                      value={selectedOrder.status}
-                      onChange={(nextStatus) => {
-                        onUpdateStatus(selectedOrder.id, nextStatus);
-                        setSelectedOrder((prev) =>
-                          prev ? { ...prev, status: nextStatus } : null
-                        );
-                      }}
-                      options={[
-                        { value: "PLACED", label: "Placed / New" },
-                        { value: "CONFIRMED", label: "Confirmed" },
-                        { value: "CUTTING_PREPARING", label: "Cutting / Prep" },
-                        { value: "PACKED", label: "Packed" },
-                        { value: "DISPATCH_READY", label: "Ready for Dispatch" },
-                        { value: "ASSIGNED", label: "Assigned" },
-                        { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
-                        { value: "DELIVERED", label: "Delivered" },
-                        { value: "CANCELLED", label: "Cancelled" },
-                      ]}
-                      size="sm"
-                    />
-                  </div>
-                )}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Custom Confirmation Modal for Cancelling Orders */}
+      <CancelOrderModal
+        isOpen={Boolean(orderToCancel)}
+        orderId={orderToCancel?.id || null}
+        orderNumber={orderToCancel?.orderNumber}
+        customerName={orderToCancel?.customerName}
+        totalAmount={orderToCancel?.totalAmount}
+        onClose={() => setOrderToCancel(null)}
+        onConfirm={async (id, reason) => {
+          if (onUpdateStatus) {
+            await onUpdateStatus(id, "CANCELLED", reason);
+            if (selectedOrder && selectedOrder.id === id) {
+              setSelectedOrder((prev) =>
+                prev ? { ...prev, status: "CANCELLED" } : null
+              );
+            }
+          }
+        }}
+      />
     </section>
   );
 }

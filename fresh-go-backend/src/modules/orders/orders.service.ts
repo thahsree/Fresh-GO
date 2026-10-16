@@ -22,23 +22,64 @@ import {
   PaymentMethod,
   Role,
   User,
+  DeliveryPhase,
 } from "@prisma/client";
 
+
 export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PLACED: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-  CONFIRMED: [OrderStatus.CUTTING_PREPARING, OrderStatus.CANCELLED],
-  CUTTING_PREPARING: [OrderStatus.PACKED, OrderStatus.CANCELLED],
-  PACKED: [OrderStatus.DISPATCH_READY, OrderStatus.CANCELLED],
-  DISPATCH_READY: [OrderStatus.ASSIGNED, OrderStatus.CANCELLED],
-  ASSIGNED: [
-    OrderStatus.ARRIVED_AT_HUB,
+  PLACED: [
+    OrderStatus.CONFIRMED,
+    OrderStatus.CUTTING_PREPARING,
+    OrderStatus.CANCELLED,
+  ],
+  CONFIRMED: [
+    OrderStatus.CUTTING_PREPARING,
+    OrderStatus.PACKED,
+    OrderStatus.CANCELLED,
+  ],
+  CUTTING_PREPARING: [
+    OrderStatus.PACKED,
     OrderStatus.DISPATCH_READY,
     OrderStatus.CANCELLED,
   ],
-  ARRIVED_AT_HUB: [OrderStatus.PICKED_UP, OrderStatus.DISPATCH_READY],
-  PICKED_UP: [OrderStatus.OUT_FOR_DELIVERY],
-  OUT_FOR_DELIVERY: [OrderStatus.DELIVERED, OrderStatus.FAILED_DELIVERY],
-  FAILED_DELIVERY: [OrderStatus.RETURNED_TO_HUB, OrderStatus.OUT_FOR_DELIVERY],
+  PACKED: [
+    OrderStatus.DISPATCH_READY,
+    OrderStatus.ASSIGNED,
+    OrderStatus.CANCELLED,
+  ],
+  DISPATCH_READY: [
+    OrderStatus.ASSIGNED,
+    OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.CANCELLED,
+  ],
+  ASSIGNED: [
+    OrderStatus.ARRIVED_AT_HUB,
+    OrderStatus.PICKED_UP,
+    OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.DISPATCH_READY,
+    OrderStatus.CANCELLED,
+  ],
+  ARRIVED_AT_HUB: [
+    OrderStatus.PICKED_UP,
+    OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.DISPATCH_READY,
+    OrderStatus.CANCELLED,
+  ],
+  PICKED_UP: [
+    OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.DELIVERED,
+    OrderStatus.CANCELLED,
+  ],
+  OUT_FOR_DELIVERY: [
+    OrderStatus.DELIVERED,
+    OrderStatus.FAILED_DELIVERY,
+    OrderStatus.CANCELLED,
+  ],
+  FAILED_DELIVERY: [
+    OrderStatus.RETURNED_TO_HUB,
+    OrderStatus.OUT_FOR_DELIVERY,
+    OrderStatus.CANCELLED,
+  ],
   RETURNED_TO_HUB: [OrderStatus.CANCELLED],
   DELIVERED: [],
   CANCELLED: [],
@@ -472,12 +513,33 @@ export class OrdersService {
     const currentStatus = order.status;
     const nextStatus = dto.status;
 
-    // Validate Transition against ALLOWED_TRANSITIONS map
-    const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
-    if (!allowed.includes(nextStatus)) {
-      throw new BadRequestException(
-        `Invalid status transition from ${currentStatus} to ${nextStatus}. Allowed: [${allowed.join(", ")}]`,
-      );
+    // If order is already in the requested status, return it immediately without error
+    if (currentStatus === nextStatus) {
+      return order;
+    }
+
+    const isAdmin =
+      actor.role === Role.ADMIN ||
+      actor.role === Role.SUPER_ADMIN ||
+      actor.role === Role.HUB_MANAGER ||
+      actor.role === Role.DISPATCHER;
+
+    if (currentStatus === OrderStatus.CANCELLED) {
+      throw new BadRequestException("Order is already cancelled");
+    }
+
+    if (currentStatus === OrderStatus.DELIVERED && nextStatus === OrderStatus.CANCELLED) {
+      throw new BadRequestException("Cannot cancel an order that has already been delivered");
+    }
+
+    // Non-admin roles (e.g. delivery partners) follow the strict sequential state machine
+    if (!isAdmin) {
+      const allowed = ALLOWED_TRANSITIONS[currentStatus] || [];
+      if (!allowed.includes(nextStatus)) {
+        throw new BadRequestException(
+          `Invalid status transition from ${currentStatus} to ${nextStatus}. Allowed: [${allowed.join(", ")}]`,
+        );
+      }
     }
 
     let weightRefundAmount: number | null = null;
@@ -534,7 +596,11 @@ export class OrdersService {
             }
           : {}),
         ...(nextStatus === OrderStatus.CANCELLED
-          ? { cancelledAt: new Date() }
+          ? {
+              cancelledAt: new Date(),
+              cancelReason: dto.note || "Cancelled from Admin Control Tower",
+              deliveryPartnerId: null, // Unassign rider so rider app is freed
+            }
           : {}),
       };
 
@@ -543,13 +609,72 @@ export class OrdersService {
         data: updateData,
       });
 
+      // If order is delivered, reconcile COD cash and complete associated delivery trip
+      if (nextStatus === OrderStatus.DELIVERED && currentStatus !== OrderStatus.DELIVERED) {
+        const isCodOrder =
+          String(order.paymentMethod || "").toUpperCase() === "COD" ||
+          order.paymentMethod === PaymentMethod.COD;
+        const codDelta = isCodOrder ? order.totalAmount : 0;
+
+        if (order.deliveryPartnerId) {
+          await tx.deliveryPartnerProfile.update({
+            where: { id: order.deliveryPartnerId },
+            data: {
+              completedDeliveries: { increment: 1 },
+              ...(codDelta > 0 ? { codCashInHand: { increment: codDelta } } : {}),
+            },
+          }).catch((err) => {
+            console.warn("Could not increment codCashInHand in orders service:", err);
+          });
+        }
+
+        await tx.deliveryTrip.updateMany({
+          where: {
+            orderId: order.id,
+            phase: { notIn: [DeliveryPhase.DELIVERED, DeliveryPhase.CANCELLED] },
+          },
+          data: {
+            phase: DeliveryPhase.DELIVERED,
+            completedAt: new Date(),
+            codCollectedAmount: codDelta,
+          },
+        }).catch(() => {});
+      }
+
+      // If order is cancelled, update any associated delivery trips to CANCELLED phase
+      if (nextStatus === OrderStatus.CANCELLED) {
+        await tx.deliveryTrip.updateMany({
+          where: { orderId: order.id },
+          data: { phase: DeliveryPhase.CANCELLED },
+        });
+      }
+
+      // Safely verify if actor.id is a real user in the database to satisfy OrderStatusEvent_actorId_fkey
+      let validActorId: string | null = null;
+      if (actor?.id) {
+        const actorRecord = await tx.user.findUnique({
+          where: { id: actor.id },
+          select: { id: true },
+        });
+        if (actorRecord) {
+          validActorId = actorRecord.id;
+        } else {
+          // If actor.id does not exist in DB (e.g. dev mock), link to the first admin or leave null
+          const fallbackAdmin = await tx.user.findFirst({
+            where: { role: { in: [Role.ADMIN, Role.SUPER_ADMIN, Role.HUB_MANAGER] } },
+            select: { id: true },
+          });
+          validActorId = fallbackAdmin?.id || null;
+        }
+      }
+
       await tx.orderStatusEvent.create({
         data: {
           orderId: order.id,
           fromStatus: currentStatus,
           toStatus: nextStatus,
-          actorId: actor.id,
-          actorRole: actor.role,
+          actorId: validActorId,
+          actorRole: actor?.role || Role.ADMIN,
           note:
             dto.note ||
             (weightRefundAmount
@@ -561,12 +686,21 @@ export class OrdersService {
       return res;
     });
 
+    const finalCancelReason =
+      nextStatus === OrderStatus.CANCELLED
+        ? dto.note || "Cancelled from Admin Control Tower"
+        : undefined;
+
     // Real-time notification broadcast via WebSockets
     this.trackingService.emitOrderStatusUpdate(order.id, {
       status: nextStatus,
       orderNumber: order.orderNumber,
-      note: dto.note,
+      note: dto.note || finalCancelReason,
+      cancelReason: finalCancelReason,
+      hubId: order.hubId || undefined,
     });
+
+
 
     // Real-time Push Notification to Customer Phone
     const statusMessages: Record<string, { title: string; body: string }> = {
@@ -598,6 +732,25 @@ export class OrdersService {
         orderId: order.id,
         status: nextStatus,
       });
+    }
+
+    if (nextStatus === OrderStatus.CANCELLED && order.deliveryPartnerId) {
+      try {
+        const partner = await this.prisma.deliveryPartnerProfile.findUnique({
+          where: { id: order.deliveryPartnerId },
+          select: { userId: true },
+        });
+        if (partner?.userId) {
+          this.pushService.sendToUser(
+            partner.userId,
+            "Order Cancelled",
+            `Order #${order.orderNumber} assigned to you has been cancelled by Admin.`,
+            { orderId: order.id, type: "ORDER_CANCELLED" },
+          );
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to notify partner on order cancellation: ${err?.message}`);
+      }
     }
 
     return updatedOrder;

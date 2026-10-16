@@ -616,7 +616,7 @@ export function ProductFormView({
               onChange={(event) =>
                 setForm({ ...form, origin: event.target.value })
               }
-              placeholder="e.g. Kozhikode Coastal Waters / Nilgiris Farm"
+              placeholder="e.g. Coastal Waters / Organic Farm"
             />
           </label>
 

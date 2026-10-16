@@ -127,7 +127,7 @@ export class HubsService {
         name: dto.name,
         code,
         address: dto.address,
-        city: dto.city || "Kozhikode",
+        city: dto.city || dto.name.split(" ")[0] || "Hub City",
         latitude: Number(dto.latitude),
         longitude: Number(dto.longitude),
         deliveryRadiusKm: dto.deliveryRadiusKm ? Number(dto.deliveryRadiusKm) : 10.0,

@@ -1,11 +1,15 @@
 import { Injectable, OnModuleDestroy, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
+import { stopLocalRedis } from "./local-redis";
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly client: Redis;
   private readonly logger = new Logger(RedisService.name);
+  private readonly memoryCache = new Map<string, { value: string; expiresAt?: number }>();
+  private isRedisHealthy = false;
+  private hasLoggedQuotaError = false;
 
   constructor(private readonly configService: ConfigService) {
     let redisUrl = this.configService.get<string>("REDIS_URL");
@@ -19,12 +23,13 @@ export class RedisService implements OnModuleDestroy {
         redisUrl = redisUrl.replace("redis://", "rediss://");
       }
 
-      this.logger.log("Initializing Redis client via REDIS_URL");
+      const sanitizedUrl = redisUrl.replace(/\/\/[^@]*@/, "//***@");
+      this.logger.log(`Initializing Redis client via REDIS_URL (${sanitizedUrl})`);
       this.client = new Redis(redisUrl, {
         lazyConnect: true,
-        maxRetriesPerRequest: null,
+        maxRetriesPerRequest: 1,
         enableReadyCheck: false,
-        retryStrategy: (times) => Math.min(times * 2000, 30000),
+        retryStrategy: (times) => Math.min(times * 3000, 30000),
       });
     } else {
       const host = this.configService.get<string>("REDIS_HOST", "localhost");
@@ -43,26 +48,42 @@ export class RedisService implements OnModuleDestroy {
         password: password || undefined,
         tls: useTls ? {} : undefined,
         lazyConnect: true,
-        maxRetriesPerRequest: null,
+        maxRetriesPerRequest: 1,
         enableReadyCheck: false,
-        retryStrategy: (times) => Math.min(times * 2000, 30000),
+        retryStrategy: (times) => Math.min(times * 3000, 30000),
       });
     }
 
     this.client.on("connect", () => {
+      this.isRedisHealthy = true;
+      this.hasLoggedQuotaError = false;
       this.logger.log("✅ Redis client connected successfully");
     });
 
-    this.client.on("error", (err) => {
-      this.logger.warn(
-        `Redis connection error (running in degraded offline cache mode): ${err.message}`,
-      );
+    this.client.on("error", (err: any) => {
+      this.isRedisHealthy = false;
+      if (err?.message?.includes("max requests limit exceeded")) {
+        if (!this.hasLoggedQuotaError) {
+          this.hasLoggedQuotaError = true;
+          this.logger.warn(
+            "⚠️ Upstash Redis daily request limit (500k) exceeded. Switched to high-speed in-memory cache mode.",
+          );
+        }
+      } else {
+        this.logger.warn(
+          `Redis connection warning (running in in-memory fallback cache mode): ${err.message}`,
+        );
+      }
     });
 
-    this.client.connect().catch((err) => {
-      this.logger.warn(
-        `Redis connection warning (running in degraded offline cache mode): ${err.message}`,
-      );
+    this.client.connect().catch((err: any) => {
+      this.isRedisHealthy = false;
+      if (!this.hasLoggedQuotaError && err?.message?.includes("max requests limit exceeded")) {
+        this.hasLoggedQuotaError = true;
+        this.logger.warn(
+          "⚠️ Upstash Redis daily request limit (500k) exceeded. Switched to high-speed in-memory cache mode.",
+        );
+      }
     });
   }
 
@@ -71,25 +92,40 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async get(key: string): Promise<string | null> {
-    try {
-      return await this.client.get(key);
-    } catch (error) {
-      this.logger.error(
-        `Error getting key ${key} from Redis: ${error.message}`,
-      );
+    if (this.isRedisHealthy) {
+      try {
+        return await this.client.get(key);
+      } catch (error: any) {
+        if (error.message?.includes("max requests limit exceeded")) {
+          this.isRedisHealthy = false;
+        }
+      }
+    }
+    const item = this.memoryCache.get(key);
+    if (!item) return null;
+    if (item.expiresAt && Date.now() > item.expiresAt) {
+      this.memoryCache.delete(key);
       return null;
     }
+    return item.value;
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    try {
-      if (ttlSeconds) {
-        await this.client.set(key, value, "EX", ttlSeconds);
-      } else {
-        await this.client.set(key, value);
+    const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : undefined;
+    this.memoryCache.set(key, { value, expiresAt });
+
+    if (this.isRedisHealthy) {
+      try {
+        if (ttlSeconds) {
+          await this.client.set(key, value, "EX", ttlSeconds);
+        } else {
+          await this.client.set(key, value);
+        }
+      } catch (error: any) {
+        if (error.message?.includes("max requests limit exceeded")) {
+          this.isRedisHealthy = false;
+        }
       }
-    } catch (error) {
-      this.logger.error(`Error setting key ${key} in Redis: ${error.message}`);
     }
   }
 
@@ -98,22 +134,22 @@ export class RedisService implements OnModuleDestroy {
     value: string,
     ttlSeconds: number,
   ): Promise<boolean> {
-    try {
-      const result = await this.client.set(key, value, "EX", ttlSeconds, "NX");
-      return result === "OK";
-    } catch (error) {
-      this.logger.error(`Error setnx for key ${key}: ${error.message}`);
-      return false;
-    }
+    const existing = await this.get(key);
+    if (existing !== null) return false;
+    await this.set(key, value, ttlSeconds);
+    return true;
   }
 
   async del(key: string): Promise<void> {
-    try {
-      await this.client.del(key);
-    } catch (error) {
-      this.logger.error(
-        `Error deleting key ${key} from Redis: ${error.message}`,
-      );
+    this.memoryCache.delete(key);
+    if (this.isRedisHealthy) {
+      try {
+        await this.client.del(key);
+      } catch (error: any) {
+        if (error.message?.includes("max requests limit exceeded")) {
+          this.isRedisHealthy = false;
+        }
+      }
     }
   }
 
@@ -126,6 +162,9 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    await this.client.quit();
+    try {
+      await this.client.quit();
+    } catch {}
+    stopLocalRedis();
   }
 }

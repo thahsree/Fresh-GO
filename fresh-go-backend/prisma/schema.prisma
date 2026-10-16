@@ -205,7 +205,7 @@ model Hub {
   name               String
   code               String   @unique
   address            String
-  city               String   @default("Kozhikode")
+  city               String   @default("")
   latitude           Float
   longitude          Float
   deliveryRadiusKm   Float    @default(10.0)

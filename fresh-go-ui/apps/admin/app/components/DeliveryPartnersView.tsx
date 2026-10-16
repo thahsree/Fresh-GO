@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, DeliveryPartnerItem, AdminUser, Hub } from "../lib/api";
-import { CustomDropdown } from "./CustomDropdown";
+import { api, DeliveryPartnerItem, AdminUser } from "../lib/api";
 import {
   Bike,
   CheckCircle,
@@ -19,11 +18,20 @@ import {
   AlertCircle,
   ShieldCheck,
   Share2,
+  Banknote,
 } from "lucide-react";
+import { ClearCashModal } from "./ClearCashModal";
 
 type DeliveryPartnersViewProps = {
   currentUser: AdminUser | null;
   onToast: (msg: string, type?: "success" | "error" | "info" | "delete") => void;
+};
+
+// Canonical default is Mavoor Road Hub
+const MAVOOR_HUB = {
+  id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
+  name: "Mavoor Road Hub",
+  code: "HUB-CLT-01",
 };
 
 export function DeliveryPartnersView({
@@ -34,8 +42,18 @@ export function DeliveryPartnersView({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "VERIFIED" | "REJECTED">("ALL");
-  const [selectedHubId, setSelectedHubId] = useState<string>("");
-  const [hubsList, setHubsList] = useState<Hub[]>([]);
+  const [settlementPartner, setSettlementPartner] = useState<DeliveryPartnerItem | null>(null);
+
+  // Identify the represented hub strictly
+  const activeHubId =
+    currentUser?.hubId || currentUser?.hub?.id || MAVOOR_HUB.id;
+
+  const rawHubName = currentUser?.hub?.name || MAVOOR_HUB.name;
+  const activeHubName = rawHubName.toLowerCase().includes("mavoor")
+    ? "Mavoor Road Hub"
+    : rawHubName;
+
+  const activeHubCode = currentUser?.hub?.code || MAVOOR_HUB.code;
 
   // Preview Licence Modal
   const [previewPhoto, setPreviewPhoto] = useState<{
@@ -55,10 +73,13 @@ export function DeliveryPartnersView({
   const fetchPartners = async () => {
     setLoading(true);
     try {
-      // Hub Admin automatically filtered by backend based on user.hubId, or pass query
-      const hubToFilter = currentUser?.role === "SUPER_ADMIN" ? selectedHubId || undefined : currentUser?.hubId;
-      const data = await api.deliveryPartners.getAll(hubToFilter);
-      setPartners(data || []);
+      const data = await api.deliveryPartners.getAll(activeHubId);
+      // Strictly enforce that only partners assigned to this specific hub are shown
+      const filteredByHub = (data || []).filter((p) => {
+        const pHubId = p.hubId || p.hub?.id;
+        return pHubId === activeHubId;
+      });
+      setPartners(filteredByHub);
     } catch (err: any) {
       onToast(err?.message || "Failed to load delivery partners", "error");
     } finally {
@@ -66,21 +87,9 @@ export function DeliveryPartnersView({
     }
   };
 
-  const fetchHubs = async () => {
-    try {
-      const data = await api.hubs.getAll();
-      setHubsList(data || []);
-    } catch {
-      // silent
-    }
-  };
-
   useEffect(() => {
     fetchPartners();
-    if (currentUser?.role === "SUPER_ADMIN") {
-      fetchHubs();
-    }
-  }, [selectedHubId, currentUser]);
+  }, [activeHubId]);
 
   const handleUpdateStatus = async (
     partner: DeliveryPartnerItem,
@@ -131,6 +140,7 @@ export function DeliveryPartnersView({
 
   const pendingCount = partners.filter((p) => p.kycStatus === "PENDING").length;
   const verifiedCount = partners.filter((p) => p.kycStatus === "VERIFIED").length;
+  const totalCodCash = partners.reduce((sum, p) => sum + (p.codCashInHand || 0), 0);
 
   return (
     <div style={{ display: "grid", gap: "24px", fontFamily: "'Manrope', sans-serif" }}>
@@ -174,29 +184,13 @@ export function DeliveryPartnersView({
               Delivery Partners & Onboarding
             </h2>
             <p style={{ fontSize: "13px", color: "#5C6B66", margin: 0 }}>
-              {currentUser?.hub
-                ? `Hub Admin Portal: ${currentUser.hub.name} (${currentUser.hub.code})`
-                : "Approve rider applications, verify driving licences, and issue 6-digit Access IDs"}
+              Fulfillment Hub: <strong>{activeHubName}</strong> ({activeHubCode}) · Showing registered delivery riders assigned to this hub
             </p>
           </div>
         </div>
 
         {/* Action Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-          {currentUser?.role === "SUPER_ADMIN" && hubsList.length > 0 && (
-            <CustomDropdown
-              value={selectedHubId}
-              onChange={setSelectedHubId}
-              options={[
-                { value: "", label: "All Fulfillment Hubs" },
-                ...hubsList.map((h) => ({
-                  value: h.id,
-                  label: `${h.name} (${h.code})`,
-                })),
-              ]}
-              style={{ minWidth: "210px", width: "auto" }}
-            />
-          )}
 
           <div style={{ position: "relative" }}>
             <Search
@@ -330,6 +324,28 @@ export function DeliveryPartnersView({
             {verifiedCount}
           </div>
         </button>
+
+        {/* Cash with Riders Counter */}
+        <div
+          style={{
+            background: "#FFFFFF",
+            border: totalCodCash > 0 ? "1px solid #F59E0B" : "1px solid #E3DDCF",
+            borderRadius: "12px",
+            padding: "16px 20px",
+            textAlign: "left",
+            boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: "#5C6B66", textTransform: "uppercase" }}>
+              Cash with Riders (COD)
+            </span>
+            <Banknote size={16} color={totalCodCash > 0 ? "#D97706" : "#5C6B66"} />
+          </div>
+          <div style={{ fontSize: "28px", fontWeight: 800, marginTop: "4px", color: totalCodCash > 0 ? "#B45309" : "#0F2E29" }}>
+            ₹{totalCodCash.toLocaleString("en-IN")}
+          </div>
+        </div>
       </div>
 
       {/* Partners Table Card */}
@@ -361,6 +377,9 @@ export function DeliveryPartnersView({
                   Unique 6-Digit ID
                 </th>
                 <th style={{ padding: "14px 18px", textAlign: "right", color: "#1F4D46", fontWeight: 700 }}>
+                  Cash in Hand (COD)
+                </th>
+                <th style={{ padding: "14px 18px", textAlign: "right", color: "#1F4D46", fontWeight: 700 }}>
                   Hub Admin Approval
                 </th>
               </tr>
@@ -368,13 +387,13 @@ export function DeliveryPartnersView({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#8B968F" }}>
+                  <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#8B968F" }}>
                     Loading delivery partner applicants...
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#8B968F" }}>
+                  <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#8B968F" }}>
                     No delivery partners matching this filter.
                   </td>
                 </tr>
@@ -601,6 +620,45 @@ export function DeliveryPartnersView({
                             Generated on approval
                           </span>
                         )}
+                      </td>
+
+                      {/* Cash in Hand Column & Control */}
+                      <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: "5px" }}>
+                          <span
+                            style={{
+                              fontWeight: 800,
+                              fontSize: "14px",
+                              color: (partner.codCashInHand || 0) > 0 ? "#BE4436" : "#2E7D5B",
+                            }}
+                          >
+                            ₹{(partner.codCashInHand || 0).toLocaleString("en-IN")}
+                          </span>
+                          {isVerified && (
+                            <button
+                              type="button"
+                              disabled={(partner.codCashInHand || 0) <= 0}
+                              onClick={() => setSettlementPartner(partner)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                cursor: (partner.codCashInHand || 0) <= 0 ? "not-allowed" : "pointer",
+                                background: (partner.codCashInHand || 0) > 0 ? "#E3F1E9" : "#F6F2EA",
+                                color: (partner.codCashInHand || 0) > 0 ? "#2E7D5B" : "#8B968F",
+                                border: (partner.codCashInHand || 0) > 0 ? "1px solid #2E7D5B" : "1px solid #E3DDCF",
+                              }}
+                              title={(partner.codCashInHand || 0) > 0 ? "Settle / Clear cash collected by rider" : "No cash in hand to clear"}
+                            >
+                              <Banknote size={12} />
+                              Clear Cash
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       {/* Hub Admin Approval Actions */}
@@ -956,6 +1014,36 @@ export function DeliveryPartnersView({
           </div>
         </div>
       )}
+
+      {/* Clear Cash Settlement Modal */}
+      <ClearCashModal
+        isOpen={Boolean(settlementPartner)}
+        partner={
+          settlementPartner
+            ? {
+                id: settlementPartner.id,
+                name: settlementPartner.user?.name,
+                phone: settlementPartner.user?.phone,
+                vehicleType: settlementPartner.vehicleType,
+                codCashInHand: settlementPartner.codCashInHand || 0,
+                hubName: settlementPartner.hub?.name,
+              }
+            : null
+        }
+        onClose={() => setSettlementPartner(null)}
+        onConfirm={async (partnerId, amount, notes) => {
+          try {
+            const res = await api.deliveryPartners.clearCash(partnerId, amount, notes);
+            onToast(
+              res.message || `Cleared ₹${amount.toLocaleString("en-IN")} cash from partner`,
+              "success"
+            );
+            fetchPartners();
+          } catch (err: any) {
+            onToast(err?.message || "Failed to clear cash", "error");
+          }
+        }}
+      />
     </div>
   );
 }

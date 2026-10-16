@@ -10,7 +10,7 @@ export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.SUPER_ADMIN, Role.ADMIN)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN, Role.HUB_MANAGER, Role.DISPATCHER)
   @Get("sales-report")
   async getSalesReport(
     @Query("startDate") startDate?: string,

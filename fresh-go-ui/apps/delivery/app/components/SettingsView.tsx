@@ -204,7 +204,7 @@ export function SettingsView({
             </div>
             <div>
               <strong style={{ fontSize: "14px", color: "#0f2e29", display: "block" }}>
-                {selectedHub?.name || "Kozhikode Fulfillment Center"}
+                {selectedHub?.name || "Fulfillment Center"}
               </strong>
               <span style={{ fontSize: "11.5px", color: "#5c6b66", display: "block", marginTop: "3px" }}>
                 {selectedHub?.address}, {selectedHub?.city}
@@ -521,7 +521,7 @@ export function SettingsView({
             <MapPinned size={18} />
             <div>
               <span>Active City Area</span>
-              <strong>{selectedHub?.city || "Kozhikode"}</strong>
+              <strong>{selectedHub?.city || selectedHub?.name || "Active Hub"}</strong>
             </div>
             <ChevronRight size={17} />
           </div>

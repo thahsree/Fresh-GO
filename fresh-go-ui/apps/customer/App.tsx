@@ -103,11 +103,11 @@ export default function App() {
   // Orders State
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
 
-  // Address & Geo-Fencing (10km Radius rule)
+  // Address & Geo-Fencing
   const [customerAddress, setCustomerAddress] = useState<string>("");
   const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number }>({
-    lat: 11.2588,
-    lng: 75.7804,
+    lat: 0,
+    lng: 0,
   });
   const [customerPincode, setCustomerPincode] = useState<string>("");
   const [serviceability, setServiceability] = useState<ServiceabilityResult | null>(null);
@@ -115,8 +115,11 @@ export default function App() {
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
 
   const checkLocationServiceability = async (lat: number, lng: number) => {
-    const safeLat = Number.isFinite(lat) ? Number(lat.toFixed(6)) : 11.2588;
-    const safeLng = Number.isFinite(lng) ? Number(lng.toFixed(6)) : 75.7804;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+      return null;
+    }
+    const safeLat = Number(lat.toFixed(6));
+    const safeLng = Number(lng.toFixed(6));
     try {
       const res = await customerApi.checkServiceability(safeLat, safeLng);
       setServiceability(res);
@@ -127,19 +130,36 @@ export default function App() {
     }
   };
 
-  const handleToggleLocationDemo = () => {
-    if (customerCoords.lat === 11.2588) {
-      const outOfZone = { lat: 11.8745, lng: 75.3704 };
-      setCustomerCoords(outOfZone);
-      setCustomerAddress("Kannur City");
-      checkLocationServiceability(outOfZone.lat, outOfZone.lng);
-    } else {
-      const inZone = { lat: 11.2588, lng: 75.7804 };
-      setCustomerCoords(inZone);
-      setCustomerAddress("Mavoor Road, Kozhikode");
-      checkLocationServiceability(inZone.lat, inZone.lng);
+  // Restore saved location or auto-acquire real device GPS on launch
+  useEffect(() => {
+    const stored = getStoredLocation();
+    if (stored && Number.isFinite(stored.lat) && Number.isFinite(stored.lng) && (stored.lat !== 0 || stored.lng !== 0)) {
+      setCustomerCoords({ lat: stored.lat, lng: stored.lng });
+      if (stored.address) {
+        setCustomerAddress(stored.address);
+        setHasChosenLocation(true);
+      }
+      checkLocationServiceability(stored.lat, stored.lng);
+      return;
     }
-  };
+
+    acquireAccurateLocation({ forcePrompt: false })
+      .then(async (loc) => {
+        if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) && (loc.lat !== 0 || loc.lng !== 0)) {
+          setCustomerCoords({ lat: loc.lat, lng: loc.lng });
+          const geo = await reverseGeocodeLocation(loc.lat, loc.lng);
+          const formatted = geo.address || [geo.area, geo.city].filter(Boolean).join(", ");
+          if (formatted) {
+            setCustomerAddress(formatted);
+            saveStoredLocation(loc, formatted);
+          }
+          if (geo.pincode) setCustomerPincode(geo.pincode);
+          setHasChosenLocation(true);
+          checkLocationServiceability(loc.lat, loc.lng);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Backend Connection & Lifecycle
   const [isInitializing, setIsInitializing] = useState(true);
@@ -235,6 +255,13 @@ export default function App() {
                     status: "delivered",
                     title: "Order Delivered! 🐟",
                     message: `Order #${newOrd.id} delivered at your address. Freshness guaranteed!`,
+                  });
+                } else if (newOrd.status === "cancelled") {
+                  dispatchOrderNotification({
+                    orderId: newOrd.id,
+                    status: "cancelled",
+                    title: "Order Cancelled ⚠️",
+                    message: `Order #${newOrd.id} was cancelled. ${newOrd.cancelReason ? `Reason: ${newOrd.cancelReason}` : ""}`,
                   });
                 }
               }
@@ -745,6 +772,7 @@ export default function App() {
                   favorites={favorites}
                   categories={categoriesList}
                   products={products}
+                  cart={cart}
                   onBack={() => {
                     setIsListingOpen(false);
                     setListingNeed(null);
@@ -753,6 +781,7 @@ export default function App() {
                   }}
                   onSelectProduct={handleOpenProduct}
                   onAddProduct={(id) => handleAddToCart(id, 1)}
+                  onUpdateQuantity={handleUpdateQuantity}
                   onToggleFavorite={toggleFavorite}
                 />
               ) : (
@@ -763,13 +792,6 @@ export default function App() {
                         serviceability={serviceability}
                         customerCoordinates={customerCoords}
                         customerAddress={customerAddress}
-                        onSwitchToDemoLocation={() => {
-                          const inZone = { lat: 11.2588, lng: 75.7804 };
-                          setCustomerCoords(inZone);
-                          setCustomerAddress("Mavoor Road, Kozhikode");
-                          setHasChosenLocation(true);
-                          checkLocationServiceability(inZone.lat, inZone.lng);
-                        }}
                         onRefreshLocation={() => {
                           checkLocationServiceability(
                             customerCoords.lat,
@@ -785,6 +807,7 @@ export default function App() {
                         favorites={favorites}
                         categories={categoriesList}
                         products={products}
+                        cart={cart}
                         address={
                           customerAddress
                             ? serviceability?.hub?.name
@@ -795,6 +818,7 @@ export default function App() {
                         onSearchChange={setSearchValue}
                         onSelectCategory={setSelectedCategory}
                         onAddProduct={(id) => handleAddToCart(id, 1)}
+                        onUpdateQuantity={handleUpdateQuantity}
                         onToggleFavorite={toggleFavorite}
                         onSelectProduct={handleOpenProduct}
                         onNavigateToListing={handleNavigateToListing}
@@ -895,6 +919,7 @@ export default function App() {
         <ProductDetailModal
           product={selectedProduct}
           products={products}
+          cart={cart}
           visible={isProductModalOpen}
           isFavorite={
             selectedProduct
@@ -904,6 +929,7 @@ export default function App() {
           }
           onClose={() => setIsProductModalOpen(false)}
           onAddToCart={handleAddToCart}
+          onUpdateQuantity={handleUpdateQuantity}
           onToggleFavorite={toggleFavorite}
           onSelectProduct={(item) => setSelectedProduct(item)}
         />

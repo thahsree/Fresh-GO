@@ -239,6 +239,8 @@ export type BackendOrder = {
       phone?: string;
     };
   } | null;
+  cancelReason?: string | null;
+  notes?: string | null;
   items: BackendOrderItem[];
 };
 
@@ -936,9 +938,10 @@ class CustomerApiClient {
             ? Date.now() - new Date(o.placedAt).getTime() > 2 * 60 * 60 * 1000
             : false;
 
-          if (
+          if (o.status === "CANCELLED") {
+            uiStatus = "cancelled";
+          } else if (
             o.status === "DELIVERED" ||
-            o.status === "CANCELLED" ||
             o.status === "FAILED_DELIVERY" ||
             o.status === "RETURNED_TO_HUB" ||
             isStale ||
@@ -997,6 +1000,7 @@ class CustomerApiClient {
             id: o.orderNumber || o.id.slice(0, 8).toUpperCase(),
             date: dateStr,
             status: uiStatus,
+            cancelReason: o.cancelReason || (o as any).notes || undefined,
             items,
             total: o.totalAmount,
             paymentMethod: o.paymentMethod?.toLowerCase() === "cod" ? "cod" : "upi",
@@ -1060,11 +1064,11 @@ class CustomerApiClient {
           title: ad.title || "Home",
           street: `${ad.houseBuilding}, ${ad.street}`,
           landmark: ad.landmark || undefined,
-          area: ad.area || "Local Area",
-          city: ad.city || "Kozhikode",
-          pincode: ad.pincode || "673004",
-          latitude: ad.latitude || 11.2588,
-          longitude: ad.longitude || 75.7804,
+          area: ad.area || "",
+          city: ad.city || "",
+          pincode: ad.pincode || "",
+          latitude: ad.latitude || 0,
+          longitude: ad.longitude || 0,
           isDefault: true,
         });
         if (newAddr) {
@@ -1156,8 +1160,11 @@ class CustomerApiClient {
   }
 
   async checkServiceability(lat: number, lng: number): Promise<ServiceabilityResult> {
-    const safeLat = Number.isFinite(lat) ? Number(lat.toFixed(6)) : 11.2588;
-    const safeLng = Number.isFinite(lng) ? Number(lng.toFixed(6)) : 75.7804;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+      return { serviceable: false, distanceKm: 0, estimatedDeliveryMinutes: 0, deliveryFee: 0 };
+    }
+    const safeLat = Number(lat.toFixed(6));
+    const safeLng = Number(lng.toFixed(6));
     try {
       const res = await this.request<any>(
         `/hubs/serviceability?lat=${safeLat}&lng=${safeLng}`,

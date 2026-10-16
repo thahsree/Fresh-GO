@@ -43,8 +43,8 @@ export function HistoryView({ history }: HistoryViewProps) {
         </section>
       ) : (
         <section className="history-list">
-          {visibleHistory.map((delivery) => (
-            <article className="history-item" key={delivery.id}>
+          {visibleHistory.map((delivery, index) => (
+            <article className="history-item" key={delivery.tripId || `${delivery.id}-${index}`}>
               <span
                 className={`history-icon ${
                   delivery.status === "Delivered" ? "delivered" : "cancelled"
@@ -65,6 +65,11 @@ export function HistoryView({ history }: HistoryViewProps) {
                   <MapPin size={12} /> {delivery.area} · {delivery.distance}
                 </small>
                 <small>{delivery.completedAt}</small>
+                {delivery.status === "Cancelled" && delivery.cancelReason && (
+                  <small style={{ color: "var(--danger)", fontWeight: 700, marginTop: 4 }}>
+                    Reason: {delivery.cancelReason}
+                  </small>
+                )}
               </div>
               <div className="history-earning">
                 {/* Earnings on order history commented out

@@ -1,7 +1,16 @@
 import { colors } from "@fresh-food/design-tokens";
 import { Plus } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
 import type { Category, Product } from "../models/catalog";
 import { CategoryRail } from "./CategoryRail";
 import { CustomerHeader } from "./CustomerHeader";
@@ -24,9 +33,11 @@ type HomeViewProps = {
   categories?: Category[];
   products?: Product[];
   address?: string;
+  cart?: Record<string, number>;
   onSearchChange: (value: string) => void;
   onSelectCategory: (category: string) => void;
   onAddProduct: (productId: string) => void;
+  onUpdateQuantity?: (productId: string, quantity: number) => void;
   onToggleFavorite: (productId: string) => void;
   onSelectProduct: (product: Product) => void;
   onNavigateToListing: (
@@ -47,9 +58,11 @@ export function HomeView({
   categories = [],
   products = [],
   address,
+  cart,
   onSearchChange,
   onSelectCategory,
   onAddProduct,
+  onUpdateQuantity,
   onToggleFavorite,
   onSelectProduct,
   onNavigateToListing,
@@ -200,7 +213,9 @@ export function HomeView({
       <ProductRail
         products={visibleCategoryProducts}
         favorites={favorites}
+        cart={cart}
         onAddProduct={onAddProduct}
+        onUpdateQuantity={onUpdateQuantity}
         onToggleFavorite={onToggleFavorite}
         onSelectProduct={onSelectProduct}
         resetKey={selectedCategory}
@@ -220,7 +235,9 @@ export function HomeView({
           <ProductRail
             products={visibleBestSellers}
             favorites={favorites}
+            cart={cart}
             onAddProduct={onAddProduct}
+            onUpdateQuantity={onUpdateQuantity}
             onToggleFavorite={onToggleFavorite}
             onSelectProduct={onSelectProduct}
             resetKey={selectedCategory}
@@ -246,14 +263,30 @@ export function HomeView({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.rail}
           >
-            {visibleOfferProducts.map((product) => (
-              <OfferCard
-                key={product.id}
-                product={product}
-                onSelect={() => onSelectProduct(product)}
-                onAdd={() => onAddProduct(product.id)}
-              />
-            ))}
+            {visibleOfferProducts.map((product) => {
+              const qty = (cart && (cart[product.id] ?? (product.slug ? cart[product.slug] : undefined))) || 0;
+              return (
+                <OfferCard
+                  key={product.id}
+                  product={product}
+                  quantity={qty}
+                  onSelect={() => onSelectProduct(product)}
+                  onAdd={() => onAddProduct(product.id)}
+                  onIncrement={() => {
+                    if (onUpdateQuantity) {
+                      onUpdateQuantity(product.id, qty + 1);
+                    } else {
+                      onAddProduct(product.id);
+                    }
+                  }}
+                  onDecrement={() => {
+                    if (onUpdateQuantity) {
+                      onUpdateQuantity(product.id, Math.max(0, qty - 1));
+                    }
+                  }}
+                />
+              );
+            })}
           </ScrollView>
         </>
       )}
@@ -283,7 +316,9 @@ export function HomeView({
               <ProductRail
                 products={secVisibleProducts}
                 favorites={favorites}
+                cart={cart}
                 onAddProduct={onAddProduct}
+                onUpdateQuantity={onUpdateQuantity}
                 onToggleFavorite={onToggleFavorite}
                 onSelectProduct={onSelectProduct}
                 resetKey={selectedCategory}
@@ -303,7 +338,9 @@ export function HomeView({
           <ProductRail
             products={visibleFrozenProducts}
             favorites={favorites}
+            cart={cart}
             onAddProduct={onAddProduct}
+            onUpdateQuantity={onUpdateQuantity}
             onToggleFavorite={onToggleFavorite}
             onSelectProduct={onSelectProduct}
             resetKey={selectedCategory}
@@ -340,13 +377,17 @@ export function HomeView({
 function ProductRail({
   products,
   favorites,
+  cart,
   onAddProduct,
+  onUpdateQuantity,
   onToggleFavorite,
   onSelectProduct,
   resetKey,
 }: Pick<HomeViewProps, "favorites" | "onAddProduct" | "onToggleFavorite" | "onSelectProduct"> & {
   products: Product[];
   resetKey?: string | null;
+  cart?: Record<string, number>;
+  onUpdateQuantity?: (productId: string, quantity: number) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
 
@@ -362,16 +403,32 @@ function ProductRail({
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.rail}
     >
-      {products.map((product) => (
-        <ProductCard
-          key={product.id}
-          product={product}
-          isFavorite={favorites.includes(product.id)}
-          onAdd={() => onAddProduct(product.id)}
-          onToggleFavorite={() => onToggleFavorite(product.id)}
-          onPress={() => onSelectProduct(product)}
-        />
-      ))}
+      {products.map((product) => {
+        const qty = (cart && (cart[product.id] ?? (product.slug ? cart[product.slug] : undefined))) || 0;
+        return (
+          <ProductCard
+            key={product.id}
+            product={product}
+            isFavorite={favorites.includes(product.id)}
+            quantity={qty}
+            onAdd={() => onAddProduct(product.id)}
+            onIncrement={() => {
+              if (onUpdateQuantity) {
+                onUpdateQuantity(product.id, qty + 1);
+              } else {
+                onAddProduct(product.id);
+              }
+            }}
+            onDecrement={() => {
+              if (onUpdateQuantity) {
+                onUpdateQuantity(product.id, Math.max(0, qty - 1));
+              }
+            }}
+            onToggleFavorite={() => onToggleFavorite(product.id)}
+            onPress={() => onSelectProduct(product)}
+          />
+        );
+      })}
       {products.length === 0 && (
         <Text style={styles.empty}>No products found. Try another search.</Text>
       )}
@@ -381,15 +438,38 @@ function ProductRail({
 
 function OfferCard({
   product,
+  quantity = 0,
   onSelect,
   onAdd,
+  onIncrement,
+  onDecrement,
 }: {
   product: Product;
+  quantity?: number;
   onSelect: () => void;
   onAdd: () => void;
+  onIncrement?: () => void;
+  onDecrement?: () => void;
 }) {
   const originalPrice = product.originalPrice || Math.round(product.price * 1.25);
   const saving = Math.max(0, originalPrice - product.price);
+
+  const isAdded = quantity > 0;
+  const animVal = useRef(new Animated.Value(isAdded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(animVal, {
+      toValue: isAdded ? 1 : 0,
+      friction: 8,
+      tension: 85,
+      useNativeDriver: false,
+    }).start();
+  }, [isAdded]);
+
+  const buttonWidth = animVal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [24, 52],
+  });
 
   return (
     <Pressable
@@ -414,16 +494,47 @@ function OfferCard({
         </View>
         <View style={styles.offerFooter}>
           <Text style={styles.saving}>Save Rs {saving}</Text>
-          <Pressable
-            style={styles.offerAddButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              onAdd();
-            }}
-            accessibilityRole="button"
-          >
-            <Plus size={14} color="#FFFFFF" strokeWidth={3} />
-          </Pressable>
+          <Animated.View style={[styles.offerActionWrapper, { width: buttonWidth }]}>
+            {isAdded ? (
+              <View style={styles.offerStepper}>
+                <Pressable
+                  style={styles.offerStepperBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onDecrement?.();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Decrease quantity"
+                >
+                  <Text style={styles.offerStepperIcon}>−</Text>
+                </Pressable>
+                <Text style={styles.offerStepperVal}>{quantity}</Text>
+                <Pressable
+                  style={styles.offerStepperBtn}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onIncrement ? onIncrement() : onAdd();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Increase quantity"
+                >
+                  <Text style={styles.offerStepperIcon}>+</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                style={styles.offerAddButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onAdd();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Add to cart"
+              >
+                <Plus size={14} color="#FFFFFF" strokeWidth={3} />
+              </Pressable>
+            )}
+          </Animated.View>
         </View>
       </View>
     </Pressable>
@@ -527,14 +638,48 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-  offerAddButton: {
-    width: 24,
+  offerActionWrapper: {
     height: 24,
     borderRadius: 12,
     backgroundColor: colors.primary,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
+  offerAddButton: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  offerStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    height: "100%",
+    paddingHorizontal: 2,
+  },
+  offerStepperBtn: {
+    width: 17,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  offerStepperIcon: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 14,
+  },
+  offerStepperVal: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    minWidth: 12,
+    textAlign: "center",
+  },
+
   needGrid: {
     paddingHorizontal: 18,
     paddingBottom: 24,

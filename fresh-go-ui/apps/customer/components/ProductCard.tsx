@@ -10,19 +10,29 @@ type ProductCardProps = {
   onAdd: () => void;
   onToggleFavorite?: () => void;
   onPress?: () => void;
+  quantity?: number;
+  onIncrement?: () => void;
+  onDecrement?: () => void;
 };
 
 export function ProductCard({
   product,
   onAdd,
   onPress,
+  quantity,
+  onIncrement,
+  onDecrement,
 }: ProductCardProps) {
   return (
     <SharedProductCard
       product={product}
       onAdd={onAdd}
       onPress={onPress}
+      quantity={quantity}
+      onIncrement={onIncrement}
+      onDecrement={onDecrement}
       addIcon={<Plus size={16} color="#FFFFFF" strokeWidth={3} />}
     />
   );
 }
+

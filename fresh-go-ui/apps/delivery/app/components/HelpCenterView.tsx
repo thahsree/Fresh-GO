@@ -127,7 +127,7 @@ export function HelpCenterView({ onBack, onOpenReport }: HelpCenterViewProps) {
                 <span className="agent-status-dot" />
                 <div>
                   <strong>Dispatch Support</strong>
-                  <small>Kozhikode Central Desk · Active</small>
+                  <small>Operations Central Desk · Active</small>
                 </div>
               </div>
               <button

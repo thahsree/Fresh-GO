@@ -90,7 +90,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get("me")
-  async getProfile(@CurrentUser() user: User) {
+  async getProfile(@CurrentUser() user: any) {
     return {
       user: {
         id: user.id,
@@ -98,6 +98,15 @@ export class AuthController {
         email: user.email,
         name: user.name,
         role: user.role,
+        hubId: user.hubId || user.hub?.id || null,
+        hub: user.hub
+          ? {
+              id: user.hub.id,
+              name: user.hub.name,
+              code: user.hub.code,
+              city: user.hub.city,
+            }
+          : null,
       },
     };
   }

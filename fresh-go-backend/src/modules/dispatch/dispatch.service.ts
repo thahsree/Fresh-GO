@@ -8,7 +8,7 @@ import { PrismaService } from "../../common/prisma/prisma.service";
 import { MapsService } from "../maps/maps.service";
 import { TrackingService } from "../tracking/tracking.service";
 import { JobsService } from "../jobs/jobs.service";
-import { OrderStatus, Role, User, KycStatus } from "@prisma/client";
+import { OrderStatus, Role, User, KycStatus, DeliveryPhase } from "@prisma/client";
 
 const COD_CASH_LIMIT = parseFloat(process.env.COD_CASH_LIMIT || "50000");
 
@@ -28,21 +28,9 @@ export class DispatchService {
    * Filtered by Hub Admin's assigned hub
    */
   async getDispatchTower(adminUser?: User) {
-    const where: any = {
-      status: {
-        in: [
-          OrderStatus.PLACED,
-          OrderStatus.CONFIRMED,
-          OrderStatus.CUTTING_PREPARING,
-          OrderStatus.PACKED,
-          OrderStatus.DISPATCH_READY,
-          OrderStatus.ASSIGNED,
-          OrderStatus.OUT_FOR_DELIVERY,
-        ],
-      },
-    };
+    const where: any = {};
 
-    if (adminUser?.role === Role.ADMIN && adminUser.hubId) {
+    if (adminUser?.hubId) {
       where.hubId = adminUser.hubId;
     }
 
@@ -56,7 +44,8 @@ export class DispatchService {
           include: { user: { select: { name: true, phone: true } } },
         },
       },
-      orderBy: { placedAt: "asc" },
+      orderBy: { placedAt: "desc" },
+      take: 200,
     });
 
     const partnerWhere: any = {
@@ -129,12 +118,9 @@ export class DispatchService {
         throw new NotFoundException("Selected delivery partner not found");
       }
       if (order.hubId && targetPartner.hubId && targetPartner.hubId !== order.hubId) {
-        // Automatically sync partner's hub to this order's hub upon manual admin dispatch
-        await this.prisma.deliveryPartnerProfile.update({
-          where: { id: targetPartner.id },
-          data: { hubId: order.hubId },
-        });
-        targetPartner.hubId = order.hubId;
+        throw new BadRequestException(
+          `Delivery partner ${targetPartner.user.name} is registered with ${targetPartner.hub?.name || "another hub"}, not ${order.hub?.name || "this order's hub"}. Cross-hub assignment is not permitted.`,
+        );
       }
       if (targetPartner.codCashInHand >= COD_CASH_LIMIT) {
         const formattedLimit = `₹${COD_CASH_LIMIT.toLocaleString("en-IN")}`;
@@ -171,21 +157,10 @@ export class DispatchService {
         });
       }
 
-      // Priority 3: fallback to any verified candidate in system
-      if (candidates.length === 0) {
-        candidates = await this.prisma.deliveryPartnerProfile.findMany({
-          where: {
-            kycStatus: KycStatus.VERIFIED,
-            codCashInHand: { lt: COD_CASH_LIMIT },
-          },
-          include: { user: true },
-          orderBy: { completedDeliveries: "asc" },
-        });
-      }
-
+      // If no candidates exist in this order's hub, strictly throw an error instead of assigning to another hub's rider
       if (candidates.length === 0) {
         throw new BadRequestException(
-          `No verified delivery partners found for ${order.hub?.name || "this hub"}`,
+          `No delivery riders available for ${order.hub?.name || "this hub"}. Please onboard or activate riders for this hub.`,
         );
       }
 
@@ -200,6 +175,28 @@ export class DispatchService {
         deliveryPartnerId: targetPartner.id,
       },
     });
+
+    // Ensure DeliveryTrip exists for tracking and rider visibility
+    const existingTrip = await this.prisma.deliveryTrip.findFirst({
+      where: { orderId: order.id },
+    });
+    if (!existingTrip) {
+      await this.prisma.deliveryTrip.create({
+        data: {
+          orderId: order.id,
+          partnerId: targetPartner.id,
+          phase: DeliveryPhase.ACCEPTED,
+        },
+      }).catch((e) => this.logger.warn(`Could not create delivery trip: ${e.message}`));
+    } else {
+      await this.prisma.deliveryTrip.update({
+        where: { id: existingTrip.id },
+        data: {
+          partnerId: targetPartner.id,
+          phase: DeliveryPhase.ACCEPTED,
+        },
+      }).catch(() => {});
+    }
 
     // Record status event in audit log
     await this.prisma.orderStatusEvent.create({

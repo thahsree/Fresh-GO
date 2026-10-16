@@ -247,7 +247,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   style={[
                     styles.primaryBtn,
                     (isLoading || phone.replace(/\D/g, "").length !== 10) &&
-                      styles.disabledBtn,
+                    styles.disabledBtn,
                   ]}
                   onPress={handleSendOtp}
                   disabled={isLoading || phone.replace(/\D/g, "").length !== 10}

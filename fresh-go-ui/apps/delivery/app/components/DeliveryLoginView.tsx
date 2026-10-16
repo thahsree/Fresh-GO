@@ -69,8 +69,8 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
   // Application / Transfer state
   const [name, setName] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [availableHubs, setAvailableHubs] = useState<DeliveryHub[]>(DEFAULT_HUBS);
-  const [selectedHubId, setSelectedHubId] = useState<string>(DEFAULT_HUBS[0].id);
+  const [availableHubs, setAvailableHubs] = useState<DeliveryHub[]>([]);
+  const [selectedHubId, setSelectedHubId] = useState<string>("");
   const [isHubDropdownOpen, setIsHubDropdownOpen] = useState(false);
   const hubDropdownRef = useRef<HTMLDivElement>(null);
   const [vehicleType, setVehicleType] = useState("Bike");
@@ -103,6 +103,8 @@ export function DeliveryLoginView({ onLoginSuccess }: DeliveryLoginViewProps) {
       })
       .catch((err) => {
         console.warn("Could not load fresh hubs from server, using active default hubs:", err);
+        setAvailableHubs(DEFAULT_HUBS);
+        setSelectedHubId(DEFAULT_HUBS[0]?.id || "");
       });
   }, []);
 

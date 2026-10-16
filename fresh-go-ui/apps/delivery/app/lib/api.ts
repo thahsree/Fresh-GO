@@ -64,7 +64,12 @@ export type BackendOrder = {
   };
   deliveryAddress?: string;
   dropAddress?: string;
+  cancelReason?: string;
+  cancelledAt?: string;
+  notes?: string;
+  deliveryAddressSnapshotJson?: string;
 };
+
 
 export type ActiveTrip = {
   id: string;
@@ -76,6 +81,13 @@ export type ActiveTrip = {
   arrivedHubAt?: string;
   pickedUpAt?: string;
   completedAt?: string;
+};
+
+export type CancelledTripInfo = {
+  orderId: string;
+  orderNumber: string;
+  cancelReason: string;
+  cancelledAt?: string;
 };
 
 export type DeliveryDashboardData = {
@@ -90,6 +102,7 @@ export type DeliveryDashboardData = {
     preferredZone?: string;
   };
   activeTrip: ActiveTrip | null;
+  cancelledTrip?: CancelledTripInfo | null;
   todayEarnings: number;
   recentDeliveries: Array<{
     id: string;
@@ -103,6 +116,7 @@ export type DeliveryDashboardData = {
     };
   }>;
 };
+
 
 const TOKEN_KEY = "freshgo_delivery_token";
 const USER_KEY = "freshgo_delivery_user";

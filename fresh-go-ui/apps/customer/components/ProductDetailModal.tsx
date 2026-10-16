@@ -26,6 +26,7 @@ type ProductDetailModalProps = {
   visible: boolean;
   isFavorite: boolean;
   products?: Product[];
+  cart?: Record<string, number>;
   onClose: () => void;
   onAddToCart: (
     productId: string,
@@ -33,6 +34,7 @@ type ProductDetailModalProps = {
     selectedCut?: string,
     selectedUnit?: ProductUnit
   ) => void;
+  onUpdateQuantity?: (productId: string, quantity: number) => void;
   onToggleFavorite: (productId: string) => void;
   onSelectProduct?: (product: Product) => void;
 };
@@ -42,8 +44,10 @@ export function ProductDetailModal({
   visible,
   isFavorite,
   products = [],
+  cart,
   onClose,
   onAddToCart,
+  onUpdateQuantity,
   onToggleFavorite,
   onSelectProduct,
 }: ProductDetailModalProps) {
@@ -345,40 +349,75 @@ export function ProductDetailModal({
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.relatedRail}
                 >
-                  {relatedProducts.map((item) => (
-                    <Pressable
-                      key={item.id}
-                      style={styles.relatedCard}
-                      onPress={() => onSelectProduct?.(item)}
-                      accessibilityRole="button"
-                    >
-                      <Image
-                        source={{ uri: item.image }}
-                        style={styles.relatedImage}
-                        resizeMode="cover"
-                      />
-                      <View style={styles.relatedBody}>
-                        <Text style={styles.relatedName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <View style={styles.relatedPriceRow}>
-                          <Text style={styles.relatedPrice}>
-                            Rs {item.price}
+                  {relatedProducts.map((item) => {
+                    const itemQty = (cart && (cart[item.id] ?? (item.slug ? cart[item.slug] : undefined))) || 0;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        style={styles.relatedCard}
+                        onPress={() => onSelectProduct?.(item)}
+                        accessibilityRole="button"
+                      >
+                        <Image
+                          source={{ uri: item.image }}
+                          style={styles.relatedImage}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.relatedBody}>
+                          <Text style={styles.relatedName} numberOfLines={1}>
+                            {item.name}
                           </Text>
-                          <Pressable
-                            style={styles.relatedAddBtn}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              onAddToCart(item.id, 1);
-                            }}
-                            accessibilityLabel="Quick add"
-                          >
-                            <Plus size={12} color="#FFFFFF" strokeWidth={3} />
-                          </Pressable>
+                          <View style={styles.relatedPriceRow}>
+                            <Text style={styles.relatedPrice}>
+                              Rs {item.price}
+                            </Text>
+                            {itemQty > 0 ? (
+                              <View style={styles.relatedStepper}>
+                                <Pressable
+                                  style={styles.relatedStepperBtn}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    if (onUpdateQuantity) {
+                                      onUpdateQuantity(item.id, Math.max(0, itemQty - 1));
+                                    }
+                                  }}
+                                  accessibilityLabel={`Decrease quantity of ${item.name}`}
+                                >
+                                  <Text style={styles.relatedStepperIcon}>−</Text>
+                                </Pressable>
+                                <Text style={styles.relatedStepperVal}>{itemQty}</Text>
+                                <Pressable
+                                  style={styles.relatedStepperBtn}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    if (onUpdateQuantity) {
+                                      onUpdateQuantity(item.id, itemQty + 1);
+                                    } else {
+                                      onAddToCart(item.id, 1);
+                                    }
+                                  }}
+                                  accessibilityLabel={`Increase quantity of ${item.name}`}
+                                >
+                                  <Text style={styles.relatedStepperIcon}>+</Text>
+                                </Pressable>
+                              </View>
+                            ) : (
+                              <Pressable
+                                style={styles.relatedAddBtn}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  onAddToCart(item.id, 1);
+                                }}
+                                accessibilityLabel="Quick add"
+                              >
+                                <Plus size={12} color="#FFFFFF" strokeWidth={3} />
+                              </Pressable>
+                            )}
+                          </View>
                         </View>
-                      </View>
-                    </Pressable>
-                  ))}
+                      </Pressable>
+                    );
+                  })}
                 </ScrollView>
               </View>
             )}
@@ -783,4 +822,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  relatedStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    height: 20,
+    paddingHorizontal: 2,
+  },
+  relatedStepperBtn: {
+    width: 16,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  relatedStepperIcon: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  relatedStepperVal: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+    minWidth: 12,
+    textAlign: "center",
+  },
 });
+

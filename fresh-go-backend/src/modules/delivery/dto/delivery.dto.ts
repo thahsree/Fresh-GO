@@ -23,18 +23,17 @@ export class RecordCashSettlementDto {
   @IsString()
   partnerProfileId: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  hubId: string;
+  hubId?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsNumber()
-  @Min(1)
-  amount: number;
+  amount?: number;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  receiptNumber: string;
+  receiptNumber?: string;
 
   @IsOptional()
   @IsString()

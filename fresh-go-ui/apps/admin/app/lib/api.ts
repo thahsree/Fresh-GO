@@ -3,7 +3,10 @@
 export function getAdminApiBase(): string {
   if (typeof window !== "undefined" && window.location) {
     const host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1") {
+    if (host === "127.0.0.1") {
+      return "http://127.0.0.1:4000/api/v1";
+    }
+    if (host === "localhost") {
       return "http://localhost:4000/api/v1";
     }
     if (/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(host)) {
@@ -14,7 +17,7 @@ export function getAdminApiBase(): string {
     const envUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "");
     if (envUrl.length > 0) return envUrl;
   }
-  return "https://fresh-go.duckdns.org/api/v1";
+  return "http://localhost:4000/api/v1";
 }
 
 export const API_BASE = getAdminApiBase();
@@ -251,6 +254,12 @@ export type ActivePartner = {
   rating?: number;
   vehicleType?: string;
   codCashInHand?: number;
+  hubId?: string;
+  hub?: {
+    id: string;
+    name: string;
+    code?: string;
+  };
   user?: {
     id?: string;
     name?: string;
@@ -406,7 +415,24 @@ class ApiClient {
    * Returns session user if role is ADMIN or SUPER_ADMIN, otherwise null.
    */
   async ensureAdminAuth(): Promise<AdminUser | null> {
-    return this.getAdminUser();
+    const cached = this.getAdminUser();
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const res = await this.get<{ user: AdminUser }>("/auth/me", true);
+      if (res?.user) {
+        const merged: AdminUser = {
+          ...(cached || {}),
+          ...res.user,
+        };
+        this.setSession(token, merged);
+        return merged;
+      }
+    } catch {
+      // Return cached on network error
+    }
+    return cached;
   }
 
   private async request<T>(
@@ -428,15 +454,32 @@ class ApiClient {
       }
     }
 
-    let res: Response;
-    try {
-      res = await fetch(url, { ...options, headers });
-    } catch (networkErr: any) {
+    let res: Response | undefined;
+    let lastNetworkErr: any = null;
+
+    // Retry once with IPv4 127.0.0.1 fallback if localhost fails (common on Windows dev)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const attemptUrl =
+          attempt === 1 && url.includes("localhost")
+            ? url.replace("localhost", "127.0.0.1")
+            : url;
+        res = await fetch(attemptUrl, { ...options, headers });
+        break;
+      } catch (networkErr: any) {
+        lastNetworkErr = networkErr;
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+    }
+
+    if (!res) {
       const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
       const errorMsg = isLocal
         ? `Cannot connect to local backend at ${url}. Please ensure your backend is running on port 4000 ("npm run start:dev").`
         : `Cannot connect to backend server at ${url}. Server might be unreachable or blocking cross-origin requests.`;
-      console.error(`[Admin API] Network error:`, networkErr?.message || networkErr);
+      console.warn(`[Admin API] Network note:`, lastNetworkErr?.message || lastNetworkErr);
       throw new Error(errorMsg);
     }
 
@@ -580,10 +623,10 @@ class ApiClient {
   };
 
   readonly orders = {
-    updateStatus: (orderId: string, status: string, notes?: string) =>
+    updateStatus: (orderId: string, status: string, note?: string) =>
       this.put<QueueOrder>(
         `/orders/${orderId}/status`,
-        { status, notes },
+        { status, note, notes: note },
         true
       ),
   };
@@ -700,18 +743,41 @@ class ApiClient {
         { status },
         true
       ),
+    clearCash: (id: string, amount?: number, notes?: string) =>
+      this.post<{
+        success: boolean;
+        message: string;
+        clearedAmount: number;
+        partner?: any;
+      }>(
+        `/delivery/partners/${id}/clear-cash`,
+        { amount, notes },
+        true
+      ),
   };
 
   readonly analytics = {
-    getSalesReport: (filter?: {
-      startDate?: string;
-      endDate?: string;
-      hubId?: string;
-    }) => {
+    getSalesReport: (
+      filterOrStart?:
+        | {
+            startDate?: string;
+            endDate?: string;
+            hubId?: string;
+          }
+        | string,
+      endDate?: string,
+      hubId?: string
+    ) => {
       const q = new URLSearchParams();
-      if (filter?.startDate) q.set("startDate", filter.startDate);
-      if (filter?.endDate) q.set("endDate", filter.endDate);
-      if (filter?.hubId) q.set("hubId", filter.hubId);
+      if (typeof filterOrStart === "string") {
+        if (filterOrStart) q.set("startDate", filterOrStart);
+        if (endDate) q.set("endDate", endDate);
+        if (hubId) q.set("hubId", hubId);
+      } else if (filterOrStart && typeof filterOrStart === "object") {
+        if (filterOrStart.startDate) q.set("startDate", filterOrStart.startDate);
+        if (filterOrStart.endDate) q.set("endDate", filterOrStart.endDate);
+        if (filterOrStart.hubId) q.set("hubId", filterOrStart.hubId);
+      }
       const queryStr = q.toString() ? `?${q.toString()}` : "";
       return this.get<SalesReportResponse>(
         `/analytics/sales-report${queryStr}`,

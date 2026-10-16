@@ -61,7 +61,8 @@ export type UserProfile = {
 export type CustomerOrder = {
   id: string;
   date: string;
-  status: "placed" | "preparing" | "out_for_delivery" | "delivered";
+  status: "placed" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
+  cancelReason?: string;
   items: {
     product: Product;
     quantity: number;

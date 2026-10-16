@@ -38,12 +38,12 @@ type HubFormData = {
 const initialFormData: HubFormData = {
   name: "",
   code: "",
-  city: "Kozhikode",
+  city: "",
   address: "",
   contactPhone: "",
   deliveryRadiusKm: 10,
-  latitude: 11.2588,
-  longitude: 75.7804,
+  latitude: 0,
+  longitude: 0,
   isActive: true,
 };
 
@@ -147,7 +147,7 @@ export function HubsManagementView({
     setFormData({
       name: hub.name,
       code: hub.code,
-      city: hub.city || "Kozhikode",
+      city: hub.city || "",
       address: hub.address,
       contactPhone: hub.contactPhone || "",
       deliveryRadiusKm: hub.deliveryRadiusKm || 10,
@@ -670,7 +670,7 @@ export function HubsManagementView({
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="e.g. Kozhikode Beach Hub"
+                    placeholder="e.g. City Central Hub"
                     required
                     style={{
                       width: "100%",
@@ -715,7 +715,7 @@ export function HubsManagementView({
                     type="text"
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="Kozhikode"
+                    placeholder="City name"
                     required
                     style={{
                       width: "100%",

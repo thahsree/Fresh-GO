@@ -68,13 +68,29 @@ export class DeliveryController {
     return this.deliveryService.reportIssue(user.id, dto);
   }
 
-  @Roles(Role.ADMIN, Role.HUB_MANAGER)
+  @Roles(Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN, Role.DISPATCHER)
   @Post("settlements")
   async recordSettlement(
     @CurrentUser() user: User,
     @Body() dto: RecordCashSettlementDto,
   ) {
     return this.deliveryService.recordCashSettlement(dto, user.id);
+  }
+
+  @Roles(Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN, Role.DISPATCHER)
+  @Post("partners/:id/clear-cash")
+  async clearPartnerCash(
+    @Param("id") partnerProfileId: string,
+    @CurrentUser() user: User,
+    @Body("amount") amount?: number,
+    @Body("notes") notes?: string,
+  ) {
+    return this.deliveryService.clearPartnerCash(
+      partnerProfileId,
+      user,
+      amount,
+      notes,
+    );
   }
 
   @Roles(Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN)

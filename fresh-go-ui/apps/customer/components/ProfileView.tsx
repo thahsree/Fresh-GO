@@ -61,7 +61,7 @@ export function ProfileView({
   onNavigateToOrders,
   onOpenHelp,
   currentAddress = "",
-  currentCoords = { lat: 11.2588, lng: 75.7804 },
+  currentCoords = { lat: 0, lng: 0 },
   currentPincode = "",
   onSelectDeliveryAddress,
 }: ProfileViewProps) {
@@ -78,8 +78,8 @@ export function ProfileView({
   const [formStreet, setFormStreet] = useState("");
   const [formLandmark, setFormLandmark] = useState("");
   const [formArea, setFormArea] = useState("");
-  const [formCity, setFormCity] = useState("Kozhikode");
-  const [formPincode, setFormPincode] = useState("673004");
+  const [formCity, setFormCity] = useState("");
+  const [formPincode, setFormPincode] = useState("");
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -124,7 +124,7 @@ export function ProfileView({
     setFormStreet("");
     setFormLandmark("");
     setFormArea("");
-    setFormCity("Kozhikode");
+    setFormCity("");
     setFormPincode("");
     setFormIsDefault(addresses.length === 0);
     setFormError(null);
@@ -173,9 +173,9 @@ export function ProfileView({
       landmark: formLandmark.trim() || undefined,
       area: formArea.trim(),
       city: formCity.trim(),
-      pincode: formPincode.trim() || "673004",
-      latitude: editingAddress?.latitude || 11.2588,
-      longitude: editingAddress?.longitude || 75.7804,
+      pincode: formPincode.trim() || currentPincode.trim() || "",
+      latitude: editingAddress?.latitude || (currentCoords?.lat !== 0 ? currentCoords?.lat : 0),
+      longitude: editingAddress?.longitude || (currentCoords?.lng !== 0 ? currentCoords?.lng : 0),
       isDefault: formIsDefault,
     };
 
@@ -628,7 +628,7 @@ export function ProfileView({
                     style={styles.input}
                     value={formCity}
                     onChangeText={setFormCity}
-                    placeholder="Kozhikode"
+                    placeholder="e.g. City / Town"
                     placeholderTextColor={colors.textSoft}
                   />
                 </View>
@@ -641,7 +641,7 @@ export function ProfileView({
                   style={styles.input}
                   value={formPincode}
                   onChangeText={setFormPincode}
-                  placeholder="673004"
+                  placeholder="e.g. 6-digit postal code"
                   keyboardType="number-pad"
                   placeholderTextColor={colors.textSoft}
                 />

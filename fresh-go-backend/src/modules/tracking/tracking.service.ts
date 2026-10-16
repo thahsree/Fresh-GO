@@ -21,6 +21,8 @@ export class TrackingService {
       etaMinutes?: number;
       partnerDetails?: any;
       note?: string;
+      cancelReason?: string;
+      hubId?: string;
     },
   ) {
     if (!this.server) {
@@ -35,7 +37,16 @@ export class TrackingService {
     this.server
       .to("admin:dispatch")
       .emit("admin:order:updated", { orderId, ...payload });
+
+    // Also broadcast to hub subscribers and delivery partners
+    if (payload.hubId) {
+      this.server
+        .to(`hub:${payload.hubId}`)
+        .emit("order:status:changed", { orderId, ...payload });
+    }
+    this.server.emit("order:status:changed", { orderId, ...payload });
   }
+
 
   /**
    * Send new delivery offer to a specific delivery partner

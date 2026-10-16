@@ -62,7 +62,11 @@ export function useDispatchController() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: string) => {
+  const updateOrderStatus = async (
+    orderId: string,
+    status: string,
+    note?: string
+  ) => {
     const liveOrder = orders.find(
       (o) => o.id === orderId || o.orderNumber === orderId
     );
@@ -70,11 +74,14 @@ export function useDispatchController() {
 
     try {
       await api.ensureAdminAuth();
-      await api.orders.updateStatus(targetOrderId, status);
+      await api.orders.updateStatus(targetOrderId, status, note);
       await fetchTower();
       return {
         success: true,
-        message: `Order #${liveOrder?.orderNumber || orderId} moved to ${status}`,
+        message:
+          status === "CANCELLED"
+            ? `Order #${liveOrder?.orderNumber || orderId} has been cancelled`
+            : `Order #${liveOrder?.orderNumber || orderId} moved to ${status}`,
       };
     } catch (err: any) {
       console.warn("Update order status backend notice:", err?.message || err);

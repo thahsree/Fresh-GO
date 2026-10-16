@@ -48,7 +48,7 @@ export class DeliveryService {
       throw new NotFoundException("Delivery partner profile not found");
 
     // Active trip if any
-    const activeTrip = await this.prisma.deliveryTrip.findFirst({
+    let activeTrip = await this.prisma.deliveryTrip.findFirst({
       where: {
         partnerId: profile.id,
         phase: { notIn: [DeliveryPhase.DELIVERED, DeliveryPhase.CANCELLED] },
@@ -58,24 +58,74 @@ export class DeliveryService {
           include: {
             customer: { select: { name: true, phone: true } },
             items: { include: { product: true } },
+            hub: true,
           },
         },
       },
     });
 
-    // Recent deliveries
+    let cancelledTrip: any = null;
+
+    if (activeTrip && activeTrip.order.status === OrderStatus.CANCELLED) {
+      cancelledTrip = {
+        orderId: activeTrip.orderId,
+        orderNumber: activeTrip.order.orderNumber,
+        cancelReason:
+          activeTrip.order.cancelReason ||
+          activeTrip.order.notes ||
+          "Cancelled from Admin Control Tower",
+        cancelledAt: activeTrip.order.cancelledAt || new Date(),
+      };
+      // Mark trip as CANCELLED so it is recorded in history
+      await this.prisma.deliveryTrip.update({
+        where: { id: activeTrip.id },
+        data: { phase: DeliveryPhase.CANCELLED },
+      });
+      activeTrip = null;
+    }
+
+    // CRITICAL: If the order was already DELIVERED (e.g. from another trip or completed earlier),
+    // close this trip immediately and do not return it as active!
+    if (activeTrip && activeTrip.order.status === OrderStatus.DELIVERED) {
+      await this.prisma.deliveryTrip.update({
+        where: { id: activeTrip.id },
+        data: { phase: DeliveryPhase.DELIVERED, completedAt: new Date() },
+      });
+      activeTrip = null;
+    }
+
+    // Recent deliveries and trip history (both DELIVERED and CANCELLED)
     const recentDeliveries = await this.prisma.deliveryTrip.findMany({
       where: {
         partnerId: profile.id,
-        phase: DeliveryPhase.DELIVERED,
+        phase: { in: [DeliveryPhase.DELIVERED, DeliveryPhase.CANCELLED] },
       },
       include: {
         order: {
-          select: { orderNumber: true, totalAmount: true, paymentMethod: true },
+          select: {
+            id: true,
+            orderNumber: true,
+            totalAmount: true,
+            paymentMethod: true,
+            status: true,
+            cancelReason: true,
+            notes: true,
+            deliveryAddressSnapshotJson: true,
+            hub: { select: { name: true } },
+          },
         },
       },
-      orderBy: { completedAt: "desc" },
-      take: 10,
+      orderBy: { acceptedAt: "desc" },
+      take: 40,
+    });
+
+    // Deduplicate by orderId so each delivered/cancelled order appears ONLY ONCE in history
+    const seenOrderIds = new Set<string>();
+    const uniqueRecentDeliveries = recentDeliveries.filter((d) => {
+      const oId = d.orderId || d.order?.id;
+      if (!oId || seenOrderIds.has(oId)) return false;
+      seenOrderIds.add(oId);
+      return true;
     });
 
     // Earnings today
@@ -102,9 +152,11 @@ export class DeliveryService {
         preferredZone: profile.preferredZone?.name,
       },
       activeTrip,
+      cancelledTrip,
       todayEarnings: todayEarnings._sum.amount || 0,
-      recentDeliveries,
+      recentDeliveries: uniqueRecentDeliveries,
     };
+
   }
 
   /**
@@ -133,8 +185,14 @@ export class DeliveryService {
           OrderStatus.ASSIGNED,
         ],
       },
+      // Exclude ANY order that already has an active or completed delivery trip!
+      deliveryTrips: {
+        none: {
+          phase: { notIn: [DeliveryPhase.CANCELLED] },
+        },
+      },
       OR: [
-        // 1. Orders explicitly assigned to this partner (regardless of status)
+        // 1. Orders explicitly assigned to this partner that haven't been accepted into a trip yet
         { deliveryPartnerId: partner.id },
         // 2. Unassigned orders strictly belonging to this partner's hub
         {
@@ -253,10 +311,41 @@ export class DeliveryService {
 
     if (!order) throw new NotFoundException("Order not found or no longer available");
 
-    if (!acceptableStatuses.includes(order.status)) {
+    if (!acceptableStatuses.includes(order.status) || order.status === OrderStatus.DELIVERED || order.status === OrderStatus.CANCELLED) {
       throw new BadRequestException(
         "Order is no longer available for delivery",
       );
+    }
+
+    // 1. If this partner already has an active trip, prevent accepting another
+    const existingPartnerTrip = await this.prisma.deliveryTrip.findFirst({
+      where: {
+        partnerId: partner.id,
+        phase: { notIn: [DeliveryPhase.DELIVERED, DeliveryPhase.CANCELLED] },
+      },
+      include: { order: true },
+    });
+
+    if (existingPartnerTrip) {
+      if (existingPartnerTrip.orderId === order.id) {
+        return existingPartnerTrip; // Idempotent return if already accepted
+      }
+      throw new BadRequestException("You already have an active delivery trip in progress. Complete it first.");
+    }
+
+    // 2. If this order already has any active or completed trip, prevent creating duplicate trip
+    const existingOrderTrip = await this.prisma.deliveryTrip.findFirst({
+      where: {
+        orderId: order.id,
+        phase: { notIn: [DeliveryPhase.CANCELLED] },
+      },
+    });
+
+    if (existingOrderTrip) {
+      if (existingOrderTrip.partnerId === partner.id && existingOrderTrip.phase !== DeliveryPhase.DELIVERED) {
+        return existingOrderTrip; // Idempotent return
+      }
+      throw new BadRequestException("This order already has an active trip or has already been delivered.");
     }
 
     // Cancel 45-second dispatch timeout job in BullMQ
@@ -390,31 +479,53 @@ export class DeliveryService {
 
       // 4. On DELIVERED: Reconcile COD cash & credit rider earnings
       if (phase === DeliveryPhase.DELIVERED) {
-        // Base pay ₹45 + ₹12/km
-        const earningsAmount = Math.round(45 + distanceKm * 12);
-
-        await tx.partnerEarningEntry.create({
+        // Also ensure any other duplicate or orphaned trips for this order are completed
+        await tx.deliveryTrip.updateMany({
+          where: {
+            orderId,
+            id: { not: tripId },
+          },
           data: {
-            partnerId: trip.partnerId,
+            phase: DeliveryPhase.DELIVERED,
+            completedAt: new Date(),
+          },
+        });
+
+        // Only credit earnings and increment COD cash IF not already credited for this order!
+        const existingEarning = await tx.partnerEarningEntry.findFirst({
+          where: {
             orderId: trip.orderId,
-            type: EarningType.BASE_PAY,
-            amount: earningsAmount,
+            partnerId: trip.partnerId,
           },
         });
 
-        // If COD order, increment cash-in-hand
-        const codCashDelta =
-          trip.order.paymentMethod === PaymentMethod.COD
-            ? trip.order.totalAmount
-            : 0;
+        if (!existingEarning) {
+          // Base pay ₹45 + ₹12/km
+          const earningsAmount = Math.round(45 + distanceKm * 12);
 
-        await tx.deliveryPartnerProfile.update({
-          where: { id: trip.partnerId },
-          data: {
-            completedDeliveries: { increment: 1 },
-            codCashInHand: { increment: codCashDelta },
-          },
-        });
+          await tx.partnerEarningEntry.create({
+            data: {
+              partnerId: trip.partnerId,
+              orderId: trip.orderId,
+              type: EarningType.BASE_PAY,
+              amount: earningsAmount,
+            },
+          });
+
+          // If COD order, increment cash-in-hand
+          const isCodOrder =
+            String(trip.order.paymentMethod || "").toUpperCase() === "COD" ||
+            trip.order.paymentMethod === PaymentMethod.COD;
+          const codCashDelta = isCodOrder ? trip.order.totalAmount : 0;
+
+          await tx.deliveryPartnerProfile.update({
+            where: { id: trip.partnerId },
+            data: {
+              completedDeliveries: { increment: 1 },
+              codCashInHand: { increment: codCashDelta },
+            },
+          });
+        }
       }
 
       return updatedTrip;
@@ -443,25 +554,47 @@ export class DeliveryService {
   ) {
     const partner = await this.prisma.deliveryPartnerProfile.findUnique({
       where: { id: dto.partnerProfileId },
-      include: { user: true },
+      include: { user: true, hub: true },
     });
 
     if (!partner) throw new NotFoundException("Partner profile not found");
 
-    if (partner.codCashInHand < dto.amount) {
+    const settleAmount =
+      dto.amount && dto.amount > 0 ? dto.amount : partner.codCashInHand;
+
+    if (settleAmount <= 0) {
+      return {
+        message: `${partner.user.name} currently has no cash in hand to settle.`,
+        partner,
+        clearedAmount: 0,
+      };
+    }
+
+    if (partner.codCashInHand < settleAmount) {
       throw new BadRequestException(
-        `Partner only has ₹${partner.codCashInHand} recorded in cash. Cannot settle ₹${dto.amount}.`,
+        `Partner only has ₹${partner.codCashInHand} recorded in cash. Cannot settle ₹${settleAmount}.`,
       );
     }
+
+    const hubId =
+      dto.hubId ||
+      partner.hubId ||
+      (await this.prisma.hub.findFirst({ select: { id: true } }))?.id;
+
+    if (!hubId) throw new BadRequestException("No fulfillment hub found for settlement");
+
+    const receiptNumber =
+      dto.receiptNumber ||
+      `CS-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
     return this.prisma.$transaction(async (tx) => {
       const settlement = await tx.cashSettlement.create({
         data: {
           partnerId: dto.partnerProfileId,
-          hubId: dto.hubId,
-          amount: dto.amount,
-          receiptNumber: dto.receiptNumber,
-          notes: dto.notes,
+          hubId,
+          amount: settleAmount,
+          receiptNumber,
+          notes: dto.notes || `Counter cash collected by Admin`,
           settledByAdminId: adminUserId,
         },
       });
@@ -469,15 +602,101 @@ export class DeliveryService {
       const updatedPartner = await tx.deliveryPartnerProfile.update({
         where: { id: dto.partnerProfileId },
         data: {
-          codCashInHand: { decrement: dto.amount },
+          codCashInHand: { decrement: settleAmount },
         },
+        include: { user: true, hub: true },
       });
 
       this.logger.log(
-        `💵 Cash Settlement recorded: ₹${dto.amount} from partner ${partner.user.name}. New COD balance: ₹${updatedPartner.codCashInHand}`,
+        `💵 Cash Settlement recorded: ₹${settleAmount} from partner ${partner.user.name}. New COD balance: ₹${updatedPartner.codCashInHand}`,
       );
 
-      return { settlement, partner: updatedPartner };
+      return {
+        success: true,
+        message: `Settled ₹${settleAmount.toLocaleString("en-IN")} from ${partner.user.name}. New balance: ₹${updatedPartner.codCashInHand.toLocaleString("en-IN")}`,
+        settlement,
+        partner: updatedPartner,
+        clearedAmount: settleAmount,
+      };
+    });
+  }
+
+  /**
+   * Fast Hub Admin Action: Clear or settle cash in hand for a delivery partner
+   */
+  async clearPartnerCash(
+    partnerProfileId: string,
+    adminUser: User,
+    amount?: number,
+    notes?: string,
+  ) {
+    const partner = await this.prisma.deliveryPartnerProfile.findFirst({
+      where: {
+        OR: [
+          { id: partnerProfileId },
+          { userId: partnerProfileId },
+          { partnerId: partnerProfileId },
+        ],
+      },
+      include: { user: true, hub: true },
+    });
+
+    if (!partner) throw new NotFoundException("Delivery partner profile not found");
+
+    if (partner.codCashInHand <= 0) {
+      return {
+        success: true,
+        message: `${partner.user.name} has no cash in hand (₹0 balance).`,
+        partner,
+        clearedAmount: 0,
+      };
+    }
+
+    const settleAmount =
+      amount && amount > 0
+        ? Math.min(amount, partner.codCashInHand)
+        : partner.codCashInHand;
+
+    const hubId =
+      partner.hubId ||
+      adminUser.hubId ||
+      (await this.prisma.hub.findFirst({ select: { id: true } }))?.id;
+
+    if (!hubId) throw new BadRequestException("No fulfillment hub found for settlement");
+
+    const receiptNumber = `CS-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      const settlement = await tx.cashSettlement.create({
+        data: {
+          partnerId: partner.id,
+          hubId,
+          amount: settleAmount,
+          receiptNumber,
+          notes: notes || `Cash cleared at counter by ${adminUser.name || "Hub Admin"}`,
+          settledByAdminId: adminUser.id,
+        },
+      });
+
+      const updatedPartner = await tx.deliveryPartnerProfile.update({
+        where: { id: partner.id },
+        data: {
+          codCashInHand: { decrement: settleAmount },
+        },
+        include: { user: true, hub: true },
+      });
+
+      this.logger.log(
+        `💵 Cleared COD cash: ₹${settleAmount} from rider ${partner.user.name}. Remaining COD cash: ₹${updatedPartner.codCashInHand}`,
+      );
+
+      return {
+        success: true,
+        message: `Cleared ₹${settleAmount.toLocaleString("en-IN")} from ${partner.user.name}. New balance: ₹${updatedPartner.codCashInHand.toLocaleString("en-IN")}`,
+        settlement,
+        partner: updatedPartner,
+        clearedAmount: settleAmount,
+      };
     });
   }
 
@@ -532,12 +751,19 @@ export class DeliveryService {
    */
   async getDeliveryPartners(adminUser: User, queryHubId?: string) {
     const where: any = {};
-    if (adminUser.role === Role.ADMIN) {
-      if (adminUser.hubId) {
-        where.hubId = adminUser.hubId;
+    const effectiveHubId = queryHubId || adminUser.hubId;
+
+    if (effectiveHubId) {
+      where.hubId = effectiveHubId;
+    } else if (adminUser.role !== Role.SUPER_ADMIN) {
+      // For Admin / Hub Manager without explicit hubId, fallback to central hub
+      const defaultHub = await this.prisma.hub.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+      if (defaultHub) {
+        where.hubId = defaultHub.id;
       }
-    } else if (queryHubId) {
-      where.hubId = queryHubId;
     }
 
     return this.prisma.deliveryPartnerProfile.findMany({

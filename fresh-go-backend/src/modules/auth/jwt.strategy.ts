@@ -26,6 +26,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       include: {
         customerProfile: true,
         partnerProfile: true,
+        hub: true,
       },
     });
 

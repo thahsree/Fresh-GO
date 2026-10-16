@@ -10,8 +10,9 @@ import {
   Star,
   X,
 } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Image,
   Modal,
   Pressable,
@@ -21,6 +22,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+
 import type { Category, Product } from "../models/catalog";
 
 type SortOption =
@@ -41,9 +43,11 @@ type ProductListingViewProps = {
   favorites: string[];
   categories?: Category[];
   products?: Product[];
+  cart?: Record<string, number>;
   onBack: () => void;
   onSelectProduct: (product: Product) => void;
   onAddProduct: (productId: string) => void;
+  onUpdateQuantity?: (productId: string, quantity: number) => void;
   onToggleFavorite: (productId: string) => void;
 };
 
@@ -55,6 +59,92 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: "cat-offers", name: "Offers", slug: "offers", icon: "🔥", tint: "#FBEEDC" },
 ];
 
+function ListingCardActionButton({
+  quantity,
+  isOutOfStock,
+  productName,
+  onAdd,
+  onIncrement,
+  onDecrement,
+}: {
+  quantity: number;
+  isOutOfStock: boolean;
+  productName: string;
+  onAdd: () => void;
+  onIncrement: () => void;
+  onDecrement: () => void;
+}) {
+  const isAdded = quantity > 0;
+  const animVal = useRef(new Animated.Value(isAdded ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(animVal, {
+      toValue: isAdded ? 1 : 0,
+      friction: 8,
+      tension: 85,
+      useNativeDriver: false,
+    }).start();
+  }, [isAdded]);
+
+  const buttonWidth = animVal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [24, 52],
+  });
+
+  if (isOutOfStock) {
+    return (
+      <View style={[styles.actionWrapper, { width: 24, backgroundColor: "#CBD5E1" }]}>
+        <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "800" }}>✕</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Animated.View style={[styles.actionWrapper, { width: buttonWidth }]}>
+      {isAdded ? (
+        <View style={styles.stepperContainer}>
+          <Pressable
+            style={styles.stepperBtn}
+            onPress={(e) => {
+              e.stopPropagation();
+              onDecrement();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Decrease quantity of ${productName}`}
+          >
+            <Text style={styles.stepperIcon}>−</Text>
+          </Pressable>
+          <Text style={styles.stepperVal}>{quantity}</Text>
+          <Pressable
+            style={styles.stepperBtn}
+            onPress={(e) => {
+              e.stopPropagation();
+              onIncrement();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Increase quantity of ${productName}`}
+          >
+            <Text style={styles.stepperIcon}>+</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          style={styles.addBtn}
+          onPress={(e) => {
+            e.stopPropagation();
+            onAdd();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Add to cart"
+        >
+          <Plus size={15} color="#FFFFFF" strokeWidth={3} />
+        </Pressable>
+      )}
+    </Animated.View>
+  );
+}
+
+
 export function ProductListingView({
   initialCategory = null,
   initialSearch = "",
@@ -64,9 +154,11 @@ export function ProductListingView({
   favorites,
   categories = [],
   products = [],
+  cart,
   onBack,
   onSelectProduct,
   onAddProduct,
+  onUpdateQuantity,
   onToggleFavorite,
 }: ProductListingViewProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(
@@ -449,22 +541,31 @@ export function ProductListingView({
                       </View>
 
                       {!isOutOfStock ? (
-                        <Pressable
-                          style={styles.addBtn}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            onAddProduct(product.id);
+                        <ListingCardActionButton
+                          quantity={(cart && (cart[product.id] ?? (product.slug ? cart[product.slug] : undefined))) || 0}
+                          isOutOfStock={false}
+                          productName={product.name}
+                          onAdd={() => onAddProduct(product.id)}
+                          onIncrement={() => {
+                            const currentQty = (cart && (cart[product.id] ?? (product.slug ? cart[product.slug] : undefined))) || 0;
+                            if (onUpdateQuantity) {
+                              onUpdateQuantity(product.id, currentQty + 1);
+                            } else {
+                              onAddProduct(product.id);
+                            }
                           }}
-                          accessibilityRole="button"
-                          accessibilityLabel="Add to cart"
-                        >
-                          <Plus size={16} color="#FFFFFF" strokeWidth={3} />
-                        </Pressable>
+                          onDecrement={() => {
+                            const currentQty = (cart && (cart[product.id] ?? (product.slug ? cart[product.slug] : undefined))) || 0;
+                            if (onUpdateQuantity) {
+                              onUpdateQuantity(product.id, Math.max(0, currentQty - 1));
+                            }
+                          }}
+                        />
                       ) : (
                         <View
                           style={[
-                            styles.addBtn,
-                            { backgroundColor: "#CBD5E1" },
+                            styles.actionWrapper,
+                            { width: 24, backgroundColor: "#CBD5E1" },
                           ]}
                         >
                           <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "800" }}>✕</Text>
@@ -837,13 +938,46 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 10,
   },
-  addBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  actionWrapper: {
+    height: 24,
+    borderRadius: 12,
     backgroundColor: colors.primary,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
+  },
+  addBtn: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    height: "100%",
+    paddingHorizontal: 2,
+  },
+  stepperBtn: {
+    width: 17,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepperIcon: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 14,
+  },
+  stepperVal: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "800",
+    minWidth: 12,
+    textAlign: "center",
   },
   emptyState: {
     alignItems: "center",

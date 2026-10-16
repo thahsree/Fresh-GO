@@ -19,7 +19,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean:dev-data": "ts-node scripts/clear-dev-data.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^10.2.1",
