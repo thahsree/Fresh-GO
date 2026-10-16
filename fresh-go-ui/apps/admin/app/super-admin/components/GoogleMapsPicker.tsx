@@ -4,12 +4,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import {
   MapPin,
   Search,
-  Navigation,
   ZoomIn,
   ZoomOut,
   Info,
   Loader2,
   Crosshair,
+  Sparkles,
 } from "lucide-react";
 
 const LOCATIONIQ_KEY = "pk.1714d75230cfe1d776514cf91ec30ae3";
@@ -39,7 +39,7 @@ export function GoogleMapsPicker({
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [locateError, setLocateError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const mapInstance = useRef<any>(null);
   const markerInstance = useRef<any>(null);
@@ -71,24 +71,52 @@ export function GoogleMapsPicker({
     }
   }, [radiusKm]);
 
-  // Reverse geocoding helper using LocationIQ
+  // Reverse geocoding helper: 100% Free OpenStreetMap Photon first (NO API key required)
   const reverseGeocode = useCallback(async (targetLat: number, targetLng: number): Promise<string> => {
+    // 1. Try Photon (OpenStreetMap) - 100% free, no key required
+    try {
+      const pRes = await fetch(
+        `https://photon.komoot.io/reverse?lat=${targetLat}&lon=${targetLng}`,
+        { signal: AbortSignal.timeout(3500) }
+      );
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        const feat = pData?.features?.[0]?.properties;
+        if (feat) {
+          const parts = [feat.name, feat.locality || feat.district, feat.city || feat.county, feat.state, feat.postcode]
+            .filter(Boolean);
+          if (parts.length > 0) return parts.join(", ");
+        }
+      }
+    } catch {}
+
+    // 2. Fallback to LocationIQ
     try {
       const res = await fetch(
         `https://us1.locationiq.com/v1/reverse?key=${LOCATIONIQ_KEY}&lat=${targetLat}&lon=${targetLng}&format=json`,
-        { signal: AbortSignal.timeout(4000) }
+        { signal: AbortSignal.timeout(3500) }
       );
-      if (!res.ok) return "";
-      const data = await res.json();
-      return data?.display_name || "";
-    } catch {
-      return "";
-    }
+      if (res.ok) {
+        const data = await res.json();
+        return data?.display_name || "";
+      }
+    } catch {}
+
+    return `Lat: ${targetLat.toFixed(4)}, Lng: ${targetLng.toFixed(4)}`;
   }, []);
 
-  // 1. Inject Leaflet CDN CSS & JS dynamically
+  // 1. Purge any lingering Google Maps scripts from DOM and inject Leaflet CDN
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Remove any lingering Google Maps scripts to prevent "API key required" popups
+    const oldGoogle = document.getElementById("google-maps-script");
+    if (oldGoogle) oldGoogle.remove();
+    if ((window as any).google?.maps) {
+      try {
+        delete (window as any).google.maps;
+      } catch {}
+    }
 
     // Inject Leaflet CSS
     if (!document.getElementById("leaflet-cdn-css")) {
@@ -115,11 +143,20 @@ export function GoogleMapsPicker({
     }
   }, []);
 
-  // 2. Initialize Leaflet Map
+  // 2. Initialize Leaflet Map (Zero API Key Required)
   useEffect(() => {
-    if (!leafletLoaded || !mapContainerRef.current || mapInstance.current) return;
+    if (!leafletLoaded || !mapContainerRef.current) return;
     const L = (window as any).L;
     if (!L) return;
+
+    // Reset container if already initialized
+    if ((mapContainerRef.current as any)._leaflet_id) {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+      delete (mapContainerRef.current as any)._leaflet_id;
+    }
 
     const initialCenter: [number, number] = [lat, lng];
 
@@ -129,10 +166,10 @@ export function GoogleMapsPicker({
       zoomControl: false,
     });
 
-    // High performance CartoDB Voyager tiles (crisp, accurate, zero API payment)
+    // 100% Free OpenStreetMap CartoDB Tiles (Zero API key required, crisp, unlimited)
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     }).addTo(map);
 
     // Custom MapPin Icon
@@ -193,10 +230,10 @@ export function GoogleMapsPicker({
     circleInstance.current = circle;
 
     return () => {
-      map.remove();
-      mapInstance.current = null;
-      markerInstance.current = null;
-      circleInstance.current = null;
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
     };
   }, [leafletLoaded, reverseGeocode, onLocationSelect]);
 
@@ -211,45 +248,77 @@ export function GoogleMapsPicker({
     }
   };
 
-  // Search Address / Geocoding using LocationIQ
+  // Search Address / Geocoding using OpenStreetMap Photon (Zero API Key Required)
   const handleSearchAddress = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!addressQuery.trim()) return;
 
     setIsSearching(true);
-    setLocateError(null);
+    setStatusMessage(null);
     try {
-      const res = await fetch(
-        `https://us1.locationiq.com/v1/search?key=${LOCATIONIQ_KEY}&q=${encodeURIComponent(
-          addressQuery
-        )}&countrycodes=in&format=json`,
-        { signal: AbortSignal.timeout(6000) }
-      );
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        const first = data[0];
-        const newLat = Number(parseFloat(first.lat).toFixed(6));
-        const newLng = Number(parseFloat(first.lon).toFixed(6));
-        setLat(newLat);
-        setLng(newLng);
+      // 1. Try free Photon search first (No API key required)
+      let foundLat: number | null = null;
+      let foundLng: number | null = null;
+      let foundName: string | null = null;
+
+      try {
+        const pRes = await fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(addressQuery)}&limit=3`,
+          { signal: AbortSignal.timeout(5000) }
+        );
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          const first = pData?.features?.[0];
+          if (first && first.geometry?.coordinates) {
+            foundLng = Number(Number(first.geometry.coordinates[0]).toFixed(6));
+            foundLat = Number(Number(first.geometry.coordinates[1]).toFixed(6));
+            const p = first.properties;
+            foundName = [p.name, p.locality || p.district, p.city || p.county, p.state].filter(Boolean).join(", ");
+          }
+        }
+      } catch {}
+
+      // 2. Fallback to LocationIQ if Photon had no match
+      if (!foundLat || !foundLng) {
+        try {
+          const res = await fetch(
+            `https://us1.locationiq.com/v1/search?key=${LOCATIONIQ_KEY}&q=${encodeURIComponent(
+              addressQuery
+            )}&countrycodes=in&format=json`,
+            { signal: AbortSignal.timeout(5000) }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              foundLat = Number(parseFloat(data[0].lat).toFixed(6));
+              foundLng = Number(parseFloat(data[0].lon).toFixed(6));
+              foundName = data[0].display_name;
+            }
+          }
+        } catch {}
+      }
+
+      if (foundLat && foundLng) {
+        setLat(foundLat);
+        setLng(foundLng);
 
         if (mapInstance.current) {
-          mapInstance.current.flyTo([newLat, newLng], 14, { duration: 1.2 });
+          mapInstance.current.flyTo([foundLat, foundLng], 14, { duration: 1.2 });
         }
         if (markerInstance.current) {
-          markerInstance.current.setLatLng([newLat, newLng]);
+          markerInstance.current.setLatLng([foundLat, foundLng]);
         }
         if (circleInstance.current) {
-          circleInstance.current.setLatLng([newLat, newLng]);
+          circleInstance.current.setLatLng([foundLat, foundLng]);
         }
 
-        onLocationSelect(newLat, newLng, first.display_name);
+        onLocationSelect(foundLat, foundLng, foundName || addressQuery);
       } else {
-        setLocateError("Address not found. Please try entering a nearby town or landmark.");
+        setStatusMessage("Place not found. You can click anywhere on the map to place the pin directly.");
       }
     } catch (err: any) {
       console.warn("Geocoding failed:", err);
-      setLocateError("Search connection error. Please try again or pinpoint on the map.");
+      setStatusMessage("Search offline. Click directly on the map to position the Hub pin.");
     } finally {
       setIsSearching(false);
     }
@@ -258,7 +327,7 @@ export function GoogleMapsPicker({
   // Locate current position with GPS and IP-fallback
   const handleGetCurrentLocation = async () => {
     setIsLocating(true);
-    setLocateError(null);
+    setStatusMessage(null);
 
     let foundLat: number | null = null;
     let foundLng: number | null = null;
@@ -296,11 +365,10 @@ export function GoogleMapsPicker({
       }
     }
 
-    // 3. Ultimate Fallback to Kasaragod Hub coordinates
+    // 3. Fallback to default Kasaragod Hub coordinates
     if (!foundLat || !foundLng) {
       foundLat = DEFAULT_LAT;
       foundLng = DEFAULT_LNG;
-      setLocateError("Using default Kerala Hub location. Please allow browser location access.");
     }
 
     setLat(foundLat);
@@ -317,7 +385,7 @@ export function GoogleMapsPicker({
     }
 
     const address = await reverseGeocode(foundLat, foundLng);
-    onLocationSelect(foundLat, foundLng, address || "Current Geolocation");
+    onLocationSelect(foundLat, foundLng, address);
     setIsLocating(false);
   };
 
@@ -357,7 +425,7 @@ export function GoogleMapsPicker({
             value={addressQuery}
             onChange={(e) => setAddressQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSearchAddress()}
-            placeholder="Search address, landmark or area in Kerala..."
+            placeholder="Search city, town, landmark or pin on map..."
             style={{
               width: "100%",
               padding: "9px 12px 9px 36px",
@@ -421,7 +489,7 @@ export function GoogleMapsPicker({
         </button>
       </div>
 
-      {locateError && (
+      {statusMessage && (
         <div
           style={{
             background: "#FFF3CD",
@@ -432,7 +500,7 @@ export function GoogleMapsPicker({
             border: "1px solid #FFEEBA",
           }}
         >
-          ⚠️ {locateError}
+          💡 {statusMessage}
         </div>
       )}
 
@@ -449,6 +517,28 @@ export function GoogleMapsPicker({
         }}
       >
         <div ref={mapContainerRef} style={{ width: "100%", height: "100%", zIndex: 1 }} />
+
+        {!leafletLoaded && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              background: "#E8EFE9",
+              zIndex: 2,
+              color: "#1F4D46",
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            <Loader2 size={24} className="animate-spin" />
+            Loading interactive map...
+          </div>
+        )}
 
         {/* Zoom Controls */}
         <div
