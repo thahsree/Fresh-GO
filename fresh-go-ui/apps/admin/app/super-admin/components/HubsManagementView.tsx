@@ -813,9 +813,9 @@ export function HubsManagementView({
                   initialLat={formData.latitude}
                   initialLng={formData.longitude}
                   radiusKm={formData.deliveryRadiusKm}
-                  onLocationSelect={(newLat, newLng, address) => {
-                    let detectedCity = "";
-                    if (address) {
+                  onLocationSelect={(newLat, newLng, address, city) => {
+                    let detectedCity = city || "";
+                    if (!detectedCity && address) {
                       const parts = address.split(",").map((s) => s.trim());
                       if (parts.length >= 3) {
                         detectedCity = parts[parts.length - 4] || parts[parts.length - 3] || "";
@@ -826,7 +826,7 @@ export function HubsManagementView({
                       latitude: newLat,
                       longitude: newLng,
                       address: address || prev.address,
-                      city: prev.city || detectedCity || prev.city,
+                      city: detectedCity || prev.city,
                     }));
                   }}
                   onRadiusChange={(newRadius) => {

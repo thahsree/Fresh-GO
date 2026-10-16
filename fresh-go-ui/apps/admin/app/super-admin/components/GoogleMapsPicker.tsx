@@ -20,8 +20,13 @@ type GoogleMapsPickerProps = {
   initialLat?: number;
   initialLng?: number;
   radiusKm?: number;
-  onLocationSelect: (lat: number, lng: number, address?: string) => void;
+  onLocationSelect: (lat: number, lng: number, address?: string, city?: string) => void;
   onRadiusChange?: (radiusKm: number) => void;
+};
+
+type GeocodeResult = {
+  address: string;
+  city?: string;
 };
 
 export function GoogleMapsPicker({
@@ -45,34 +50,17 @@ export function GoogleMapsPicker({
   const markerInstance = useRef<any>(null);
   const circleInstance = useRef<any>(null);
 
-  // Sync internal coordinates when initial props change
-  useEffect(() => {
-    if (initialLat && initialLng && initialLat !== 0 && initialLng !== 0) {
-      setLat(initialLat);
-      setLng(initialLng);
-      if (markerInstance.current) {
-        markerInstance.current.setLatLng([initialLat, initialLng]);
-      }
-      if (circleInstance.current) {
-        circleInstance.current.setLatLng([initialLat, initialLng]);
-      }
-      if (mapInstance.current) {
-        mapInstance.current.setView([initialLat, initialLng]);
-      }
-    }
-  }, [initialLat, initialLng]);
+  // Keep references to callbacks so effect listeners don't tear down map on re-render
+  const onLocationSelectRef = useRef(onLocationSelect);
+  onLocationSelectRef.current = onLocationSelect;
 
-  useEffect(() => {
-    if (radiusKm) {
-      setRadius(radiusKm);
-      if (circleInstance.current) {
-        circleInstance.current.setRadius(radiusKm * 1000);
-      }
-    }
-  }, [radiusKm]);
+  const lastReportedCoords = useRef<{ lat: number; lng: number }>({
+    lat: initialLat && initialLat !== 0 ? initialLat : DEFAULT_LAT,
+    lng: initialLng && initialLng !== 0 ? initialLng : DEFAULT_LNG,
+  });
 
-  // Reverse geocoding helper: 100% Free OpenStreetMap Photon first (NO API key required)
-  const reverseGeocode = useCallback(async (targetLat: number, targetLng: number): Promise<string> => {
+  // Reverse geocoding helper: 100% Free OpenStreetMap Photon + BigDataCloud (NO API key required)
+  const reverseGeocode = useCallback(async (targetLat: number, targetLng: number): Promise<GeocodeResult> => {
     // 1. Try Photon (OpenStreetMap) - 100% free, no key required
     try {
       const pRes = await fetch(
@@ -85,12 +73,27 @@ export function GoogleMapsPicker({
         if (feat) {
           const parts = [feat.name, feat.locality || feat.district, feat.city || feat.county, feat.state, feat.postcode]
             .filter(Boolean);
-          if (parts.length > 0) return parts.join(", ");
+          const city = feat.city || feat.locality || feat.district || feat.county || "";
+          if (parts.length > 0) return { address: parts.join(", "), city };
         }
       }
     } catch {}
 
-    // 2. Fallback to LocationIQ
+    // 2. Try BigDataCloud reverse geocode (100% free, no key required)
+    try {
+      const bRes = await fetch(
+        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${targetLat}&longitude=${targetLng}&localityLanguage=en`,
+        { signal: AbortSignal.timeout(3500) }
+      );
+      if (bRes.ok) {
+        const bData = await bRes.json();
+        const parts = [bData.locality || bData.city, bData.principalSubdivision, bData.countryName].filter(Boolean);
+        const city = bData.city || bData.locality || "";
+        if (parts.length > 0) return { address: parts.join(", "), city };
+      }
+    } catch {}
+
+    // 3. Fallback to LocationIQ
     try {
       const res = await fetch(
         `https://us1.locationiq.com/v1/reverse?key=${LOCATIONIQ_KEY}&lat=${targetLat}&lon=${targetLng}&format=json`,
@@ -98,12 +101,47 @@ export function GoogleMapsPicker({
       );
       if (res.ok) {
         const data = await res.json();
-        return data?.display_name || "";
+        const city = data?.address?.city || data?.address?.town || data?.address?.village || data?.address?.county || "";
+        return { address: data?.display_name || "", city };
       }
     } catch {}
 
-    return `Lat: ${targetLat.toFixed(4)}, Lng: ${targetLng.toFixed(4)}`;
+    return { address: `Lat: ${targetLat.toFixed(4)}, Lng: ${targetLng.toFixed(4)}` };
   }, []);
+
+  const reverseGeocodeRef = useRef(reverseGeocode);
+  reverseGeocodeRef.current = reverseGeocode;
+
+  // Sync internal coordinates when initial props change externally (avoid interrupting smooth flyTo)
+  useEffect(() => {
+    if (initialLat && initialLng && initialLat !== 0 && initialLng !== 0) {
+      const diffLat = Math.abs(lastReportedCoords.current.lat - initialLat);
+      const diffLng = Math.abs(lastReportedCoords.current.lng - initialLng);
+      if (diffLat > 0.0001 || diffLng > 0.0001) {
+        lastReportedCoords.current = { lat: initialLat, lng: initialLng };
+        setLat(initialLat);
+        setLng(initialLng);
+        if (markerInstance.current) {
+          markerInstance.current.setLatLng([initialLat, initialLng]);
+        }
+        if (circleInstance.current) {
+          circleInstance.current.setLatLng([initialLat, initialLng]);
+        }
+        if (mapInstance.current) {
+          mapInstance.current.setView([initialLat, initialLng]);
+        }
+      }
+    }
+  }, [initialLat, initialLng]);
+
+  useEffect(() => {
+    if (radiusKm) {
+      setRadius(radiusKm);
+      if (circleInstance.current) {
+        circleInstance.current.setRadius(radiusKm * 1000);
+      }
+    }
+  }, [radiusKm]);
 
   // 1. Purge any lingering Google Maps scripts from DOM and inject Leaflet CDN
   useEffect(() => {
@@ -205,11 +243,12 @@ export function GoogleMapsPicker({
       const pos = marker.getLatLng();
       const newLat = Number(pos.lat.toFixed(6));
       const newLng = Number(pos.lng.toFixed(6));
+      lastReportedCoords.current = { lat: newLat, lng: newLng };
       setLat(newLat);
       setLng(newLng);
       circle.setLatLng(pos);
-      const address = await reverseGeocode(newLat, newLng);
-      onLocationSelect(newLat, newLng, address);
+      const geo = await reverseGeocodeRef.current(newLat, newLng);
+      onLocationSelectRef.current(newLat, newLng, geo.address, geo.city);
     });
 
     // Click map event
@@ -217,12 +256,13 @@ export function GoogleMapsPicker({
       const clicked = e.latlng;
       const newLat = Number(clicked.lat.toFixed(6));
       const newLng = Number(clicked.lng.toFixed(6));
+      lastReportedCoords.current = { lat: newLat, lng: newLng };
       setLat(newLat);
       setLng(newLng);
       marker.setLatLng(clicked);
       circle.setLatLng(clicked);
-      const address = await reverseGeocode(newLat, newLng);
-      onLocationSelect(newLat, newLng, address);
+      const geo = await reverseGeocodeRef.current(newLat, newLng);
+      onLocationSelectRef.current(newLat, newLng, geo.address, geo.city);
     });
 
     mapInstance.current = map;
@@ -235,7 +275,7 @@ export function GoogleMapsPicker({
         mapInstance.current = null;
       }
     };
-  }, [leafletLoaded, reverseGeocode, onLocationSelect]);
+  }, [leafletLoaded]);
 
   // Handle radius changes
   const handleRadiusChange = (newRadius: number) => {
@@ -299,6 +339,7 @@ export function GoogleMapsPicker({
       }
 
       if (foundLat && foundLng) {
+        lastReportedCoords.current = { lat: foundLat, lng: foundLng };
         setLat(foundLat);
         setLng(foundLng);
 
@@ -312,70 +353,180 @@ export function GoogleMapsPicker({
           circleInstance.current.setLatLng([foundLat, foundLng]);
         }
 
-        onLocationSelect(foundLat, foundLng, foundName || addressQuery);
+        onLocationSelectRef.current(foundLat, foundLng, foundName || addressQuery);
       } else {
-        setStatusMessage("Place not found. You can click anywhere on the map to place the pin directly.");
+        setStatusMessage("⚠️ Place not found. You can click anywhere on the map to place the pin directly.");
       }
     } catch (err: any) {
       console.warn("Geocoding failed:", err);
-      setStatusMessage("Search offline. Click directly on the map to position the Hub pin.");
+      setStatusMessage("⚠️ Search offline. Click directly on the map to position the Hub pin.");
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Locate current position with GPS and IP-fallback
+  // Locate current position with GPS and multi-tier IP fallback
   const handleGetCurrentLocation = async () => {
     setIsLocating(true);
     setStatusMessage(null);
 
     let foundLat: number | null = null;
     let foundLng: number | null = null;
+    let locationSource: "gps" | "network" | "ip" | null = null;
+    let detectedCity: string | null = null;
+    let isPermissionDenied = false;
 
-    // 1. Try HTML5 Geolocation API
-    if (typeof navigator !== "undefined" && navigator.geolocation) {
+    // Check browser permission state upfront if supported
+    if (typeof navigator !== "undefined" && (navigator as any).permissions?.query) {
       try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 7000,
-            maximumAge: 10000,
-          });
-        });
-        foundLat = Number(pos.coords.latitude.toFixed(6));
-        foundLng = Number(pos.coords.longitude.toFixed(6));
-      } catch (err: any) {
-        console.warn("Browser GPS unavailable or blocked, falling back to IP geolocation...", err?.message);
-      }
+        const perm = await (navigator as any).permissions.query({ name: "geolocation" });
+        if (perm && perm.state === "denied") {
+          isPermissionDenied = true;
+        }
+      } catch {}
     }
 
-    // 2. Fallback to IP Geolocation if browser GPS is blocked (e.g. non-HTTPS duckdns or permission denied)
-    if (!foundLat || !foundLng) {
+    // 1. Try Browser Geolocation API (if not explicitly blocked by permission)
+    if (!isPermissionDenied && typeof navigator !== "undefined" && navigator.geolocation) {
+      const getBrowserPos = (enableHighAccuracy: boolean, timeoutMs: number) => {
+        return new Promise<{ lat: number; lng: number; accuracy?: number } | null>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const pLat = pos.coords.latitude;
+              const pLng = pos.coords.longitude;
+              if (Number.isFinite(pLat) && Number.isFinite(pLng)) {
+                resolve({
+                  lat: Number(pLat.toFixed(6)),
+                  lng: Number(pLng.toFixed(6)),
+                  accuracy: pos.coords.accuracy,
+                });
+              } else {
+                resolve(null);
+              }
+            },
+            (err) => reject(err),
+            {
+              enableHighAccuracy,
+              timeout: timeoutMs,
+              maximumAge: 30000,
+            }
+          );
+        });
+      };
+
       try {
-        const ipRes = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(4000) });
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          if (ipData?.latitude && ipData?.longitude) {
-            foundLat = Number(Number(ipData.latitude).toFixed(6));
-            foundLng = Number(Number(ipData.longitude).toFixed(6));
+        // Fast network triangulation first (Wi-Fi / ISP, resolves in < 500ms on desktop & laptop)
+        const netPos = await getBrowserPos(false, 3500);
+        if (netPos) {
+          foundLat = netPos.lat;
+          foundLng = netPos.lng;
+          locationSource = "network";
+        }
+      } catch (firstErr: any) {
+        if (firstErr?.code === 1) {
+          isPermissionDenied = true;
+        } else {
+          // Fallback to high accuracy GPS (e.g. mobile phones or devices with GPS chip)
+          try {
+            const gpsPos = await getBrowserPos(true, 4000);
+            if (gpsPos) {
+              foundLat = gpsPos.lat;
+              foundLng = gpsPos.lng;
+              locationSource = "gps";
+            }
+          } catch (secondErr: any) {
+            if (secondErr?.code === 1) isPermissionDenied = true;
           }
         }
-      } catch (ipErr) {
-        console.warn("IP geolocation fallback failed:", ipErr);
       }
     }
 
-    // 3. Fallback to default Kasaragod Hub coordinates
+    // 2. High-speed, Multi-Provider IP Geolocation Fallback
+    // If browser GPS was blocked, timed out, or running in an insecure context
+    if (!foundLat || !foundLng) {
+      // Source A: ipwho.is (Tested: Instant, HTTPS, CORS *)
+      try {
+        const res = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(3500) });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Number.isFinite(data?.latitude) && Number.isFinite(data?.longitude)) {
+            foundLat = Number(Number(data.latitude).toFixed(6));
+            foundLng = Number(Number(data.longitude).toFixed(6));
+            detectedCity = data.city || data.region || "";
+            locationSource = "ip";
+          }
+        }
+      } catch {}
+
+      // Source B: BigDataCloud client reverse geocode (Tested: Instant, HTTPS, CORS *)
+      if (!foundLat || !foundLng) {
+        try {
+          const res = await fetch("https://api.bigdatacloud.net/data/reverse-geocode-client", {
+            signal: AbortSignal.timeout(3500),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Number.isFinite(data?.latitude) && Number.isFinite(data?.longitude)) {
+              foundLat = Number(Number(data.latitude).toFixed(6));
+              foundLng = Number(Number(data.longitude).toFixed(6));
+              detectedCity = data.city || data.locality || "";
+              locationSource = "ip";
+            }
+          }
+        } catch {}
+      }
+
+      // Source C: GeoJS (Cloudflare backend, CORS *)
+      if (!foundLat || !foundLng) {
+        try {
+          const res = await fetch("https://get.geojs.io/v1/ip/geo.json", {
+            signal: AbortSignal.timeout(3500),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const latNum = parseFloat(data?.latitude);
+            const lngNum = parseFloat(data?.longitude);
+            if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
+              foundLat = Number(latNum.toFixed(6));
+              foundLng = Number(lngNum.toFixed(6));
+              detectedCity = data.city || data.region || "";
+              locationSource = "ip";
+            }
+          }
+        } catch {}
+      }
+    }
+
+    // 3. Fallback to default Kasaragod Hub coordinates if completely offline
     if (!foundLat || !foundLng) {
       foundLat = DEFAULT_LAT;
       foundLng = DEFAULT_LNG;
+      setStatusMessage("⚠️ Could not detect current location. You can search or click anywhere on the map to place the hub pin.");
+    } else {
+      // Clear, informative feedback based on resolution source
+      if (locationSource === "gps") {
+        setStatusMessage("📍 Pinpointed your location via device GPS.");
+      } else if (locationSource === "network") {
+        setStatusMessage("📍 Detected your location via Wi-Fi / network.");
+      } else if (locationSource === "ip") {
+        if (isPermissionDenied) {
+          setStatusMessage(
+            `⚠️ Browser location permission is blocked. Located approximate area via network (${detectedCity || "region"}). To enable precise GPS, click the lock/settings icon in your address bar and allow Location.`
+          );
+        } else {
+          setStatusMessage(
+            `📍 Located approximate area via network (${detectedCity || "region"}). You can click or drag the pin for exact street placement.`
+          );
+        }
+      }
     }
 
+    lastReportedCoords.current = { lat: foundLat, lng: foundLng };
     setLat(foundLat);
     setLng(foundLng);
 
     if (mapInstance.current) {
-      mapInstance.current.flyTo([foundLat, foundLng], 14, { duration: 1.2 });
+      mapInstance.current.flyTo([foundLat, foundLng], 15, { duration: 1.2 });
     }
     if (markerInstance.current) {
       markerInstance.current.setLatLng([foundLat, foundLng]);
@@ -384,8 +535,8 @@ export function GoogleMapsPicker({
       circleInstance.current.setLatLng([foundLat, foundLng]);
     }
 
-    const address = await reverseGeocode(foundLat, foundLng);
-    onLocationSelect(foundLat, foundLng, address);
+    const geo = await reverseGeocodeRef.current(foundLat, foundLng);
+    onLocationSelectRef.current(foundLat, foundLng, geo.address, geo.city || detectedCity || undefined);
     setIsLocating(false);
   };
 
@@ -492,15 +643,33 @@ export function GoogleMapsPicker({
       {statusMessage && (
         <div
           style={{
-            background: "#FFF3CD",
-            color: "#856404",
-            padding: "8px 12px",
+            background: statusMessage.startsWith("⚠️")
+              ? "#FFF3CD"
+              : statusMessage.startsWith("📍")
+              ? "#E8F5E9"
+              : "#E4ECE9",
+            color: statusMessage.startsWith("⚠️")
+              ? "#856404"
+              : statusMessage.startsWith("📍")
+              ? "#1B5E20"
+              : "#1F4D46",
+            padding: "9px 12px",
             borderRadius: "8px",
             fontSize: "12px",
-            border: "1px solid #FFEEBA",
+            fontWeight: 600,
+            border: `1px solid ${
+              statusMessage.startsWith("⚠️")
+                ? "#FFEEBA"
+                : statusMessage.startsWith("📍")
+                ? "#C8E6C9"
+                : "#C5D8D3"
+            }`,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
-          💡 {statusMessage}
+          {statusMessage}
         </div>
       )}
 
