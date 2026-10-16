@@ -16,8 +16,15 @@ import { ensureLocalRedis } from "./common/redis/local-redis";
 async function bootstrap() {
   const logger = new Logger("FreshGoBootstrap");
 
-  // Automatically start local Redis server if not already running (zero separate commands required)
-  await ensureLocalRedis(6379, "127.0.0.1", logger);
+  // Automatically start local Redis server if running locally and not using dedicated Docker/cloud Redis
+  const redisHost = process.env.REDIS_HOST || "127.0.0.1";
+  const redisUrl = process.env.REDIS_URL || "";
+  const isExternalRedis = redisHost !== "localhost" && redisHost !== "127.0.0.1";
+  const isCloudOrDockerRedis = redisUrl.includes("upstash.io") || redisUrl.includes("redis://redis:");
+
+  if (!isExternalRedis && !isCloudOrDockerRedis) {
+    await ensureLocalRedis(6379, "127.0.0.1", logger);
+  }
 
   const app = await NestFactory.create(AppModule);
 
