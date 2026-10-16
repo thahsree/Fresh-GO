@@ -83,7 +83,10 @@ export class HubsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Delete(":id")
-  async deleteHub(@Param("id") id: string) {
-    return this.hubsService.deleteHub(id);
+  async deleteHub(
+    @Param("id") id: string,
+    @Query("force") force?: string,
+  ) {
+    return this.hubsService.deleteHub(id, force === "true");
   }
 }

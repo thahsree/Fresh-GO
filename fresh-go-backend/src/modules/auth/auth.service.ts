@@ -509,6 +509,13 @@ export class AuthService {
       throw new UnauthorizedException("No Hub found matching Hub Number / Code: " + rawIdentifier);
     }
 
+    // Do not allow login to deactivated or removed hubs
+    if (hub && !hub.isActive && adminUser?.role !== Role.SUPER_ADMIN) {
+      throw new UnauthorizedException(
+        "This Hub has been deactivated or removed. Please contact Super Admin."
+      );
+    }
+
     // 3. Password match verification
     let passwordMatches = false;
     if (adminUser?.password) {

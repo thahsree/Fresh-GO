@@ -213,22 +213,92 @@ export class HubsService {
     return this.getHubById(updated.id);
   }
 
-  async deleteHub(id: string) {
+  async deleteHub(id: string, force?: boolean) {
     const existing = await this.prisma.hub.findUnique({
       where: { id },
       include: { _count: { select: { orders: true, batches: true } } },
     });
     if (!existing) throw new NotFoundException(`Hub with ID ${id} not found`);
 
-    if (existing._count.orders > 0 || existing._count.batches > 0) {
+    if ((existing._count.orders > 0 || existing._count.batches > 0) && !force) {
       // Soft-delete/deactivate so historical records remain consistent
-      return this.prisma.hub.update({
+      const deactivated = await this.prisma.hub.update({
         where: { id },
-        data: { isActive: false },
+        data: {
+          isActive: false,
+          adminPasswordRaw: null, // Clear raw password so deleted hub cannot be logged in
+        },
       });
+
+      // Unlink users and delivery partners from deactivated hub
+      await this.prisma.user.updateMany({
+        where: { hubId: id },
+        data: { hubId: null },
+      });
+      await this.prisma.deliveryPartnerProfile.updateMany({
+        where: { hubId: id },
+        data: { hubId: null },
+      });
+
+      return deactivated;
     }
 
-    return this.prisma.hub.delete({ where: { id } });
+    // Hard-delete: Clean up relational foreign keys in a safe transaction
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Unlink users
+      await tx.user.updateMany({
+        where: { hubId: id },
+        data: { hubId: null },
+      });
+
+      // 2. Unlink delivery partners
+      await tx.deliveryPartnerProfile.updateMany({
+        where: { hubId: id },
+        data: { hubId: null },
+      });
+
+      // 3. Remove settlements
+      await tx.cashSettlement.deleteMany({
+        where: { hubId: id },
+      });
+
+      // 4. Remove orders, items, tracking events if force-purging test hub
+      const orders = await tx.order.findMany({
+        where: { hubId: id },
+        select: { id: true },
+      });
+      const orderIds = orders.map((o) => o.id);
+      if (orderIds.length > 0) {
+        await tx.orderItem.deleteMany({
+          where: { orderId: { in: orderIds } },
+        });
+        await tx.orderStatusEvent.deleteMany({
+          where: { orderId: { in: orderIds } },
+        });
+        await tx.deliveryTrip.deleteMany({
+          where: { orderId: { in: orderIds } },
+        });
+        await tx.paymentTransaction.deleteMany({
+          where: { orderId: { in: orderIds } },
+        });
+        await tx.deliveryIssueTicket.deleteMany({
+          where: { orderId: { in: orderIds } },
+        });
+        await tx.order.deleteMany({
+          where: { id: { in: orderIds } },
+        });
+      }
+
+      // 5. Delete inventory batches
+      await tx.inventoryBatch.deleteMany({
+        where: { hubId: id },
+      });
+
+      // 6. Delete Hub record completely from database
+      return tx.hub.delete({
+        where: { id },
+      });
+    });
   }
 
   async checkServiceability(lat: number, lng: number) {

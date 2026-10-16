@@ -671,7 +671,8 @@ class ApiClient {
   };
 
   readonly hubs = {
-    getAll: () => this.get<Hub[]>("/hubs", false),
+    getAll: (includeInactive = true) =>
+      this.get<Hub[]>(includeInactive ? "/hubs?all=true" : "/hubs", false),
     getById: (id: string) => this.get<Hub>(`/hubs/${id}`, false),
     create: (data: {
       name: string;
@@ -698,8 +699,11 @@ class ApiClient {
         isActive?: boolean;
       }
     ) => this.put<Hub>(`/hubs/${id}`, data, true),
-    delete: (id: string) =>
-      this.delete<{ id: string; message: string }>(`/hubs/${id}`, true),
+    delete: (id: string, force = true) =>
+      this.delete<{ id: string; message: string }>(
+        `/hubs/${id}${force ? "?force=true" : ""}`,
+        true
+      ),
     checkServiceability: (lat: number, lng: number) =>
       this.get<{
         serviceable: boolean;
