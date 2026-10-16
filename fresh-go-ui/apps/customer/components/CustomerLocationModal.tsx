@@ -79,28 +79,6 @@ const DEFAULT_HUBS: BackendHub[] = [
     deliveryRadiusKm: 10,
     isActive: true,
   },
-  {
-    id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
-    name: "FreshGo Central Hub (Mavoor Road)",
-    code: "HUB-CLT-01",
-    address: "Mavoor Road, Kozhikode, Kerala 673004",
-    city: "Kozhikode",
-    latitude: 11.2588,
-    longitude: 75.7804,
-    deliveryRadiusKm: 10,
-    isActive: true,
-  },
-  {
-    id: "4942d016-533c-4fa7-a820-6e64c76e12c7",
-    name: "Kannur Hub",
-    code: "HUB-CLT-02",
-    address: "Kannur City, Kerala 670004",
-    city: "Kannur",
-    latitude: 11.876384,
-    longitude: 75.373797,
-    deliveryRadiusKm: 10,
-    isActive: true,
-  },
 ];
 
 // Self-contained high-performance Leaflet HTML for React Native WebView on mobile
