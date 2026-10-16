@@ -166,10 +166,10 @@ export function GoogleMapsPicker({
       zoomControl: false,
     });
 
-    // 100% Free OpenStreetMap CartoDB Tiles (Zero API key required, crisp, unlimited)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+    // 100% Free Official OpenStreetMap Tiles (Zero watermark, zero API key required)
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
 
     // Custom MapPin Icon
