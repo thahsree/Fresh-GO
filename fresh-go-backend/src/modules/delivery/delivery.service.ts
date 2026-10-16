@@ -579,7 +579,7 @@ export class DeliveryService {
     const hubId =
       dto.hubId ||
       partner.hubId ||
-      (await this.prisma.hub.findFirst({ select: { id: true } }))?.id;
+      (await this.prisma.hub.findFirst({ where: { isActive: true }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id;
 
     if (!hubId) throw new BadRequestException("No fulfillment hub found for settlement");
 
@@ -660,7 +660,7 @@ export class DeliveryService {
     const hubId =
       partner.hubId ||
       adminUser.hubId ||
-      (await this.prisma.hub.findFirst({ select: { id: true } }))?.id;
+      (await this.prisma.hub.findFirst({ where: { isActive: true }, orderBy: { createdAt: "desc" }, select: { id: true } }))?.id;
 
     if (!hubId) throw new BadRequestException("No fulfillment hub found for settlement");
 

@@ -190,7 +190,10 @@ export class CatalogService {
 
     const stockKg = Number(dto.stock ?? dto.initialStockKg ?? 10);
     if (stockKg > 0) {
-      const defaultHub = await this.prisma.hub.findFirst();
+      const defaultHub = await this.prisma.hub.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "desc" },
+      });
       await this.prisma.inventoryBatch.create({
         data: {
           productId: created.id,
@@ -294,7 +297,10 @@ export class CatalogService {
           },
         });
       } else {
-        const defaultHub = await this.prisma.hub.findFirst();
+        const defaultHub = await this.prisma.hub.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+        });
         await this.prisma.inventoryBatch.create({
           data: {
             productId: id,

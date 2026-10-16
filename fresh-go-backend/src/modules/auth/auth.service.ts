@@ -461,10 +461,11 @@ export class AuthService {
     const trimmedPass = dto.password.trim();
     const normalizedPhone = this.normalizePhone(rawIdentifier);
 
-    // 1. Find Hub by code or contactPhone or id
-    const hub = await this.prisma.hub.findFirst({
+    // 1. Find Hub by id, code or contactPhone (prioritizing active hubs, hubs with orders, or latest created)
+    const matchingHubs = await this.prisma.hub.findMany({
       where: {
         OR: [
+          { id: rawIdentifier },
           { code: { equals: rawIdentifier, mode: "insensitive" } },
           { contactPhone: rawIdentifier },
           { contactPhone: normalizedPhone },
@@ -472,8 +473,18 @@ export class AuthService {
       },
       include: {
         admins: true,
+        _count: {
+          select: { orders: true },
+        },
       },
+      orderBy: [
+        { isActive: "desc" },
+        { orders: { _count: "desc" } },
+        { createdAt: "desc" },
+      ],
     });
+
+    let hub = matchingHubs[0] || null;
 
     // 2. Find admin user linked to this hub or by direct phone match
     let adminUser: any = hub?.admins[0];
@@ -487,6 +498,11 @@ export class AuthService {
           hub: true,
         },
       });
+
+      // If user has a linked active hub and matched by phone, stick to their active hub
+      if (adminUser?.hub?.isActive && (!hub || !hub.isActive)) {
+        hub = adminUser.hub;
+      }
     }
 
     if (!adminUser && !hub) {
@@ -537,13 +553,22 @@ export class AuthService {
         },
         include: { hub: true },
       });
+    } else if (adminUser && hub && (adminUser.hubId !== hub.id || !adminUser.hub?.isActive)) {
+      // Keep adminUser synchronized with active hub
+      adminUser = await this.prisma.user.update({
+        where: { id: adminUser.id },
+        data: {
+          hubId: hub.id,
+        },
+        include: { hub: true },
+      });
     }
 
     if (!adminUser) {
       throw new UnauthorizedException("Unable to locate or initialize admin account for this hub.");
     }
 
-    const linkedHub = adminUser.hub || hub;
+    const linkedHub = (adminUser.hub?.isActive ? adminUser.hub : null) || hub;
     const tokens = await this.generateTokens(adminUser.id, adminUser.phone, adminUser.role);
 
     return {
