@@ -111,6 +111,10 @@ export class CreateProductDto {
   initialStockKg?: number;
 
   @IsOptional()
+  @IsNumber()
+  shelfLifeDays?: number;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateCutOptionDto)
@@ -147,6 +151,10 @@ export class UpdateProductDto {
   @IsOptional()
   @IsNumber()
   initialStockKg?: number;
+
+  @IsOptional()
+  @IsNumber()
+  shelfLifeDays?: number;
 
   @IsOptional()
   @IsString()

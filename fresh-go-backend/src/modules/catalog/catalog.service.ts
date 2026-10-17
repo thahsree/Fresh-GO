@@ -205,7 +205,7 @@ export class CatalogService {
           remainingQuantityKg: stockKg,
           temperatureAtIntake: 2.0,
           freshnessStatus: FreshnessStatus.FRESH,
-          expiryDate: new Date(Date.now() + 72 * 3600 * 1000),
+          expiryDate: new Date(Date.now() + (dto.shelfLifeDays || 14) * 24 * 3600 * 1000),
           isActive: true,
         },
       });
@@ -312,7 +312,7 @@ export class CatalogService {
             remainingQuantityKg: Number(stockVal),
             temperatureAtIntake: 2.0,
             freshnessStatus: FreshnessStatus.FRESH,
-            expiryDate: new Date(Date.now() + 72 * 3600 * 1000),
+            expiryDate: new Date(Date.now() + (dto.shelfLifeDays || 14) * 24 * 3600 * 1000),
             isActive: true,
           },
         });
@@ -398,7 +398,7 @@ export class CatalogService {
     const productMap = new Map<string, any>();
     if (allProductIds.length > 0) {
       const products = await this.prisma.product.findMany({
-        where: { id: { in: allProductIds } },
+        where: { id: { in: allProductIds }, isActive: true },
         include: {
           category: true,
           cuts: true,
