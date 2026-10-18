@@ -9,11 +9,13 @@ type AdminHeaderProps = {
   section: AdminSection;
   onViewOrders?: () => void;
   isBackendConnected?: boolean;
+  currentUser?: AdminUser | null;
 };
 
 export function AdminHeader({
   section,
   isBackendConnected = false,
+  currentUser,
 }: AdminHeaderProps) {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -33,19 +35,26 @@ export function AdminHeader({
       setDateStr("Today");
     }
 
-    api.ensureAdminAuth().then((user) => {
-      if (user) setAdminUser(user);
-    });
-  }, []);
+    if (!currentUser) {
+      const cached = api.getAdminUser();
+      if (cached) setAdminUser(cached);
+      api.ensureAdminAuth().then((user) => {
+        if (user) setAdminUser(user);
+      });
+    }
+  }, [currentUser]);
 
+  const activeUser = currentUser || adminUser;
+  const isSuperAdmin = activeUser?.role === "SUPER_ADMIN";
   const hubName =
-    adminUser?.hub?.name || "FreshGo Central Hub (Mavoor Road)";
-  const hubCode = adminUser?.hub?.code || "HUB-CLT-01";
+    activeUser?.hub?.name ||
+    (isSuperAdmin ? "Central Dispatch" : "FreshGo Hub");
+  const hubCode = activeUser?.hub?.code || (isSuperAdmin ? "ALL" : "");
 
   const heading =
     section === "dashboard"
-      ? mounted && adminUser?.name
-        ? `Good day, ${adminUser.name}`
+      ? mounted && activeUser?.name
+        ? `Good day, ${activeUser.name}`
         : "Good day, Hub Dispatch Admin"
       : navItems.find(([id]) => id === section)?.[2];
 
@@ -61,41 +70,15 @@ export function AdminHeader({
         <p className="eyebrow" suppressHydrationWarning>
           <span style={{ fontWeight: 700, color: "#1F4D46", display: "inline-flex", alignItems: "center", gap: 4 }}>
             <MapPin size={14} color="#E5623E" />
-            {hubName} ({hubCode})
+            {hubName} {hubCode ? `(${hubCode})` : ""}
           </span>
           {" · "}
           {dateStr}
-          {mounted && (
-            <>
-              {" · "}
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontWeight: 700,
-                  color: isBackendConnected ? "#2E7D5B" : "#B9791F",
-                }}
-              >
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: "50%",
-                    background: isBackendConnected ? "#2E7D5B" : "#B9791F",
-                  }}
-                />
-                {isBackendConnected
-                  ? "Backend Connected"
-                  : "Local Mode"}
-              </span>
-            </>
-          )}
         </p>
       </div>
 
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        {mounted && adminUser && (
+        {mounted && activeUser && (
           <span
             style={{
               fontSize: "12px",
@@ -106,7 +89,7 @@ export function AdminHeader({
               fontWeight: 700,
             }}
           >
-            {adminUser.role}: {adminUser.phone}
+            {activeUser.role}: {activeUser.phone}
           </span>
         )}
 

@@ -7,6 +7,16 @@
 @media(max-width:1100px){.main{width:100%;max-width:none}.toolbar-actions{flex-wrap:wrap}.search-wrap{flex:1;min-width:220px}.search-wrap .search{width:100%;min-width:0}}
 @media(max-width:800px){.app{display:block}.sidebar{width:100%;padding:14px 16px}.brand{padding:0 0 14px;justify-content:flex-start}.brand span,.nav button span{display:inline}.nav{display:flex;gap:4px;overflow-x:auto}.nav button{flex:0 0 auto;text-align:center;font-size:12px;padding:9px 10px}.main{padding:20px 14px;min-width:0}.topbar{align-items:stretch;flex-direction:column;margin-bottom:20px}.topbar .primary{align-self:flex-start}.heading{font-size:25px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kpi{padding:14px}.kpi strong{font-size:20px}.grid{grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:12px}.panel,.products-layout > .panel,.table-wrap,.toolbar{min-width:0}.panel{padding:15px}.toolbar-actions{width:100%;flex-direction:column;align-items:stretch}.search-wrap{min-width:0;width:100%}.toolbar-actions .primary{justify-content:center;width:100%;white-space:normal}.form-grid{grid-template-columns:1fr}.inventory .row{display:grid;grid-template-columns:1fr auto;gap:8px}.inventory .progress{grid-column:1/-1;width:100%}.inventory .badge{justify-self:end}.map-placeholder{height:240px}}
 
+/* Spin animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Product Delete Animations & Modal */
 @keyframes rowDeleteSlideOut {
   0% {

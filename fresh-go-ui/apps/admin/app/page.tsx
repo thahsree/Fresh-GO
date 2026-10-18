@@ -27,6 +27,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(true);
   const [section, setSection] = useState<AdminSection>("dashboard");
   const [productDisplay, setProductDisplay] = useState<ProductDisplay>({
     name: "list",
@@ -42,22 +43,50 @@ export default function AdminPage() {
   const dispatchController = useDispatchController();
   const featuredSectionsController = useFeaturedSectionsController();
 
-  // Verify Admin Session - Redirect to /login if unauthenticated
+  // Verify Admin Session & Connect to Backend
   useEffect(() => {
+    let isMounted = true;
     const adminUser = api.getAdminUser();
     if (!adminUser) {
       router.replace("/login");
-    } else {
-      setCurrentUser(adminUser);
-      setIsAuthChecking(false);
+      return;
     }
+    setCurrentUser(adminUser);
 
-    api.ensureAdminAuth().then((freshUser) => {
-      if (freshUser) {
-        setCurrentUser(freshUser);
+    api.ensureAdminAuth()
+      .then((freshUser) => {
+        if (isMounted && freshUser) {
+          setCurrentUser(freshUser);
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend admin auth notice:", err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsAuthChecking(false);
+        }
+      });
+
+    // Safety timeout: dismiss initial loader after at most 3.2 seconds
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setIsConnecting(false);
+        setIsAuthChecking(false);
       }
-    });
+    }, 3200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, [router]);
+
+  useEffect(() => {
+    if (!isAuthChecking && !productController.isLoading && !dispatchController.isLoading) {
+      setIsConnecting(false);
+    }
+  }, [isAuthChecking, productController.isLoading, dispatchController.isLoading]);
 
   const showToast = (
     message: string,
@@ -225,7 +254,7 @@ export default function AdminPage() {
     };
   }, [productController.products]);
 
-  if (isAuthChecking) {
+  if (isAuthChecking || isConnecting) {
     return (
       <div
         style={{
@@ -236,20 +265,65 @@ export default function AdminPage() {
           fontFamily: "'Manrope', sans-serif",
         }}
       >
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", maxWidth: "340px", padding: "24px" }}>
           <div
             style={{
-              width: "42px",
-              height: "42px",
-              borderRadius: "50%",
-              border: "3px solid #E4ECE9",
-              borderTopColor: "#1F4D46",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 12px",
+              width: "56px",
+              height: "56px",
+              margin: "0 auto 18px",
+              position: "relative",
+              display: "grid",
+              placeItems: "center",
             }}
-          />
-          <p style={{ fontSize: "13px", color: "#5C6B66", fontWeight: 700 }}>
-            Verifying Admin Session...
+          >
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                border: "3.5px solid #E4ECE9",
+                borderTopColor: "#1F4D46",
+                animation: "spin 0.9s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite",
+              }}
+            />
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #1F4D46 0%, #2E7D5B 100%)",
+                display: "grid",
+                placeItems: "center",
+                color: "#FFFFFF",
+                fontSize: "18px",
+                fontWeight: 900,
+                boxShadow: "0 4px 12px rgba(31, 77, 70, 0.25)",
+              }}
+            >
+              🌱
+            </div>
+          </div>
+          <h2
+            style={{
+              fontSize: "16px",
+              fontWeight: 800,
+              color: "#1F4D46",
+              margin: "0 0 6px",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            Connecting to FreshGo
+          </h2>
+          <p
+            style={{
+              fontSize: "12.5px",
+              color: "#6B7C75",
+              fontWeight: 600,
+              margin: 0,
+              lineHeight: 1.4,
+            }}
+          >
+            Synchronizing dispatch hub, catalog and real-time orders...
           </p>
         </div>
       </div>
@@ -408,7 +482,7 @@ export default function AdminPage() {
         <AdminHeader
           section={section}
           onViewOrders={() => changeSection("orders")}
-          isBackendConnected={productController.isBackendConnected}
+          currentUser={currentUser}
         />
 
         {section === "dashboard" && (

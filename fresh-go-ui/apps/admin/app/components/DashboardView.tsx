@@ -29,28 +29,19 @@ export function DashboardView({
   const [timeRange, setTimeRange] = useState<7 | 14>(7);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Fallback hub representation if user has no assigned hub
-  const FALLBACK_HUB = {
-    id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
-    name: "Main Hub",
-    code: "HUB-MAIN",
-    city: "Central Hub",
-  };
-
   // Identify the logged-in hub strictly
-  const activeHubId =
-    currentUser?.hubId || currentUser?.hub?.id || FALLBACK_HUB.id;
-
-  const activeHubName = currentUser?.hub?.name || FALLBACK_HUB.name;
-  const activeHubCode = currentUser?.hub?.code || FALLBACK_HUB.code;
-  const activeHubCity = currentUser?.hub?.city || FALLBACK_HUB.city;
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const activeHubId = currentUser?.hubId || currentUser?.hub?.id || "";
+  const activeHubName = currentUser?.hub?.name || (isSuperAdmin ? "Central Dispatch" : "Main Hub");
+  const activeHubCode = currentUser?.hub?.code || (isSuperAdmin ? "ALL" : "HUB");
+  const activeHubCity = currentUser?.hub?.city || "";
 
   // Fetch sales report filtered strictly to this specific logged-in hub
   useEffect(() => {
     let isMounted = true;
 
     api.analytics
-      .getSalesReport({ hubId: activeHubId })
+      .getSalesReport(activeHubId ? { hubId: activeHubId } : undefined)
       .then((res) => {
         if (isMounted && res) {
           setSalesReport(res);
@@ -65,26 +56,21 @@ export function DashboardView({
     };
   }, [activeHubId]);
 
-  // Filter orders strictly for this specific hub (exclude any cross-hub orders like Kannur)
+  // Filter orders strictly for this specific hub (or all orders if Super Admin with no specific hub)
   const hubOrders = useMemo(() => {
+    if (!activeHubId) return orders;
     return orders.filter((o) => {
       const orderHubId = o.hub?.id || (o as any).hubId;
-      const orderHubName = o.hub?.name || "";
-      if (activeHubId && orderHubId) {
-        return orderHubId === activeHubId;
-      }
-      return orderHubName.toLowerCase().includes("mavoor");
+      return orderHubId === activeHubId;
     });
   }, [orders, activeHubId]);
 
   // Filter partners strictly for this specific hub
   const hubPartners = useMemo(() => {
+    if (!activeHubId) return partners;
     return partners.filter((p) => {
       const partnerHubId = (p as any).hubId || p.hub?.id;
-      if (activeHubId && partnerHubId) {
-        return partnerHubId === activeHubId;
-      }
-      return false;
+      return partnerHubId === activeHubId;
     });
   }, [partners, activeHubId]);
 
@@ -94,9 +80,8 @@ export function DashboardView({
     if (salesReport?.hubBreakdown && salesReport.hubBreakdown.length > 0) {
       const matched = salesReport.hubBreakdown.find(
         (h) =>
-          h.hubId === activeHubId ||
-          h.hubName.toLowerCase().includes("mavoor") ||
-          h.hubName.toLowerCase() === activeHubName.toLowerCase()
+          (activeHubId && h.hubId === activeHubId) ||
+          (activeHubName && h.hubName.toLowerCase() === activeHubName.toLowerCase())
       );
       if (matched && matched.grossRevenue > 0) {
         return Math.round(matched.grossRevenue);

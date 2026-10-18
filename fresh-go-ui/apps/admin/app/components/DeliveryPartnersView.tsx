@@ -27,13 +27,6 @@ type DeliveryPartnersViewProps = {
   onToast: (msg: string, type?: "success" | "error" | "info" | "delete") => void;
 };
 
-// Canonical default is Mavoor Road Hub
-const MAVOOR_HUB = {
-  id: "aa829d49-5bca-4892-ac5e-b0a1c0ad6b36",
-  name: "Mavoor Road Hub",
-  code: "HUB-CLT-01",
-};
-
 export function DeliveryPartnersView({
   currentUser,
   onToast,
@@ -45,15 +38,10 @@ export function DeliveryPartnersView({
   const [settlementPartner, setSettlementPartner] = useState<DeliveryPartnerItem | null>(null);
 
   // Identify the represented hub strictly
-  const activeHubId =
-    currentUser?.hubId || currentUser?.hub?.id || MAVOOR_HUB.id;
-
-  const rawHubName = currentUser?.hub?.name || MAVOOR_HUB.name;
-  const activeHubName = rawHubName.toLowerCase().includes("mavoor")
-    ? "Mavoor Road Hub"
-    : rawHubName;
-
-  const activeHubCode = currentUser?.hub?.code || MAVOOR_HUB.code;
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const activeHubId = currentUser?.hubId || currentUser?.hub?.id || "";
+  const activeHubName = currentUser?.hub?.name || (isSuperAdmin ? "All Hubs" : "Central Hub");
+  const activeHubCode = currentUser?.hub?.code || (isSuperAdmin ? "ALL" : "HUB");
 
   // Preview Licence Modal
   const [previewPhoto, setPreviewPhoto] = useState<{
@@ -73,9 +61,10 @@ export function DeliveryPartnersView({
   const fetchPartners = async () => {
     setLoading(true);
     try {
-      const data = await api.deliveryPartners.getAll(activeHubId);
-      // Strictly enforce that only partners assigned to this specific hub are shown
+      const data = await api.deliveryPartners.getAll(activeHubId || undefined);
+      // Strictly enforce that only partners assigned to this specific hub are shown (or all if super admin)
       const filteredByHub = (data || []).filter((p) => {
+        if (!activeHubId) return true;
         const pHubId = p.hubId || p.hub?.id;
         return pHubId === activeHubId;
       });
