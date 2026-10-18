@@ -91,11 +91,20 @@ export function useProductController(hubId?: string) {
           };
         });
 
-        // Set mapped products (or empty array if new hub has 0 products)
+        // Set mapped products
         setProducts(mapped);
         setIsBackendConnected(true);
         if (typeof window !== "undefined") {
-          window.localStorage.setItem(currentKey, JSON.stringify(mapped));
+          try {
+            // Strip oversized data:image strings from local storage to prevent QuotaExceededError
+            const lightCache = mapped.map((p) => ({
+              ...p,
+              image: p.image && p.image.startsWith("data:") ? "" : p.image,
+            }));
+            window.localStorage.setItem(currentKey, JSON.stringify(lightCache));
+          } catch (storageErr) {
+            console.warn("Could not write to localStorage (quota limit):", storageErr);
+          }
         }
       } else {
         setProducts([]);
@@ -258,7 +267,13 @@ export function useProductController(hubId?: string) {
     );
     setProducts(updated);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(getStorageKey(), JSON.stringify(updated));
+      try {
+        const lightCache = updated.map((p) => ({
+          ...p,
+          image: p.image && p.image.startsWith("data:") ? "" : p.image,
+        }));
+        window.localStorage.setItem(getStorageKey(), JSON.stringify(lightCache));
+      } catch {}
     }
   };
 
@@ -277,7 +292,13 @@ export function useProductController(hubId?: string) {
     const updated = products.filter((product) => product.id !== id);
     setProducts(updated);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(getStorageKey(), JSON.stringify(updated));
+      try {
+        const lightCache = updated.map((p) => ({
+          ...p,
+          image: p.image && p.image.startsWith("data:") ? "" : p.image,
+        }));
+        window.localStorage.setItem(getStorageKey(), JSON.stringify(lightCache));
+      } catch {}
     }
   };
 
