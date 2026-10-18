@@ -1,20 +1,44 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { api, QueueOrder, ActivePartner } from "../lib/api";
+import { playOrderAlertSound } from "../lib/sound";
 
-export function useDispatchController() {
+export type OnNewOrderCallback = (newOrders: QueueOrder[]) => void;
+
+export function useDispatchController(onNewOrder?: OnNewOrderCallback) {
   const [orders, setOrders] = useState<QueueOrder[]>([]);
   const [partners, setPartners] = useState<ActivePartner[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLive, setIsLive] = useState<boolean>(false);
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const isFirstLoadRef = useRef<boolean>(true);
 
   const fetchTower = useCallback(async () => {
     try {
       await api.ensureAdminAuth();
       const data = await api.dispatch.getTower();
       if (data) {
-        if (data.queueOrders) setOrders(data.queueOrders);
+        if (data.queueOrders) {
+          const freshOrders = data.queueOrders;
+          setOrders(freshOrders);
+
+          // Detect new incoming orders
+          if (isFirstLoadRef.current) {
+            freshOrders.forEach((o) => knownOrderIdsRef.current.add(o.id));
+            isFirstLoadRef.current = false;
+          } else {
+            const newlyArrived = freshOrders.filter(
+              (o) => !knownOrderIdsRef.current.has(o.id)
+            );
+            if (newlyArrived.length > 0) {
+              newlyArrived.forEach((o) => knownOrderIdsRef.current.add(o.id));
+              // Play dark store order chime alert
+              playOrderAlertSound();
+              onNewOrder?.(newlyArrived);
+            }
+          }
+        }
         if (data.activePartners) setPartners(data.activePartners);
         setIsLive(true);
       }
@@ -24,11 +48,11 @@ export function useDispatchController() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [onNewOrder]);
 
   useEffect(() => {
     fetchTower();
-    const interval = setInterval(fetchTower, 10000); // 10s live poll
+    const interval = setInterval(fetchTower, 7000); // 7s live poll for prompt order alerts
     return () => clearInterval(interval);
   }, [fetchTower]);
 

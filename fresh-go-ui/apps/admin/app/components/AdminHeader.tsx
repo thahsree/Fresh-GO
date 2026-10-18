@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { AdminSection, navItems } from "./AdminNavigation";
 import { api, AdminUser } from "../lib/api";
-import { MapPin, LogOut } from "lucide-react";
+import { MapPin, LogOut, Volume2, VolumeX } from "lucide-react";
+import {
+  isOrderSoundEnabled,
+  setOrderSoundEnabled,
+  playOrderAlertSound,
+} from "../lib/sound";
 
 type AdminHeaderProps = {
   section: AdminSection;
@@ -24,6 +29,7 @@ export function AdminHeader({
   const [dateStr, setDateStr] = useState("Today");
   const [storeActive, setStoreActive] = useState<boolean>(true);
   const [updatingStore, setUpdatingStore] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -38,6 +44,8 @@ export function AdminHeader({
     } catch {
       setDateStr("Today");
     }
+
+    setSoundEnabled(isOrderSoundEnabled());
 
     if (!currentUser) {
       const cached = api.getAdminUser();
@@ -73,6 +81,18 @@ export function AdminHeader({
   const handleLogout = () => {
     api.clearSession();
     window.location.href = "/login";
+  };
+
+  const handleToggleSound = () => {
+    const nextState = !soundEnabled;
+    setSoundEnabled(nextState);
+    setOrderSoundEnabled(nextState);
+    if (nextState) {
+      playOrderAlertSound(true);
+      onToast?.("Order alert sound enabled 🔔", "success");
+    } else {
+      onToast?.("Order alert sound muted 🔇", "info");
+    }
   };
 
   const handleToggleStoreActive = async () => {
@@ -117,6 +137,35 @@ export function AdminHeader({
       </div>
 
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        {/* Order Alert Sound Toggle Button */}
+        {mounted && (
+          <button
+            type="button"
+            onClick={handleToggleSound}
+            title={soundEnabled ? "Order Alert Sound is ON (Click to mute)" : "Order Alert Sound is MUTED (Click to enable)"}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 13px",
+              borderRadius: "999px",
+              background: soundEnabled ? "#E4ECE9" : "#F6F2EA",
+              border: soundEnabled ? "1px solid #2E7D5B" : "1px solid #D5CFC2",
+              color: soundEnabled ? "#1F4D46" : "#7E8B86",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+          >
+            {soundEnabled ? (
+              <Volume2 size={15} color="#2E7D5B" />
+            ) : (
+              <VolumeX size={15} color="#7E8B86" />
+            )}
+            <span>{soundEnabled ? "Sound ON" : "Muted"}</span>
+          </button>
+        )}
         {/* Store Active / Inactive Status Switch */}
         {mounted && activeUser && (activeUser.hub?.id || activeUser.hubId) && (
           <button

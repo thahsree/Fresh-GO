@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, AdminUser } from "./lib/api";
+import { api, AdminUser, QueueOrder } from "./lib/api";
 import { AdminHeader } from "./components/AdminHeader";
 import { AdminNavigation, AdminSection } from "./components/AdminNavigation";
 import { DashboardView } from "./components/DashboardView";
@@ -44,12 +44,39 @@ export default function AdminPage() {
     type: "success" | "error" | "info" | "delete";
   } | null>(null);
 
+  const showToast = useCallback(
+    (
+      message: string,
+      type: "success" | "error" | "info" | "delete" = "success",
+      title?: string
+    ) => {
+      setToast({ message, type, title });
+      setTimeout(() => {
+        setToast((cur) => (cur?.message === message ? null : cur));
+      }, 4500);
+    },
+    []
+  );
+
+  const handleNewOrder = useCallback(
+    (newOrders: QueueOrder[]) => {
+      const latest = newOrders[0];
+      const count = newOrders.length;
+      const msg =
+        count === 1
+          ? `Order #${latest.orderNumber} received! (${latest.customer?.name || "Customer"} · ₹${latest.totalAmount})`
+          : `${count} New Orders Received!`;
+      showToast(msg, "success", "🔔 New Order Alert");
+    },
+    [showToast]
+  );
+
   const activeHubId =
     currentUser?.role === "SUPER_ADMIN"
       ? undefined
       : currentUser?.hubId || currentUser?.hub?.id;
   const productController = useProductController(activeHubId);
-  const dispatchController = useDispatchController();
+  const dispatchController = useDispatchController(handleNewOrder);
   const featuredSectionsController = useFeaturedSectionsController();
 
   // Verify Admin Session & Connect to Backend
@@ -97,16 +124,6 @@ export default function AdminPage() {
     }
   }, [isAuthChecking, productController.isLoading, dispatchController.isLoading]);
 
-  const showToast = (
-    message: string,
-    type: "success" | "error" | "info" | "delete" = "success",
-    title?: string
-  ) => {
-    setToast({ message, type, title });
-    setTimeout(() => {
-      setToast((cur) => (cur?.message === message ? null : cur));
-    }, 4500);
-  };
 
   const assign = async (orderId: string, partnerProfileId?: string) => {
     const res = await dispatchController.assignOrder(orderId, partnerProfileId);
