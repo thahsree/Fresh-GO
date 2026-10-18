@@ -452,9 +452,39 @@ export function ProductFormView({
 
   const handleImageChange = (file: File | undefined) => {
     if (!file) return;
+
+    // Automatic client-side compression to prevent 5MB+ base64 bloat
     const reader = new FileReader();
-    reader.onload = () =>
-      setForm((current) => ({ ...current, image: String(reader.result) }));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress to JPEG with 0.82 quality -> results in ~40KB - 80KB instead of 5MB+
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          setForm((current) => ({ ...current, image: compressedDataUrl }));
+        } else {
+          setForm((current) => ({ ...current, image: String(e.target?.result) }));
+        }
+      };
+      img.src = String(e.target?.result);
+    };
     reader.readAsDataURL(file);
   };
 
