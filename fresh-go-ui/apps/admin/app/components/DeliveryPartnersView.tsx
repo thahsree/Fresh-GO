@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Share2,
   Banknote,
+  Trash2,
 } from "lucide-react";
 import { ClearCashModal } from "./ClearCashModal";
 
@@ -36,6 +37,8 @@ export function DeliveryPartnersView({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "VERIFIED" | "REJECTED">("ALL");
   const [settlementPartner, setSettlementPartner] = useState<DeliveryPartnerItem | null>(null);
+  const [partnerToDelete, setPartnerToDelete] = useState<DeliveryPartnerItem | null>(null);
+  const [isDeletingPartner, setIsDeletingPartner] = useState(false);
 
   // Identify the represented hub strictly
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
@@ -103,6 +106,21 @@ export function DeliveryPartnersView({
       fetchPartners();
     } catch (err: any) {
       onToast(err?.message || "Failed to update partner status", "error");
+    }
+  };
+
+  const handleDeletePartner = async () => {
+    if (!partnerToDelete) return;
+    setIsDeletingPartner(true);
+    try {
+      const res = await api.deliveryPartners.delete(partnerToDelete.id);
+      onToast(res?.message || `Rider ${partnerToDelete.user?.name || "Partner"} has been deleted`, "delete");
+      setPartnerToDelete(null);
+      await fetchPartners();
+    } catch (err: any) {
+      onToast(err?.message || "Failed to delete delivery partner", "error");
+    } finally {
+      setIsDeletingPartner(false);
     }
   };
 
@@ -652,119 +670,145 @@ export function DeliveryPartnersView({
 
                       {/* Hub Admin Approval Actions */}
                       <td style={{ padding: "14px 18px", textAlign: "right" }}>
-                        {isPending ? (
-                          <div style={{ display: "inline-flex", gap: "8px", alignItems: "center" }}>
-                            {partner.licensePhoto && (
+                        <div style={{ display: "inline-flex", gap: "8px", alignItems: "center", justifyContent: "flex-end" }}>
+                          {isPending ? (
+                            <>
+                              {partner.licensePhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewPhoto({
+                                      url: partner.licensePhoto!,
+                                      partnerName: partner.user?.name || "Delivery Partner",
+                                      phone: partner.user?.phone || "",
+                                    })
+                                  }
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    padding: "7px 11px",
+                                    borderRadius: "8px",
+                                    border: "1px solid #1F4D46",
+                                    background: "#E4ECE9",
+                                    color: "#1F4D46",
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <Eye size={13} />
+                                  View Document
+                                </button>
+                              )}
                               <button
                                 type="button"
-                                onClick={() =>
-                                  setPreviewPhoto({
-                                    url: partner.licensePhoto!,
-                                    partnerName: partner.user?.name || "Delivery Partner",
-                                    phone: partner.user?.phone || "",
-                                  })
-                                }
+                                onClick={() => handleUpdateStatus(partner, "VERIFIED")}
                                 style={{
                                   display: "inline-flex",
                                   alignItems: "center",
-                                  gap: "4px",
-                                  padding: "7px 11px",
+                                  gap: "5px",
+                                  padding: "7px 14px",
                                   borderRadius: "8px",
-                                  border: "1px solid #1F4D46",
-                                  background: "#E4ECE9",
-                                  color: "#1F4D46",
+                                  background: "#2E7D5B",
+                                  color: "#FFFFFF",
+                                  fontSize: "12px",
+                                  fontWeight: 800,
+                                  border: "none",
+                                  cursor: "pointer",
+                                  boxShadow: "0 2px 6px rgba(46, 125, 91, 0.2)",
+                                }}
+                              >
+                                <CheckCircle size={14} />
+                                Approve
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStatus(partner, "REJECTED")}
+                                style={{
+                                  padding: "7px 12px",
+                                  borderRadius: "8px",
+                                  border: "1px solid #BE4436",
+                                  background: "#FFFFFF",
+                                  color: "#BE4436",
                                   fontSize: "12px",
                                   fontWeight: 700,
                                   cursor: "pointer",
                                 }}
                               >
-                                <Eye size={13} />
-                                View Document
+                                Reject
                               </button>
-                            )}
+                            </>
+                          ) : isVerified ? (
+                            <>
+                              <span style={{ fontSize: "11px", color: "#2E7D5B", fontWeight: 700 }}>
+                                ✓ Active Rider
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(partner.partnerId!, `share-${partner.id}`)}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  padding: "5px 9px",
+                                  borderRadius: "6px",
+                                  border: "1px solid #E3DDCF",
+                                  background: "#F6F2EA",
+                                  color: "#1F4D46",
+                                  fontSize: "11px",
+                                  fontWeight: 700,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <Share2 size={12} />
+                                Share ID
+                              </button>
+                            </>
+                          ) : (
                             <button
                               type="button"
                               onClick={() => handleUpdateStatus(partner, "VERIFIED")}
                               style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "5px",
-                                padding: "7px 14px",
-                                borderRadius: "8px",
-                                background: "#2E7D5B",
-                                color: "#FFFFFF",
-                                fontSize: "12px",
-                                fontWeight: 800,
-                                border: "none",
-                                cursor: "pointer",
-                                boxShadow: "0 2px 6px rgba(46, 125, 91, 0.2)",
-                              }}
-                            >
-                              <CheckCircle size={14} />
-                              Approve
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateStatus(partner, "REJECTED")}
-                              style={{
-                                padding: "7px 12px",
-                                borderRadius: "8px",
-                                border: "1px solid #BE4436",
+                                padding: "6px 12px",
+                                borderRadius: "7px",
+                                border: "1px solid #1F4D46",
                                 background: "#FFFFFF",
-                                color: "#BE4436",
+                                color: "#1F4D46",
                                 fontSize: "12px",
                                 fontWeight: 700,
                                 cursor: "pointer",
                               }}
                             >
-                              Reject
+                              Re-Approve
                             </button>
-                          </div>
-                        ) : isVerified ? (
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "11px", color: "#2E7D5B", fontWeight: 700 }}>
-                              ✓ Active Rider
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(partner.partnerId!, `share-${partner.id}`)}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                padding: "5px 9px",
-                                borderRadius: "6px",
-                                border: "1px solid #E3DDCF",
-                                background: "#F6F2EA",
-                                color: "#1F4D46",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                cursor: "pointer",
-                              }}
-                            >
-                              <Share2 size={12} />
-                              Share ID
-                            </button>
-                          </div>
-                        ) : (
+                          )}
+
+                          {/* Delete Rider Button */}
                           <button
                             type="button"
-                            onClick={() => handleUpdateStatus(partner, "VERIFIED")}
+                            onClick={() => setPartnerToDelete(partner)}
+                            title="Delete Rider from fleet"
                             style={{
-                              padding: "6px 12px",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              padding: "6px 10px",
                               borderRadius: "7px",
-                              border: "1px solid #1F4D46",
-                              background: "#FFFFFF",
-                              color: "#1F4D46",
-                              fontSize: "12px",
+                              border: "1px solid #F5C2BC",
+                              background: "#FDF5F4",
+                              color: "#BE4436",
+                              fontSize: "11.5px",
                               fontWeight: 700,
                               cursor: "pointer",
+                              transition: "all 0.15s ease",
                             }}
                           >
-                            Re-Approve
+                            <Trash2 size={13} />
+                            Delete
                           </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -998,6 +1042,113 @@ export function DeliveryPartnersView({
                 }}
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {partnerToDelete && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 46, 41, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "20px",
+          }}
+          onClick={() => !isDeletingPartner && setPartnerToDelete(null)}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: "16px",
+              padding: "28px",
+              maxWidth: "460px",
+              width: "100%",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+              border: "1px solid #F5C2BC",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+              <div
+                style={{
+                  width: "44px",
+                  height: "44px",
+                  borderRadius: "12px",
+                  background: "#FDF5F4",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#BE4436",
+                }}
+              >
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#BE4436" }}>
+                  Delete Delivery Partner?
+                </h3>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#5C6B66" }}>
+                  Permanent fleet removal
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: "13px", color: "#2E3B37", lineHeight: "1.6", margin: "0 0 20px" }}>
+              Are you sure you want to permanently delete rider{" "}
+              <strong>{partnerToDelete.user?.name || "Partner"}</strong> (
+              {partnerToDelete.user?.phone || "No phone"})?
+              <br />
+              <span style={{ fontSize: "12px", color: "#BE4436", display: "inline-block", marginTop: "6px" }}>
+                ⚠️ This will unlink past trips and permanently delete their rider account from the hub. This action cannot be undone.
+              </span>
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                type="button"
+                disabled={isDeletingPartner}
+                onClick={() => setPartnerToDelete(null)}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: "9px",
+                  border: "1px solid #E3DDCF",
+                  background: "#FFFFFF",
+                  color: "#1F4D46",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  cursor: isDeletingPartner ? "not-allowed" : "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingPartner}
+                onClick={handleDeletePartner}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: "9px",
+                  border: "none",
+                  background: "#BE4436",
+                  color: "#FFFFFF",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  cursor: isDeletingPartner ? "not-allowed" : "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  boxShadow: "0 4px 12px rgba(190, 68, 54, 0.25)",
+                }}
+              >
+                {isDeletingPartner ? "Deleting..." : "Yes, Delete Rider"}
               </button>
             </div>
           </div>

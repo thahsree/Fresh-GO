@@ -40,6 +40,7 @@ export type AdminUser = {
     code: string;
     city: string;
     address?: string;
+    isActive?: boolean;
   } | null;
 };
 
@@ -555,10 +556,11 @@ class ApiClient {
 
   readonly catalog = {
     getCategories: () => this.get<Category[]>("/catalog/categories", false),
-    getProducts: (params?: { category?: string; search?: string }) => {
+    getProducts: (params?: { category?: string; search?: string; hubId?: string }) => {
       const q = new URLSearchParams();
       if (params?.category) q.set("category", params.category);
       if (params?.search) q.set("search", params.search);
+      if (params?.hubId) q.set("hubId", params.hubId);
       const queryStr = q.toString() ? `?${q.toString()}` : "";
       return this.get<BackendProduct[]>(`/catalog/products${queryStr}`, false);
     },
@@ -569,6 +571,7 @@ class ApiClient {
       unit: string;
       stock?: number;
       initialStockKg?: number;
+      hubId?: string;
       description?: string;
       image?: string;
       origin?: string;
@@ -596,6 +599,7 @@ class ApiClient {
         unit?: string;
         stock?: number;
         initialStockKg?: number;
+        hubId?: string;
         description?: string;
         image?: string;
         origin?: string;
@@ -758,6 +762,11 @@ class ApiClient {
       }>(
         `/delivery/partners/${id}/clear-cash`,
         { amount, notes },
+        true
+      ),
+    delete: (id: string) =>
+      this.delete<{ success: boolean; message: string }>(
+        `/delivery/partners/${id}`,
         true
       ),
   };

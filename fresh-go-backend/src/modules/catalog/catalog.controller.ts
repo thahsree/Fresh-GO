@@ -40,12 +40,14 @@ export class CatalogController {
     @Query("bestseller") bestseller?: string,
     @Query("offer") offer?: string,
     @Query("todaysoffer") todaysoffer?: string,
+    @Query("hubId") hubId?: string,
   ) {
     return this.catalogService.getProducts({
       categorySlug: category,
       search,
       bestSellerOnly: bestseller === "true",
       todaysOfferOnly: offer === "true" || todaysoffer === "true",
+      hubId,
     });
   }
 

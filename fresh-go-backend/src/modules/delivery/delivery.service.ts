@@ -847,4 +847,78 @@ export class DeliveryService {
       },
     });
   }
+
+  /**
+   * Delete a delivery partner and clean up all associated records
+   */
+  async deleteDeliveryPartner(partnerProfileId: string, adminUser: User) {
+    const profile = await this.prisma.deliveryPartnerProfile.findFirst({
+      where: {
+        OR: [
+          { id: partnerProfileId },
+          { userId: partnerProfileId },
+          { partnerId: partnerProfileId },
+        ],
+      },
+      include: { user: true },
+    });
+    if (!profile) {
+      throw new NotFoundException("Delivery partner not found");
+    }
+
+    // Hub admin can only delete partners registered to their own hub; Super Admin can delete any
+    if (
+      adminUser.role !== Role.SUPER_ADMIN &&
+      adminUser.hubId &&
+      profile.hubId &&
+      profile.hubId !== adminUser.hubId
+    ) {
+      throw new BadRequestException(
+        "You can only delete delivery partners registered to your hub."
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Unlink any assigned orders
+      await tx.order.updateMany({
+        where: { deliveryPartnerId: profile.id },
+        data: { deliveryPartnerId: null },
+      });
+
+      // 2. Delete delivery trips
+      await tx.deliveryTrip.deleteMany({
+        where: { partnerId: profile.id },
+      });
+
+      // 3. Delete cash settlements
+      await tx.cashSettlement.deleteMany({
+        where: { partnerId: profile.id },
+      });
+
+      // 4. Delete partner earning entries
+      await tx.partnerEarningEntry.deleteMany({
+        where: { partnerId: profile.id },
+      });
+
+      // 5. Delete issue tickets reported by this rider
+      await tx.deliveryIssueTicket.deleteMany({
+        where: { partnerId: profile.userId },
+      });
+
+      // 6. Delete delivery partner profile
+      await tx.deliveryPartnerProfile.delete({
+        where: { id: profile.id },
+      });
+
+      // 7. Delete the user account
+      await tx.user.delete({
+        where: { id: profile.userId },
+      });
+
+      return {
+        success: true,
+        message: `Delivery partner "${profile.user?.name || profile.partnerId || "Rider"}" deleted successfully.`,
+      };
+    });
+  }
 }

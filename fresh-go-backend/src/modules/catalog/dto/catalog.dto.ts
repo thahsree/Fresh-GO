@@ -115,6 +115,10 @@ export class CreateProductDto {
   shelfLifeDays?: number;
 
   @IsOptional()
+  @IsString()
+  hubId?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateCutOptionDto)
@@ -128,6 +132,10 @@ export class CreateProductDto {
 }
 
 export class UpdateProductDto {
+  @IsOptional()
+  @IsString()
+  hubId?: string;
+
   @IsOptional()
   @IsString()
   name?: string;

@@ -6,29 +6,43 @@ import { api, BackendProduct, Category } from "../lib/api";
 
 const storageKey = "fresh-food-admin-products";
 
-export function useProductController() {
+export function useProductController(hubId?: string) {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
 
+  const getEffectiveHubId = useCallback(() => {
+    if (hubId !== undefined) return hubId;
+    const adminUser = api.getAdminUser();
+    if (!adminUser || adminUser.role === "SUPER_ADMIN") return undefined;
+    return adminUser.hubId || adminUser.hub?.id;
+  }, [hubId]);
+
+  const getStorageKey = useCallback(() => {
+    const hId = getEffectiveHubId();
+    return `fresh-food-admin-products-${hId || "all"}`;
+  }, [getEffectiveHubId]);
+
   const fetchBackendData = useCallback(async () => {
     setIsLoading(true);
+    const activeHubId = getEffectiveHubId();
+    const currentKey = `fresh-food-admin-products-${activeHubId || "all"}`;
     try {
       // 1. Ensure authenticated
       await api.ensureAdminAuth();
 
-      // 2. Fetch categories & products in parallel
+      // 2. Fetch categories & products in parallel (scoped to hubId if hub admin)
       const [backendCats, backendProds] = await Promise.all([
         api.catalog.getCategories().catch(() => []),
-        api.catalog.getProducts().catch(() => []),
+        api.catalog.getProducts(activeHubId ? { hubId: activeHubId } : undefined).catch(() => []),
       ]);
 
       if (backendCats && backendCats.length > 0) {
         setCategories(backendCats);
       }
 
-      if (backendProds && backendProds.length > 0) {
+      if (backendProds && Array.isArray(backendProds)) {
         const mapped: Product[] = backendProds.map((bp: BackendProduct) => {
           let unitOptions = bp.unitOptions;
           if (!unitOptions && bp.grossWeightDescription) {
@@ -76,28 +90,34 @@ export function useProductController() {
             unitOptions: unitOptions || [],
           };
         });
+
+        // Set mapped products (or empty array if new hub has 0 products)
         setProducts(mapped);
         setIsBackendConnected(true);
         if (typeof window !== "undefined") {
-          window.localStorage.setItem(storageKey, JSON.stringify(mapped));
+          window.localStorage.setItem(currentKey, JSON.stringify(mapped));
         }
       } else {
-        // If no products returned yet (e.g. fresh DB), keep local products
+        setProducts([]);
         setIsBackendConnected(true);
       }
     } catch (err) {
-      console.warn("Could not fetch products from backend, using cached/initial:", err);
+      console.warn("Could not fetch products from backend, checking cached:", err);
       setIsBackendConnected(false);
-      const stored = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem(currentKey) : null;
       if (stored) {
         try {
           setProducts(JSON.parse(stored) as Product[]);
-        } catch {}
+        } catch {
+          setProducts([]);
+        }
+      } else {
+        setProducts([]);
       }
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [getEffectiveHubId]);
 
   useEffect(() => {
     fetchBackendData();
@@ -142,9 +162,11 @@ export function useProductController() {
         ? input.description
         : `${input.name} - freshly sourced and hygienically packed.`;
 
+    const activeHubId = getEffectiveHubId();
     await api.ensureAdminAuth();
     await api.catalog.createProduct({
       name: input.name,
+      hubId: activeHubId,
       categoryId: catId,
       basePrice: Number(input.price),
       unit: input.unit || "kg",
@@ -179,6 +201,7 @@ export function useProductController() {
   };
 
   const updateProduct = async (id: string, input: ProductInput) => {
+    const activeHubId = getEffectiveHubId();
     if (isBackendConnected) {
       try {
         await api.ensureAdminAuth();
@@ -192,6 +215,7 @@ export function useProductController() {
 
         await api.catalog.updateProduct(id, {
           name: input.name,
+          hubId: activeHubId,
           categoryId: catId,
           basePrice: Number(input.price),
           unit: input.unit || "kg",
@@ -234,7 +258,7 @@ export function useProductController() {
     );
     setProducts(updated);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(storageKey, JSON.stringify(updated));
+      window.localStorage.setItem(getStorageKey(), JSON.stringify(updated));
     }
   };
 
@@ -253,7 +277,7 @@ export function useProductController() {
     const updated = products.filter((product) => product.id !== id);
     setProducts(updated);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(storageKey, JSON.stringify(updated));
+      window.localStorage.setItem(getStorageKey(), JSON.stringify(updated));
     }
   };
 

@@ -25,7 +25,12 @@ type ProductDisplay =
 
 export default function AdminPage() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
+    if (typeof window !== "undefined") {
+      return api.getAdminUser();
+    }
+    return null;
+  });
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isConnecting, setIsConnecting] = useState(true);
   const [section, setSection] = useState<AdminSection>("dashboard");
@@ -39,7 +44,11 @@ export default function AdminPage() {
     type: "success" | "error" | "info" | "delete";
   } | null>(null);
 
-  const productController = useProductController();
+  const activeHubId =
+    currentUser?.role === "SUPER_ADMIN"
+      ? undefined
+      : currentUser?.hubId || currentUser?.hub?.id;
+  const productController = useProductController(activeHubId);
   const dispatchController = useDispatchController();
   const featuredSectionsController = useFeaturedSectionsController();
 
@@ -483,6 +492,7 @@ export default function AdminPage() {
           section={section}
           onViewOrders={() => changeSection("orders")}
           currentUser={currentUser}
+          onToast={showToast}
         />
 
         {section === "dashboard" && (

@@ -105,6 +105,7 @@ export class AuthController {
               name: user.hub.name,
               code: user.hub.code,
               city: user.hub.city,
+              isActive: user.hub.isActive,
             }
           : null,
       },

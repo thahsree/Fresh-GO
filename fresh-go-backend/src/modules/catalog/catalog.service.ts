@@ -48,8 +48,9 @@ export class CatalogService {
     search?: string;
     bestSellerOnly?: boolean;
     todaysOfferOnly?: boolean;
+    hubId?: string;
   }) {
-    const { categorySlug, search, bestSellerOnly, todaysOfferOnly } = params || {};
+    const { categorySlug, search, bestSellerOnly, todaysOfferOnly, hubId } = params || {};
 
     const products = await this.prisma.product.findMany({
       where: {
@@ -70,7 +71,11 @@ export class CatalogService {
         category: true,
         cuts: true,
         batches: {
-          where: { isActive: true, freshnessStatus: "FRESH" },
+          where: {
+            isActive: true,
+            freshnessStatus: "FRESH",
+            ...(hubId ? { hubId } : {}),
+          },
           select: {
             id: true,
             batchNumber: true,
@@ -78,14 +83,20 @@ export class CatalogService {
             originSource: true,
             remainingQuantityKg: true,
             freshnessStatus: true,
+            hubId: true,
           },
         },
       },
       orderBy: [{ isBestSeller: "desc" }, { rating: "desc" }],
     });
 
+    // If hubId is specified (Hub Admin mode), only return products that exist in this hub's inventory
+    const scopedProducts = hubId
+      ? products.filter((p) => p.batches.length > 0)
+      : products;
+
     // Augment with total available stock across active fresh batches
-    return products.map((product) => {
+    return scopedProducts.map((product) => {
       const totalAvailableKg = product.batches.reduce(
         (sum, b) => sum + b.remainingQuantityKg,
         0,
@@ -188,16 +199,13 @@ export class CatalogService {
       include: { cuts: true, category: true },
     });
 
-    const stockKg = Number(dto.stock ?? dto.initialStockKg ?? 10);
+    const stockKg = Number(dto.stock ?? dto.initialStockKg ?? 0);
+    const targetHubId = dto.hubId || null;
     if (stockKg > 0) {
-      const defaultHub = await this.prisma.hub.findFirst({
-        where: { isActive: true },
-        orderBy: { createdAt: "desc" },
-      });
       await this.prisma.inventoryBatch.create({
         data: {
           productId: created.id,
-          hubId: defaultHub?.id || null,
+          hubId: targetHubId,
           batchNumber: `BATCH-${Date.now().toString().slice(-6)}`,
           catchOrHarvestDate: new Date(),
           originSource: dto.origin || "Local Sourcing",
@@ -294,17 +302,15 @@ export class CatalogService {
           data: {
             remainingQuantityKg: Number(stockVal),
             initialQuantityKg: Math.max(activeBatch.initialQuantityKg, Number(stockVal)),
+            ...(dto.hubId !== undefined ? { hubId: dto.hubId } : {}),
           },
         });
       } else {
-        const defaultHub = await this.prisma.hub.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: "desc" },
-        });
+        const targetHubId = dto.hubId || null;
         await this.prisma.inventoryBatch.create({
           data: {
             productId: id,
-            hubId: defaultHub?.id || null,
+            hubId: targetHubId,
             batchNumber: `BATCH-${Date.now().toString().slice(-6)}`,
             catchOrHarvestDate: new Date(),
             originSource: updated.origin || "Local Sourcing",

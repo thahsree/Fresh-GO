@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -109,5 +110,14 @@ export class DeliveryController {
     @Body("status") status: "VERIFIED" | "REJECTED" | "PENDING",
   ) {
     return this.deliveryService.updatePartnerKycStatus(partnerProfileId, status);
+  }
+
+  @Roles(Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN)
+  @Delete("partners/:id")
+  async deletePartner(
+    @CurrentUser() user: User,
+    @Param("id") partnerProfileId: string,
+  ) {
+    return this.deliveryService.deleteDeliveryPartner(partnerProfileId, user);
   }
 }
