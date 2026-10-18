@@ -74,7 +74,6 @@ export class CatalogService {
           where: {
             isActive: true,
             freshnessStatus: "FRESH",
-            ...(hubId ? { hubId } : {}),
           },
           select: {
             id: true,
@@ -90,13 +89,8 @@ export class CatalogService {
       orderBy: [{ isBestSeller: "desc" }, { rating: "desc" }],
     });
 
-    // If hubId is specified (Hub Admin mode), only return products that exist in this hub's inventory
-    const scopedProducts = hubId
-      ? products.filter((p) => p.batches.length > 0)
-      : products;
-
     // Augment with total available stock across active fresh batches
-    return scopedProducts.map((product) => {
+    return products.map((product) => {
       const totalAvailableKg = product.batches.reduce(
         (sum, b) => sum + b.remainingQuantityKg,
         0,

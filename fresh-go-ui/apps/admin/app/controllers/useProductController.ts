@@ -32,10 +32,10 @@ export function useProductController(hubId?: string) {
       // 1. Ensure authenticated
       await api.ensureAdminAuth();
 
-      // 2. Fetch categories & products in parallel (scoped to hubId if hub admin)
+      // 2. Fetch categories & products in parallel
       const [backendCats, backendProds] = await Promise.all([
         api.catalog.getCategories().catch(() => []),
-        api.catalog.getProducts(activeHubId ? { hubId: activeHubId } : undefined).catch(() => []),
+        api.catalog.getProducts().catch(() => []),
       ]);
 
       if (backendCats && backendCats.length > 0) {
