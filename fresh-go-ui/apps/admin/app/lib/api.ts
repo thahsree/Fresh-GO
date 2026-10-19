@@ -800,6 +800,45 @@ class ApiClient {
       );
     },
   };
+
+  readonly deliveryFee = {
+    getSettings: () =>
+      this.get<DeliveryFeeSettings>("/zones/delivery-fee", false),
+    updateSettings: (data: {
+      deliveryFee: number;
+      freeDeliveryThreshold?: number;
+      minOrderAmount?: number;
+      handlingFee?: number;
+      zoneId?: string;
+    }) => this.put<DeliveryFeeSettings>("/zones/delivery-fee", data, true),
+    getZones: (activeOnly = false) =>
+      this.get<DeliveryZoneItem[]>(`/zones${activeOnly ? "" : "?all=true"}`, false),
+    updateZone: (id: string, data: Partial<DeliveryZoneItem>) =>
+      this.put<DeliveryZoneItem>(`/zones/${id}`, data, true),
+  };
 }
+
+export type DeliveryZoneItem = {
+  id: string;
+  name: string;
+  centerLat: number;
+  centerLng: number;
+  radiusKm: number;
+  polygonGeoJson?: string | null;
+  baseDeliveryFee: number;
+  minOrderAmount: number;
+  freeDeliveryThreshold: number;
+  estimatedDeliveryMinutes: number;
+  isActive: boolean;
+};
+
+export type DeliveryFeeSettings = {
+  deliveryFee: number;
+  freeDeliveryThreshold: number;
+  minOrderAmount: number;
+  handlingFee: number;
+  isFreeDelivery: boolean;
+  zones: DeliveryZoneItem[];
+};
 
 export const api = new ApiClient();

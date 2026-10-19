@@ -44,6 +44,58 @@ export class ZonesService {
     return this.prisma.deliveryZone.delete({ where: { id } });
   }
 
+  async getDeliveryFeeSettings() {
+    const zones = await this.findAll(true);
+    const primaryZone = zones[0] || null;
+    return {
+      deliveryFee: primaryZone?.baseDeliveryFee ?? 0,
+      freeDeliveryThreshold: primaryZone?.freeDeliveryThreshold ?? 0,
+      minOrderAmount: primaryZone?.minOrderAmount ?? 0,
+      handlingFee: 0,
+      isFreeDelivery: (primaryZone?.baseDeliveryFee ?? 0) === 0,
+      zones,
+    };
+  }
+
+  async updateDeliveryFeeSettings(dto: {
+    deliveryFee: number;
+    freeDeliveryThreshold?: number;
+    minOrderAmount?: number;
+    handlingFee?: number;
+    zoneId?: string;
+  }) {
+    const fee = Math.max(0, Number(dto.deliveryFee ?? 0));
+    const freeThreshold =
+      dto.freeDeliveryThreshold !== undefined
+        ? Math.max(0, Number(dto.freeDeliveryThreshold))
+        : undefined;
+    const minOrder =
+      dto.minOrderAmount !== undefined
+        ? Math.max(0, Number(dto.minOrderAmount))
+        : undefined;
+
+    if (dto.zoneId) {
+      await this.prisma.deliveryZone.update({
+        where: { id: dto.zoneId },
+        data: {
+          baseDeliveryFee: fee,
+          ...(freeThreshold !== undefined ? { freeDeliveryThreshold: freeThreshold } : {}),
+          ...(minOrder !== undefined ? { minOrderAmount: minOrder } : {}),
+        },
+      });
+    } else {
+      await this.prisma.deliveryZone.updateMany({
+        data: {
+          baseDeliveryFee: fee,
+          ...(freeThreshold !== undefined ? { freeDeliveryThreshold: freeThreshold } : {}),
+          ...(minOrder !== undefined ? { minOrderAmount: minOrder } : {}),
+        },
+      });
+    }
+
+    return this.getDeliveryFeeSettings();
+  }
+
   /**
    * Identifies which delivery zone services the given GPS coordinates.
    * Calculates actual distance from center, estimated ETA, and applicable delivery fee.
@@ -85,6 +137,10 @@ export class ZonesService {
           ),
         );
 
+        const fee = matchingZone?.baseDeliveryFee ?? (activeZones[0]?.baseDeliveryFee ?? 0);
+        const minOrder = matchingZone?.minOrderAmount ?? (activeZones[0]?.minOrderAmount ?? 0);
+        const freeThreshold = matchingZone?.freeDeliveryThreshold ?? (activeZones[0]?.freeDeliveryThreshold ?? 0);
+
         return {
           serviceable: true,
           hub,
@@ -95,17 +151,17 @@ export class ZonesService {
             centerLng: hub.longitude,
             radiusKm,
             polygonGeoJson: null,
-            baseDeliveryFee: 25,
-            minOrderAmount: 99,
-            freeDeliveryThreshold: 499,
+            baseDeliveryFee: fee,
+            minOrderAmount: minOrder,
+            freeDeliveryThreshold: freeThreshold,
             estimatedDeliveryMinutes: 15,
             isActive: true,
           },
           distanceKm,
           etaMinutes: Math.max(15, etaMinutes),
-          baseDeliveryFee: 25,
-          minOrderAmount: 99,
-          freeDeliveryThreshold: 499,
+          baseDeliveryFee: fee,
+          minOrderAmount: minOrder,
+          freeDeliveryThreshold: freeThreshold,
         };
       }
     }
@@ -136,9 +192,9 @@ export class ZonesService {
           zone,
           distanceKm,
           etaMinutes: Math.max(zone.estimatedDeliveryMinutes, etaMinutes),
-          baseDeliveryFee: zone.baseDeliveryFee,
-          minOrderAmount: zone.minOrderAmount,
-          freeDeliveryThreshold: zone.freeDeliveryThreshold,
+          baseDeliveryFee: zone.baseDeliveryFee ?? 0,
+          minOrderAmount: zone.minOrderAmount ?? 0,
+          freeDeliveryThreshold: zone.freeDeliveryThreshold ?? 0,
         };
       }
     }

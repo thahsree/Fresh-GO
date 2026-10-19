@@ -17,6 +17,7 @@ import { ProductFormView } from "./views/ProductFormView";
 import { ProductsView } from "./views/ProductsView";
 import { FeaturedSectionsView } from "./views/FeaturedSectionsView";
 import { DeliveryPartnersView } from "./components/DeliveryPartnersView";
+import { DeliveryFeeView } from "./views/DeliveryFeeView";
 
 type ProductDisplay =
   | { name: "list" }
@@ -518,6 +519,7 @@ export default function AdminPage() {
             products={productController.products}
             partners={dispatchController.partners}
             currentUser={currentUser}
+            onNavigateDeliveryFee={() => changeSection("delivery-fee")}
           />
         )}
 
@@ -640,6 +642,13 @@ export default function AdminPage() {
               await productController.refreshProducts();
             }}
             showToast={showToast}
+          />
+        )}
+
+        {section === "delivery-fee" && (
+          <DeliveryFeeView
+            currentUser={currentUser}
+            onToast={showToast}
           />
         )}
       </main>

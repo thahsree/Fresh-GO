@@ -1178,7 +1178,7 @@ class CustomerApiClient {
         serviceable: true,
         distanceKm: 2.5,
         estimatedDeliveryMinutes: 15,
-        deliveryFee: 25,
+        deliveryFee: 0,
       };
     }
   }

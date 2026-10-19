@@ -836,6 +836,7 @@ export default function App() {
                       deliveryLocation={customerAddress}
                       deliveryCoords={customerCoords}
                       deliveryPincode={customerPincode}
+                      deliveryFee={serviceability?.deliveryFee ?? 0}
                       onOpenLocationPicker={() => setIsLocationModalOpen(true)}
                       isLoggedIn={user.isLoggedIn}
                       onOpenAuth={() => setIsAuthModalOpen(true)}

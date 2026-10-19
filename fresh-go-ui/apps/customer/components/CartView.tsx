@@ -78,6 +78,9 @@ type CartViewProps = {
       longitude?: number;
     };
   }) => void;
+  deliveryFee?: number;
+  handlingFee?: number;
+  freeDeliveryThreshold?: number;
 };
 
 export function CartView({
@@ -89,6 +92,9 @@ export function CartView({
   deliveryLocation: propDeliveryLocation,
   deliveryCoords,
   deliveryPincode,
+  deliveryFee: propDeliveryFee,
+  handlingFee: propHandlingFee,
+  freeDeliveryThreshold = 0,
   onOpenLocationPicker,
   isLoggedIn = false,
   onOpenAuth,
@@ -255,8 +261,13 @@ export function CartView({
     0,
   );
 
-  const deliveryFee = itemsTotal >= 499 || itemsTotal === 0 ? 0 : 40;
-  const handlingFee = itemsTotal > 0 ? 15 : 0;
+  const baseDelivery = propDeliveryFee !== undefined ? propDeliveryFee : 0;
+  const isFreeDelivery =
+    itemsTotal === 0 ||
+    baseDelivery === 0 ||
+    (freeDeliveryThreshold > 0 && itemsTotal >= freeDeliveryThreshold);
+  const deliveryFee = isFreeDelivery ? 0 : baseDelivery;
+  const handlingFee = propHandlingFee !== undefined ? propHandlingFee : 0;
   const discount = couponApplied ? Math.min(50, itemsTotal) : 0;
   const grandTotal = Math.max(0, itemsTotal + deliveryFee + handlingFee - discount);
 
@@ -942,7 +953,9 @@ export function CartView({
         </View>
         <View style={styles.billRow}>
           <Text style={styles.billLabel}>Handling & Packaging</Text>
-          <Text style={styles.billVal}>Rs {handlingFee}</Text>
+          <Text style={[styles.billVal, handlingFee === 0 && styles.freeDelivery]}>
+            {handlingFee === 0 ? "FREE" : `Rs ${handlingFee}`}
+          </Text>
         </View>
         {couponApplied && (
           <View style={styles.billRow}>

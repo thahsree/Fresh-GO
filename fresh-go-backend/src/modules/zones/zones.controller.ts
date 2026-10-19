@@ -37,6 +37,28 @@ export class ZonesController {
   }
 
   @Public()
+  @Get("delivery-fee")
+  async getDeliveryFeeSettings() {
+    return this.zonesService.getDeliveryFeeSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Put("delivery-fee")
+  async updateDeliveryFeeSettings(
+    @Body()
+    dto: {
+      deliveryFee: number;
+      freeDeliveryThreshold?: number;
+      minOrderAmount?: number;
+      handlingFee?: number;
+      zoneId?: string;
+    },
+  ) {
+    return this.zonesService.updateDeliveryFeeSettings(dto);
+  }
+
+  @Public()
   @Get(":id")
   async getById(@Param("id") id: string) {
     return this.zonesService.findById(id);

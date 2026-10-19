@@ -8,6 +8,7 @@ export const navItems = [
   ["dispatch", "⇢", "Dispatch"],
   ["delivery-partners", "🚲", "Delivery Partners"],
   ["featured", "★", "Featured Sections"],
+  ["delivery-fee", "🚚", "Delivery Fee"],
 ] as const;
 
 export type AdminSection = (typeof navItems)[number][0];

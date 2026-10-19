@@ -229,7 +229,7 @@ model DeliveryZone {
   centerLng                Float
   radiusKm                 Float
   polygonGeoJson           String?
-  baseDeliveryFee          Float    @default(35.0)
+  baseDeliveryFee          Float    @default(0.0)
   minOrderAmount           Float    @default(199.0)
   freeDeliveryThreshold    Float    @default(799.0)
   estimatedDeliveryMinutes Int      @default(30)

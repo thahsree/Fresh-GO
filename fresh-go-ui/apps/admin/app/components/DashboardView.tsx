@@ -16,6 +16,7 @@ type DashboardViewProps = {
   products?: Product[];
   partners?: ActivePartner[];
   currentUser?: AdminUser | null;
+  onNavigateDeliveryFee?: () => void;
 };
 
 export function DashboardView({
@@ -23,11 +24,22 @@ export function DashboardView({
   products = [],
   partners = [],
   currentUser,
+  onNavigateDeliveryFee,
 }: DashboardViewProps) {
   const [salesReport, setSalesReport] = useState<SalesReportResponse | null>(null);
   const [metricMode, setMetricMode] = useState<"revenue" | "orders">("revenue");
   const [timeRange, setTimeRange] = useState<7 | 14>(7);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [activeDeliveryFee, setActiveDeliveryFee] = useState<number | null>(null);
+
+  useEffect(() => {
+    api.deliveryFee
+      .getSettings()
+      .then((s) => {
+        if (s) setActiveDeliveryFee(s.deliveryFee);
+      })
+      .catch(() => {});
+  }, []);
 
   // Identify the logged-in hub strictly
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
@@ -230,6 +242,26 @@ export function DashboardView({
         <div className="kpi">
           <strong>{onlinePartnersCount}</strong>
           <span>Active delivery riders online</span>
+        </div>
+        <div
+          className="kpi"
+          style={{ cursor: onNavigateDeliveryFee ? "pointer" : "default" }}
+          onClick={onNavigateDeliveryFee}
+          title="Click to manage delivery fee & pricing"
+        >
+          <strong
+            style={{
+              color:
+                activeDeliveryFee === 0 || activeDeliveryFee === null
+                  ? "#2E7D5B"
+                  : "#1F4D46",
+            }}
+          >
+            {activeDeliveryFee === 0 || activeDeliveryFee === null
+              ? "₹0 · FREE"
+              : `₹${activeDeliveryFee}`}
+          </strong>
+          <span>Delivery fee · Manage 🚚</span>
         </div>
       </section>
 
