@@ -86,32 +86,36 @@ export function DashboardView({
     });
   }, [partners, activeHubId]);
 
-  // Live revenue strictly for this specific hub
+  // Helper: format a Date as local YYYY-MM-DD (IST-safe, avoids UTC day-shift)
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  // Today's revenue strictly for this hub
+  const todayStr = toLocalDateStr(new Date());
+
   const hubLiveRevenue = useMemo(() => {
-    // 1. If sales report has a matching hub in breakdown, use it
-    if (salesReport?.hubBreakdown && salesReport.hubBreakdown.length > 0) {
-      const matched = salesReport.hubBreakdown.find(
-        (h) =>
-          (activeHubId && h.hubId === activeHubId) ||
-          (activeHubName && h.hubName.toLowerCase() === activeHubName.toLowerCase())
-      );
-      if (matched && matched.grossRevenue > 0) {
-        return Math.round(matched.grossRevenue);
+    // 1. Try to find today's revenue in the daily trend (backend-filtered by hubId)
+    if (salesReport?.dailyTrend) {
+      const todayTrend = salesReport.dailyTrend.find((d) => d.date === todayStr);
+      if (todayTrend && todayTrend.revenue > 0) {
+        return Math.round(todayTrend.revenue);
       }
     }
 
-    // 2. If salesReport has general grossRevenue for this filtered hub
-    if (salesReport?.kpis?.grossRevenue && salesReport.kpis.grossRevenue > 0) {
-      return Math.round(salesReport.kpis.grossRevenue);
-    }
-
-    // 3. Fallback to real-time live orders in queue for this hub
+    // 2. Fallback: sum today's live orders in the queue for this hub
     return Math.round(
       hubOrders
-        .filter((o) => o.status !== "CANCELLED" && o.status !== "FAILED_DELIVERY")
+        .filter((o) => {
+          if (o.status === "CANCELLED" || o.status === "FAILED_DELIVERY") return false;
+          try {
+            return toLocalDateStr(new Date(o.placedAt)) === todayStr;
+          } catch {
+            return false;
+          }
+        })
         .reduce((sum, o) => sum + (o.totalAmount || 0), 0)
     );
-  }, [salesReport, hubOrders, activeHubId, activeHubName]);
+  }, [salesReport, hubOrders, todayStr]);
 
   const formattedRevenue =
     hubLiveRevenue > 0 ? `Rs ${hubLiveRevenue.toLocaleString()}` : "Rs 0";
@@ -135,6 +139,10 @@ export function DashboardView({
   const trajectoryData = useMemo(() => {
     const dateMap = new Map<string, { revenue: number; orders: number }>();
 
+    // Helper: local date string to avoid UTC day-shift
+    const toLocal = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
     // From sales report daily trend (already filtered by hubId on backend)
     if (salesReport?.dailyTrend) {
       for (const item of salesReport.dailyTrend) {
@@ -153,7 +161,8 @@ export function DashboardView({
         order.status !== "FAILED_DELIVERY"
       ) {
         try {
-          const dateStr = new Date(order.placedAt).toISOString().split("T")[0];
+          // Use LOCAL date (avoids UTC midnight shift — e.g. 10pm IST would not roll to next day)
+          const dateStr = toLocal(new Date(order.placedAt));
           const existing = dateMap.get(dateStr) || { revenue: 0, orders: 0 };
           if (!salesReport) {
             existing.revenue += Number(order.totalAmount || 0);
@@ -176,9 +185,10 @@ export function DashboardView({
 
     const now = new Date();
     for (let i = timeRange - 1; i >= 0; i--) {
-      const d = new Date();
+      const d = new Date(now);
       d.setDate(now.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
+      // Use LOCAL date string to match backend daily trend keys
+      const dateStr = toLocal(d);
       const isToday = i === 0;
       const dayName = isToday
         ? "Today"
@@ -229,7 +239,7 @@ export function DashboardView({
       <section className="kpis">
         <div className="kpi featured">
           <strong>{formattedRevenue}</strong>
-          <span>Live revenue · {activeHubName}</span>
+          <span>Today&apos;s revenue · {activeHubName}</span>
         </div>
         <div className="kpi">
           <strong>{activeOrdersCount}</strong>
