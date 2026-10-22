@@ -44,15 +44,33 @@ export class ZonesService {
     return this.prisma.deliveryZone.delete({ where: { id } });
   }
 
+
   async getDeliveryFeeSettings() {
-    const zones = await this.findAll(true);
-    const primaryZone = zones[0] || null;
+    // Derive fee settings dynamically from active hubs — no legacy seed zone needed
+    const activeHubs = await this.prisma.hub.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+    });
+
+    // Map each hub into a zone-shaped object for the admin UI
+    const zones = activeHubs.map((hub) => ({
+      id: hub.id,
+      name: hub.name,
+      radiusKm: hub.deliveryRadiusKm ?? 10.0,
+      baseDeliveryFee: (hub as any).deliveryFee ?? 0,
+      freeDeliveryThreshold: (hub as any).freeDeliveryThreshold ?? 0,
+      minOrderAmount: (hub as any).minOrderAmount ?? 0,
+      isActive: hub.isActive,
+    }));
+
+    // Global defaults = first active hub's settings (or zeros if no hubs yet)
+    const primary = zones[0] ?? null;
     return {
-      deliveryFee: primaryZone?.baseDeliveryFee ?? 0,
-      freeDeliveryThreshold: primaryZone?.freeDeliveryThreshold ?? 0,
-      minOrderAmount: primaryZone?.minOrderAmount ?? 0,
+      deliveryFee: primary?.baseDeliveryFee ?? 0,
+      freeDeliveryThreshold: primary?.freeDeliveryThreshold ?? 0,
+      minOrderAmount: primary?.minOrderAmount ?? 0,
       handlingFee: 0,
-      isFreeDelivery: (primaryZone?.baseDeliveryFee ?? 0) === 0,
+      isFreeDelivery: (primary?.baseDeliveryFee ?? 0) === 0,
       zones,
     };
   }
@@ -74,27 +92,27 @@ export class ZonesService {
         ? Math.max(0, Number(dto.minOrderAmount))
         : undefined;
 
+    const updateData: any = { deliveryFee: fee };
+    if (freeThreshold !== undefined) updateData.freeDeliveryThreshold = freeThreshold;
+    if (minOrder !== undefined) updateData.minOrderAmount = minOrder;
+
     if (dto.zoneId) {
-      await this.prisma.deliveryZone.update({
+      // Update a specific hub by its id
+      await this.prisma.hub.update({
         where: { id: dto.zoneId },
-        data: {
-          baseDeliveryFee: fee,
-          ...(freeThreshold !== undefined ? { freeDeliveryThreshold: freeThreshold } : {}),
-          ...(minOrder !== undefined ? { minOrderAmount: minOrder } : {}),
-        },
+        data: updateData,
       });
     } else {
-      await this.prisma.deliveryZone.updateMany({
-        data: {
-          baseDeliveryFee: fee,
-          ...(freeThreshold !== undefined ? { freeDeliveryThreshold: freeThreshold } : {}),
-          ...(minOrder !== undefined ? { minOrderAmount: minOrder } : {}),
-        },
+      // Update ALL active hubs globally
+      await this.prisma.hub.updateMany({
+        where: { isActive: true },
+        data: updateData,
       });
     }
 
     return this.getDeliveryFeeSettings();
   }
+
 
   /**
    * Identifies which delivery zone services the given GPS coordinates.
@@ -125,28 +143,16 @@ export class ZonesService {
         );
         const etaMinutes = this.mapsService.estimateDurationMinutes(distanceKm);
 
-        // Find if an active DeliveryZone covers this location
-        const activeZones = await this.findAll(true);
-        const matchingZone = activeZones.find((z) =>
-          this.mapsService.isPointInZone(
-            latitude,
-            longitude,
-            z.centerLat,
-            z.centerLng,
-            z.radiusKm,
-          ),
-        );
-
-        const fee = matchingZone?.baseDeliveryFee ?? (activeZones[0]?.baseDeliveryFee ?? 0);
-        const minOrder = matchingZone?.minOrderAmount ?? (activeZones[0]?.minOrderAmount ?? 0);
-        const freeThreshold = matchingZone?.freeDeliveryThreshold ?? (activeZones[0]?.freeDeliveryThreshold ?? 0);
+        const fee = (hub as any).deliveryFee ?? 0;
+        const minOrder = (hub as any).minOrderAmount ?? 0;
+        const freeThreshold = (hub as any).freeDeliveryThreshold ?? 0;
 
         return {
           serviceable: true,
           hub,
-          zone: matchingZone || {
-            id: null,
-            name: hub.name,
+          zone: {
+            id: hub.id,
+            name: `${hub.name} Zone`,
             centerLat: hub.latitude,
             centerLng: hub.longitude,
             radiusKm,
@@ -154,7 +160,7 @@ export class ZonesService {
             baseDeliveryFee: fee,
             minOrderAmount: minOrder,
             freeDeliveryThreshold: freeThreshold,
-            estimatedDeliveryMinutes: 15,
+            estimatedDeliveryMinutes: Math.max(15, etaMinutes),
             isActive: true,
           },
           distanceKm,
@@ -162,39 +168,6 @@ export class ZonesService {
           baseDeliveryFee: fee,
           minOrderAmount: minOrder,
           freeDeliveryThreshold: freeThreshold,
-        };
-      }
-    }
-
-    // 2. Check legacy delivery zones table
-    const activeZones = await this.findAll(true);
-
-    for (const zone of activeZones) {
-      const isInside = this.mapsService.isPointInZone(
-        latitude,
-        longitude,
-        zone.centerLat,
-        zone.centerLng,
-        zone.radiusKm,
-      );
-
-      if (isInside) {
-        const distanceKm = this.mapsService.calculateDistanceKm(
-          latitude,
-          longitude,
-          zone.centerLat,
-          zone.centerLng,
-        );
-        const etaMinutes = this.mapsService.estimateDurationMinutes(distanceKm);
-
-        return {
-          serviceable: true,
-          zone,
-          distanceKm,
-          etaMinutes: Math.max(zone.estimatedDeliveryMinutes, etaMinutes),
-          baseDeliveryFee: zone.baseDeliveryFee ?? 0,
-          minOrderAmount: zone.minOrderAmount ?? 0,
-          freeDeliveryThreshold: zone.freeDeliveryThreshold ?? 0,
         };
       }
     }

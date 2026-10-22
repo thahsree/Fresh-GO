@@ -13,6 +13,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -44,8 +45,25 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
   const [errorMessage, setErrorMessage] = useState("");
   const [timer, setTimer] = useState(30);
   const [sessionInfo, setSessionInfo] = useState<string>("");
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Listen to keyboard on Android so modal sheet adjusts reliably inside Modal
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const showSub = Keyboard.addListener("keyboardDidShow", (e) => {
+      setKeyboardOffset(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardOffset(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -154,10 +172,16 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.overlay}
+        style={[
+          styles.overlay,
+          Platform.OS === "android" && keyboardOffset > 0 && {
+            paddingBottom: keyboardOffset,
+          },
+        ]}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.container}>
@@ -184,7 +208,13 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+            bounces={false}
+          >
             {step === "phone" ? (
               /* STEP 1: MOBILE NUMBER */
               <View style={styles.content}>
@@ -210,6 +240,11 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                         setPhone(clean);
                         if (errorMessage) setErrorMessage("");
                       }}
+                      onFocus={() => {
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                        }, 100);
+                      }}
                       placeholder="Enter 10-digit number"
                       keyboardType="phone-pad"
                       maxLength={10}
@@ -228,6 +263,11 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                     <TextInput
                       value={name}
                       onChangeText={setName}
+                      onFocus={() => {
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollTo({ y: 70, animated: true });
+                        }, 100);
+                      }}
                       placeholder="e.g. Rahul Sharma"
                       style={styles.textInput}
                       placeholderTextColor={colors.textSoft}
@@ -292,6 +332,11 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                         const clean = val.replace(/\D/g, "").slice(0, 6);
                         setOtp(clean);
                         if (errorMessage) setErrorMessage("");
+                      }}
+                      onFocus={() => {
+                        setTimeout(() => {
+                          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                        }, 100);
                       }}
                       placeholder="• • • • • •"
                       keyboardType="number-pad"
@@ -370,6 +415,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: Platform.OS === "ios" ? 36 : 24,
     maxHeight: "92%",
+    flexShrink: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.15,
@@ -413,6 +459,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: Platform.OS === "ios" ? 20 : 36,
   },
   content: {
     paddingBottom: 10,

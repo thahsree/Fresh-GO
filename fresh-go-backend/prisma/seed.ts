@@ -15,38 +15,26 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Starting FreshGo complete database seed...");
 
-  // 1. Hub
-  const hub = await prisma.hub.upsert({
-    where: { code: "HUB-CLT-01" },
-    update: {},
-    create: {
-      name: "FreshGo Central Hub (Mavoor Road)",
-      code: "HUB-CLT-01",
-      address: "Mavoor Road, Kozhikode, Kerala 673004",
-      latitude: 11.2588,
-      longitude: 75.7804,
-      isActive: true,
-    },
-  });
+  // 1. Hub (use existing active hub or create default)
+  let hub = await prisma.hub.findFirst({ where: { isActive: true } });
+  if (!hub) {
+    hub = await prisma.hub.create({
+      data: {
+        name: "Chigrupade Hub",
+        code: "HUB-KSD-01",
+        address: "Chigrupade, Kasaragod, Kerala",
+        city: "Kasaragod",
+        latitude: 12.6998,
+        longitude: 74.9477,
+        deliveryRadiusKm: 10,
+        deliveryFee: 25.0,
+        freeDeliveryThreshold: 299.0,
+        minOrderAmount: 99.0,
+        isActive: true,
+      },
+    });
+  }
   console.log("✅ Hub ready:", hub.name);
-
-  // 2. Delivery Zone
-  const zone = await prisma.deliveryZone.upsert({
-    where: { name: "Zone 1 · Kozhikode Central" },
-    update: {},
-    create: {
-      name: "Zone 1 · Kozhikode Central",
-      centerLat: 11.2588,
-      centerLng: 75.7804,
-      radiusKm: 12.0,
-      baseDeliveryFee: 35.0,
-      minOrderAmount: 199.0,
-      freeDeliveryThreshold: 799.0,
-      estimatedDeliveryMinutes: 25,
-      isActive: true,
-    },
-  });
-  console.log("✅ Zone ready:", zone.name);
 
   // 3. Admin User
   const admin = await prisma.user.upsert({
@@ -79,8 +67,8 @@ async function main() {
           currentLat: 11.2592,
           currentLng: 75.7812,
           lastLocationUpdate: new Date(),
-          codCashInHand: 450.0,
-          preferredZoneId: zone.id,
+          hubId: hub.id,
+          preferredZoneId: null,
           rating: 4.9,
           completedDeliveries: 42,
         },
@@ -811,7 +799,7 @@ async function main() {
         orderNumber: "FF90214",
         customerId: customer.id,
         hubId: hub.id,
-        zoneId: zone.id,
+        zoneId: null,
         deliveryPartnerId: partnerProfile.id,
         status: OrderStatus.DELIVERED,
         subtotal: 1040,
@@ -874,7 +862,7 @@ async function main() {
         orderNumber: "FF88421",
         customerId: customer.id,
         hubId: hub.id,
-        zoneId: zone.id,
+        zoneId: null,
         deliveryPartnerId: partnerProfile.id,
         status: OrderStatus.DELIVERED,
         subtotal: 1320,

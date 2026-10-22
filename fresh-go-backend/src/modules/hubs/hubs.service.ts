@@ -338,11 +338,7 @@ export class HubsService {
         45,
         Math.max(15, Math.round(15 + closest.distanceKm * 2.2))
       );
-      const activeZone = await this.prisma.deliveryZone.findFirst({
-        where: { isActive: true },
-        orderBy: { name: "asc" },
-      });
-      const deliveryFee = activeZone?.baseDeliveryFee ?? 0;
+      const deliveryFee = (closest.hub as any).deliveryFee ?? 0;
 
       return {
         serviceable: true,
