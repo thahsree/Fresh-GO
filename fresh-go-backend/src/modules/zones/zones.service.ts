@@ -60,6 +60,7 @@ export class ZonesService {
       baseDeliveryFee: (hub as any).deliveryFee ?? 0,
       freeDeliveryThreshold: (hub as any).freeDeliveryThreshold ?? 0,
       minOrderAmount: (hub as any).minOrderAmount ?? 0,
+      handlingFee: (hub as any).handlingFee ?? 0,
       isActive: hub.isActive,
     }));
 
@@ -69,7 +70,7 @@ export class ZonesService {
       deliveryFee: primary?.baseDeliveryFee ?? 0,
       freeDeliveryThreshold: primary?.freeDeliveryThreshold ?? 0,
       minOrderAmount: primary?.minOrderAmount ?? 0,
-      handlingFee: 0,
+      handlingFee: primary?.handlingFee ?? 0,
       isFreeDelivery: (primary?.baseDeliveryFee ?? 0) === 0,
       zones,
     };
@@ -83,6 +84,10 @@ export class ZonesService {
     zoneId?: string;
   }) {
     const fee = Math.max(0, Number(dto.deliveryFee ?? 0));
+    const handling =
+      dto.handlingFee !== undefined
+        ? Math.max(0, Number(dto.handlingFee))
+        : undefined;
     const freeThreshold =
       dto.freeDeliveryThreshold !== undefined
         ? Math.max(0, Number(dto.freeDeliveryThreshold))
@@ -93,6 +98,7 @@ export class ZonesService {
         : undefined;
 
     const updateData: any = { deliveryFee: fee };
+    if (handling !== undefined) updateData.handlingFee = handling;
     if (freeThreshold !== undefined) updateData.freeDeliveryThreshold = freeThreshold;
     if (minOrder !== undefined) updateData.minOrderAmount = minOrder;
 

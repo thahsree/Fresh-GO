@@ -339,6 +339,7 @@ export class HubsService {
         Math.max(15, Math.round(15 + closest.distanceKm * 2.2))
       );
       const deliveryFee = (closest.hub as any).deliveryFee ?? 0;
+      const handlingFee = (closest.hub as any).handlingFee ?? 0;
 
       return {
         serviceable: true,
@@ -355,6 +356,7 @@ export class HubsService {
         distanceKm: closest.distanceKm,
         estimatedDeliveryMinutes: estMinutes,
         deliveryFee,
+        handlingFee,
       };
     }
 

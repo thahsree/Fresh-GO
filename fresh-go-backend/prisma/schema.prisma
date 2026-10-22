@@ -210,6 +210,7 @@ model Hub {
   longitude             Float
   deliveryRadiusKm      Float    @default(10.0)
   deliveryFee           Float    @default(0.0)
+  handlingFee           Float    @default(0.0)
   freeDeliveryThreshold Float    @default(0.0)
   minOrderAmount        Float    @default(0.0)
   isActive              Boolean  @default(true)

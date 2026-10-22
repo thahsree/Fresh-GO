@@ -24,14 +24,12 @@ export function DeliveryFeeView({ currentUser, onToast }: DeliveryFeeViewProps) 
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<DeliveryFeeSettings | null>(null);
 
-  // Form State
-  const [baseDeliveryFee, setBaseDeliveryFee] = useState<number>(0);
-  const [handlingFee, setHandlingFee] = useState<number>(0);
-  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(0);
-  const [minOrderAmount, setMinOrderAmount] = useState<number>(0);
+  // Form State: number | string to allow natural typing without sticky '0' or '013'
+  const [baseDeliveryFee, setBaseDeliveryFee] = useState<number | string>(0);
+  const [handlingFee, setHandlingFee] = useState<number | string>(0);
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number | string>(0);
+  const [minOrderAmount, setMinOrderAmount] = useState<number | string>(0);
   const [hasChanges, setHasChanges] = useState(false);
-
-
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -56,19 +54,55 @@ export function DeliveryFeeView({ currentUser, onToast }: DeliveryFeeViewProps) 
     fetchSettings();
   }, [fetchSettings]);
 
+  // Clean typing handler: removes leading 0 when typing numbers (e.g. 013 -> 13) and allows backspacing to empty
+  const handleNumberInput = (
+    val: string,
+    setter: (v: number | string) => void
+  ) => {
+    if (val === "") {
+      setter("");
+      setHasChanges(true);
+      return;
+    }
+    // Remove leading zeros when typing (prevents 013)
+    const cleaned = val.replace(/^0+(?=\d)/, "");
+    setter(cleaned);
+    setHasChanges(true);
+  };
+
+  const handleBlurNumber = (
+    val: number | string,
+    setter: (v: number | string) => void
+  ) => {
+    if (val === "" || isNaN(Number(val))) {
+      setter(0);
+    } else {
+      setter(Math.max(0, Number(val)));
+    }
+  };
+
   const handleSaveSettings = async () => {
     setSaving(true);
+    const dFee = Number(baseDeliveryFee) || 0;
+    const hFee = Number(handlingFee) || 0;
+    const fThreshold = Number(freeDeliveryThreshold) || 0;
+    const mOrder = Number(minOrderAmount) || 0;
+
     try {
       const updated = await api.deliveryFee.updateSettings({
-        deliveryFee: baseDeliveryFee,
-        freeDeliveryThreshold,
-        minOrderAmount,
-        handlingFee,
+        deliveryFee: dFee,
+        freeDeliveryThreshold: fThreshold,
+        minOrderAmount: mOrder,
+        handlingFee: hFee,
       });
       if (updated) {
+        setBaseDeliveryFee(updated.deliveryFee ?? dFee);
+        setHandlingFee(updated.handlingFee ?? hFee);
+        setFreeDeliveryThreshold(updated.freeDeliveryThreshold ?? fThreshold);
+        setMinOrderAmount(updated.minOrderAmount ?? mOrder);
         setHasChanges(false);
-        const feeText = baseDeliveryFee === 0 ? "Free (Rs 0)" : `Rs ${baseDeliveryFee}`;
-        onToast(`Delivery fee updated to ${feeText}`, "success");
+        const feeText = dFee === 0 ? "Free (Rs 0)" : `Rs ${dFee}`;
+        onToast(`Delivery fee & handling fee updated successfully! (${feeText}, Handling: Rs ${hFee})`, "success");
       }
     } catch (err: any) {
       onToast(err.message || "Failed to save delivery settings", "error");
@@ -230,10 +264,9 @@ export function DeliveryFeeView({ currentUser, onToast }: DeliveryFeeViewProps) 
                   min="0"
                   step="1"
                   value={baseDeliveryFee}
-                  onChange={(e) => {
-                    setBaseDeliveryFee(Math.max(0, Number(e.target.value)));
-                    setHasChanges(true);
-                  }}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => handleNumberInput(e.target.value, setBaseDeliveryFee)}
+                  onBlur={() => handleBlurNumber(baseDeliveryFee, setBaseDeliveryFee)}
                   style={{ ...inputStyle, paddingLeft: "36px" }}
                 />
               </div>
@@ -249,10 +282,9 @@ export function DeliveryFeeView({ currentUser, onToast }: DeliveryFeeViewProps) 
                   min="0"
                   step="1"
                   value={handlingFee}
-                  onChange={(e) => {
-                    setHandlingFee(Math.max(0, Number(e.target.value)));
-                    setHasChanges(true);
-                  }}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => handleNumberInput(e.target.value, setHandlingFee)}
+                  onBlur={() => handleBlurNumber(handlingFee, setHandlingFee)}
                   style={{ ...inputStyle, paddingLeft: "36px" }}
                 />
               </div>
@@ -271,10 +303,9 @@ export function DeliveryFeeView({ currentUser, onToast }: DeliveryFeeViewProps) 
                   min="0"
                   step="50"
                   value={freeDeliveryThreshold}
-                  onChange={(e) => {
-                    setFreeDeliveryThreshold(Math.max(0, Number(e.target.value)));
-                    setHasChanges(true);
-                  }}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => handleNumberInput(e.target.value, setFreeDeliveryThreshold)}
+                  onBlur={() => handleBlurNumber(freeDeliveryThreshold, setFreeDeliveryThreshold)}
                   style={{ ...inputStyle, paddingLeft: "36px" }}
                 />
               </div>
@@ -290,10 +321,9 @@ export function DeliveryFeeView({ currentUser, onToast }: DeliveryFeeViewProps) 
                   min="0"
                   step="50"
                   value={minOrderAmount}
-                  onChange={(e) => {
-                    setMinOrderAmount(Math.max(0, Number(e.target.value)));
-                    setHasChanges(true);
-                  }}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => handleNumberInput(e.target.value, setMinOrderAmount)}
+                  onBlur={() => handleBlurNumber(minOrderAmount, setMinOrderAmount)}
                   style={{ ...inputStyle, paddingLeft: "36px" }}
                 />
               </div>
