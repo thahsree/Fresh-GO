@@ -155,10 +155,56 @@ export class OrdersService {
       throw new BadRequestException("Invalid delivery address");
     }
 
-    const zoneCheck = await this.zonesService.findZoneForCoordinates(
-      address.latitude,
-      address.longitude,
-    );
+    // If address has zero/invalid GPS coordinates (common for new installs before
+    // location permission is granted), and the app sent a hubId, resolve via hub directly.
+    const hasValidCoords =
+      address.latitude !== 0 &&
+      address.longitude !== 0 &&
+      Number.isFinite(address.latitude) &&
+      Number.isFinite(address.longitude);
+
+    let zoneCheck = hasValidCoords
+      ? await this.zonesService.findZoneForCoordinates(
+          address.latitude,
+          address.longitude,
+        )
+      : { serviceable: false as const, zone: null, message: "" };
+
+    // Fallback: if geo-check failed but a hubId was passed, trust it and resolve via hub
+    if ((!zoneCheck.serviceable || !zoneCheck.zone) && dto.hubId) {
+      const fallbackHub = await this.prisma.hub.findUnique({
+        where: { id: dto.hubId, isActive: true },
+      });
+      if (fallbackHub) {
+        const fee = (fallbackHub as any).deliveryFee ?? 0;
+        const minOrder = (fallbackHub as any).minOrderAmount ?? 0;
+        const freeThreshold = (fallbackHub as any).freeDeliveryThreshold ?? 0;
+        const radiusKm = fallbackHub.deliveryRadiusKm || 10.0;
+        zoneCheck = {
+          serviceable: true,
+          hub: fallbackHub,
+          zone: {
+            id: fallbackHub.id,
+            name: `${fallbackHub.name} Zone`,
+            centerLat: fallbackHub.latitude,
+            centerLng: fallbackHub.longitude,
+            radiusKm,
+            polygonGeoJson: null,
+            baseDeliveryFee: fee,
+            minOrderAmount: minOrder,
+            freeDeliveryThreshold: freeThreshold,
+            estimatedDeliveryMinutes: 30,
+            isActive: true,
+          },
+          distanceKm: 0,
+          etaMinutes: 30,
+          baseDeliveryFee: fee,
+          minOrderAmount: minOrder,
+          freeDeliveryThreshold: freeThreshold,
+        } as any;
+      }
+    }
+
     if (!zoneCheck.serviceable || !zoneCheck.zone) {
       throw new BadRequestException(
         zoneCheck.message || "Address outside serviceable delivery zones",

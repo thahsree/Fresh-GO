@@ -1067,8 +1067,9 @@ class CustomerApiClient {
           area: ad.area || "",
           city: ad.city || "",
           pincode: ad.pincode || "",
-          latitude: ad.latitude || 0,
-          longitude: ad.longitude || 0,
+          // Use GPS coords if available; backend resolves serviceability via hubId if coords are (0,0)
+          latitude: (ad.latitude && Number.isFinite(ad.latitude) && ad.latitude !== 0) ? ad.latitude : 0,
+          longitude: (ad.longitude && Number.isFinite(ad.longitude) && ad.longitude !== 0) ? ad.longitude : 0,
           isDefault: true,
         });
         if (newAddr) {

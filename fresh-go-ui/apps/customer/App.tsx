@@ -635,7 +635,12 @@ export default function App() {
     }
 
     // 1. Send live order to backend with hubId and cut preparations
-    const targetHubId = serviceability?.hub?.id || (orderDetails as any).hubId;
+    // Fall back to the first loaded hub if serviceability hasn't resolved yet
+    // (e.g. new install before location permission was granted)
+    const targetHubId =
+      serviceability?.hub?.id ||
+      (orderDetails as any).hubId ||
+      hubs[0]?.id;
 
     const res = await customerApi.createOrder({
       ...orderDetails,
