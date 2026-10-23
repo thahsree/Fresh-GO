@@ -302,13 +302,12 @@ export class HubsService {
   }
 
   async checkServiceability(lat: number, lng: number) {
-    const hubs = await this.prisma.hub.findMany({
-      where: { isActive: true },
-    });
+    const allHubs = await this.prisma.hub.findMany();
 
-    if (hubs.length === 0) {
+    if (allHubs.length === 0) {
       return {
         serviceable: false,
+        storeOffline: false,
         nearestDistanceKm: null,
         nearestHub: null,
         message:
@@ -316,8 +315,8 @@ export class HubsService {
       };
     }
 
-    // Calculate distance to each active hub
-    const hubsWithDistance = hubs.map((hub) => {
+    // Calculate distance to each hub (both active and inactive)
+    const hubsWithDistance = allHubs.map((hub) => {
       const dist = calculateDistanceKm(lat, lng, hub.latitude, hub.longitude);
       return {
         hub,
@@ -328,40 +327,72 @@ export class HubsService {
 
     // Sort closest first
     hubsWithDistance.sort((a, b) => a.distanceKm - b.distanceKm);
-    const closest = hubsWithDistance[0];
 
-    // Only customers surrounded by 10km (or hub radius) are serviceable
-    const isServiceable = closest.distanceKm <= closest.radius;
+    // 1. Check if any ACTIVE hub covers this customer's location
+    const activeHubsWithinRadius = hubsWithDistance.filter(
+      (h) => h.hub.isActive && h.distanceKm <= h.radius
+    );
 
-    if (isServiceable) {
+    if (activeHubsWithinRadius.length > 0) {
+      const servingHub = activeHubsWithinRadius[0];
       const estMinutes = Math.min(
         45,
-        Math.max(15, Math.round(15 + closest.distanceKm * 2.2))
+        Math.max(15, Math.round(15 + servingHub.distanceKm * 2.2))
       );
-      const deliveryFee = (closest.hub as any).deliveryFee ?? 0;
-      const handlingFee = (closest.hub as any).handlingFee ?? 0;
+      const deliveryFee = (servingHub.hub as any).deliveryFee ?? 0;
+      const handlingFee = (servingHub.hub as any).handlingFee ?? 0;
 
       return {
         serviceable: true,
+        storeOffline: false,
         hub: {
-          id: closest.hub.id,
-          name: closest.hub.name,
-          code: closest.hub.code,
-          address: closest.hub.address,
-          city: closest.hub.city,
-          latitude: closest.hub.latitude,
-          longitude: closest.hub.longitude,
-          deliveryRadiusKm: closest.radius,
+          id: servingHub.hub.id,
+          name: servingHub.hub.name,
+          code: servingHub.hub.code,
+          address: servingHub.hub.address,
+          city: servingHub.hub.city,
+          latitude: servingHub.hub.latitude,
+          longitude: servingHub.hub.longitude,
+          deliveryRadiusKm: servingHub.radius,
+          isActive: true,
         },
-        distanceKm: closest.distanceKm,
+        distanceKm: servingHub.distanceKm,
         estimatedDeliveryMinutes: estMinutes,
         deliveryFee,
         handlingFee,
       };
     }
 
+    // 2. Check if the customer is within the delivery radius of a hub that is currently OFFLINE
+    const offlineHubWithinRadius = hubsWithDistance.find(
+      (h) => !h.hub.isActive && h.distanceKm <= h.radius
+    );
+
+    if (offlineHubWithinRadius) {
+      return {
+        serviceable: false,
+        storeOffline: true,
+        hub: {
+          id: offlineHubWithinRadius.hub.id,
+          name: offlineHubWithinRadius.hub.name,
+          code: offlineHubWithinRadius.hub.code,
+          address: offlineHubWithinRadius.hub.address,
+          city: offlineHubWithinRadius.hub.city,
+          latitude: offlineHubWithinRadius.hub.latitude,
+          longitude: offlineHubWithinRadius.hub.longitude,
+          deliveryRadiusKm: offlineHubWithinRadius.radius,
+          isActive: false,
+        },
+        distanceKm: offlineHubWithinRadius.distanceKm,
+        message: `${offlineHubWithinRadius.hub.name} is currently offline and not accepting orders right now.`,
+      };
+    }
+
+    // 3. Customer is outside the delivery radius of any hub -> Coming Soon
+    const closest = hubsWithDistance[0];
     return {
       serviceable: false,
+      storeOffline: false,
       nearestDistanceKm: closest.distanceKm,
       nearestHub: {
         id: closest.hub.id,

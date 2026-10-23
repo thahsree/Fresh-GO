@@ -86,6 +86,11 @@ export function ProfileView({
   // Privacy Policy Modal
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
+  // Delete Account Custom Modal State (Apple Guideline 5.1.1(v))
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Fetch real saved addresses from backend when logged in
   const loadAddresses = async () => {
     if (!user.isLoggedIn) {
@@ -228,6 +233,37 @@ export function ProfileView({
       await loadAddresses();
     } catch {
       // ignore
+    }
+  };
+
+  // Delete Account Custom Modal Handlers (Apple App Store Guideline 5.1.1(v))
+  const handleOpenDeleteModal = () => {
+    setDeleteError(null);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (isDeletingAccount) return;
+    setDeleteError(null);
+    setIsDeleteModalOpen(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      const res = await customerApi.deleteAccount();
+      if (res && res.success === false && res.message) {
+        setDeleteError(res.message);
+        setIsDeletingAccount(false);
+        return;
+      }
+      setIsDeleteModalOpen(false);
+      onLogout();
+    } catch (err: any) {
+      setDeleteError(err?.message || "Failed to delete account. Please try again.");
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -485,16 +521,27 @@ export function ProfileView({
         </View>
       </View>
 
-      {/* Log Out Button */}
+      {/* Account Actions: Log Out & Delete Account */}
       {user.isLoggedIn && (
-        <Pressable
-          style={styles.logoutBtn}
-          onPress={onLogout}
-          accessibilityRole="button"
-        >
-          <LogOut size={16} color={colors.error} />
-          <Text style={styles.logoutBtnText}>Log Out</Text>
-        </Pressable>
+        <View style={styles.accountActionSection}>
+          <Pressable
+            style={styles.logoutBtn}
+            onPress={onLogout}
+            accessibilityRole="button"
+          >
+            <LogOut size={16} color={colors.text} />
+            <Text style={styles.logoutBtnText}>Log Out</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.deleteAccountBtn}
+            onPress={handleOpenDeleteModal}
+            accessibilityRole="button"
+          >
+            <Trash2 size={15} color="#BE4436" />
+            <Text style={styles.deleteAccountBtnText}>Delete Account</Text>
+          </Pressable>
+        </View>
       )}
 
       {/* App Version Info */}
@@ -681,6 +728,78 @@ export function ProfileView({
                     <Text style={styles.saveBtnText}>
                       {editingAddress ? "Update Address" : "Save Address"}
                     </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Delete Account Confirmation Modal */}
+      <Modal
+        visible={isDeleteModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseDeleteModal}
+      >
+        <View style={styles.confirmModalOverlay}>
+          <Pressable
+            style={styles.confirmModalBackdrop}
+            onPress={handleCloseDeleteModal}
+          />
+          <View style={styles.confirmModalCard}>
+            {/* Soft Danger Icon */}
+            <View style={styles.confirmIconOuter}>
+              <View style={styles.confirmIconInner}>
+                <Trash2 size={24} color="#BE4436" />
+              </View>
+            </View>
+
+            {/* Title & Description */}
+            <Text style={styles.confirmModalTitle}>Delete Account?</Text>
+            <Text style={styles.confirmModalSubtitle}>
+              Are you sure you want to delete your FreshGo account? All your personal profile details, phone number, and saved delivery addresses will be permanently removed.
+            </Text>
+
+            <View style={styles.confirmWarningBox}>
+              <Text style={styles.confirmWarningText}>
+                ⚠️ This action cannot be undone and your session will end immediately.
+              </Text>
+            </View>
+
+            {deleteError ? (
+              <View style={styles.confirmErrorBox}>
+                <Text style={styles.confirmErrorText}>{deleteError}</Text>
+              </View>
+            ) : null}
+
+            {/* Actions: Cancel vs Delete */}
+            <View style={styles.confirmActionRow}>
+              <Pressable
+                style={styles.confirmCancelBtn}
+                onPress={handleCloseDeleteModal}
+                disabled={isDeletingAccount}
+                accessibilityRole="button"
+              >
+                <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={[
+                  styles.confirmDeleteBtn,
+                  isDeletingAccount && styles.confirmDeleteBtnDisabled,
+                ]}
+                onPress={handleConfirmDelete}
+                disabled={isDeletingAccount}
+                accessibilityRole="button"
+              >
+                {isDeletingAccount ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Trash2 size={14} color="#FFFFFF" />
+                    <Text style={styles.confirmDeleteBtnText}>Delete</Text>
                   </>
                 )}
               </Pressable>
@@ -999,21 +1118,42 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
   },
+  accountActionSection: {
+    marginTop: 6,
+    marginBottom: 16,
+    gap: 8,
+  },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: colors.errorTint,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingVertical: 12,
     borderRadius: 12,
-    marginTop: 4,
-    marginBottom: 16,
   },
   logoutBtnText: {
-    color: colors.error,
+    color: colors.text,
     fontSize: 13,
-    fontWeight: "800",
+    fontWeight: "700",
+  },
+  deleteAccountBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FBE7E3",
+    borderWidth: 1,
+    borderColor: "#F4C4BC",
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  deleteAccountBtnText: {
+    color: "#BE4436",
+    fontSize: 13,
+    fontWeight: "700",
   },
   appInfo: {
     alignItems: "center",
@@ -1180,6 +1320,136 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 14,
     fontWeight: "800",
+    color: "#FFFFFF",
+  },
+
+  /* Custom Delete Account Confirmation Modal Styles */
+  confirmModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 46, 41, 0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  confirmModalBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  confirmModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmIconOuter: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#FBE7E3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  confirmIconInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F6D2CA",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.primaryDark,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  confirmModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginBottom: 14,
+  },
+  confirmWarningBox: {
+    backgroundColor: "#FFF8F6",
+    borderWidth: 1,
+    borderColor: "#FBE7E3",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 20,
+    width: "100%",
+  },
+  confirmWarningText: {
+    fontSize: 11.5,
+    color: "#BE4436",
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: 16,
+  },
+  confirmErrorBox: {
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 14,
+    width: "100%",
+  },
+  confirmErrorText: {
+    fontSize: 11.5,
+    color: "#DC2626",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  confirmActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmCancelBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  confirmDeleteBtn: {
+    flex: 1.2,
+    flexDirection: "row",
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#BE4436",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  confirmDeleteBtnDisabled: {
+    opacity: 0.7,
+  },
+  confirmDeleteBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
 });

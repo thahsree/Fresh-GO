@@ -61,4 +61,14 @@ export class UsersController {
   ) {
     return this.usersService.updatePushToken(user.id, pushToken);
   }
+
+  /**
+   * DELETE /users/account
+   * Permanently anonymizes & deactivates the authenticated customer's account.
+   * Required by Apple App Store guideline 5.1.1(v).
+   */
+  @Delete("account")
+  async deleteAccount(@CurrentUser() user: User) {
+    return this.usersService.deleteAccount(user.id);
+  }
 }

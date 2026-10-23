@@ -81,6 +81,7 @@ type CartViewProps = {
   deliveryFee?: number;
   handlingFee?: number;
   freeDeliveryThreshold?: number;
+  isStoreOffline?: boolean;
 };
 
 export function CartView({
@@ -95,6 +96,7 @@ export function CartView({
   deliveryFee: propDeliveryFee,
   handlingFee: propHandlingFee,
   freeDeliveryThreshold = 0,
+  isStoreOffline = false,
   onOpenLocationPicker,
   isLoggedIn = false,
   onOpenAuth,
@@ -997,14 +999,36 @@ export function CartView({
           </View>
         )}
 
+        {isStoreOffline && (
+          <View
+            style={{
+              padding: 10,
+              borderRadius: 8,
+              backgroundColor: "#FBE7E3",
+              borderWidth: 1,
+              borderColor: "#F4C4BC",
+              marginBottom: 8,
+              width: "100%",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <Clock size={16} color="#BE4436" />
+            <Text style={{ fontSize: 12, color: "#9C2B1F", fontWeight: "700", flex: 1 }}>
+              Store is currently offline. Orders are temporarily paused.
+            </Text>
+          </View>
+        )}
+
         <Pressable
           style={[
             styles.placeOrderBtn,
-            (isSubmitting || isCountdownOpen || hasStockIssue) &&
+            (isSubmitting || isCountdownOpen || hasStockIssue || isStoreOffline) &&
               styles.placeOrderBtnDisabled,
           ]}
           onPress={handleInitiateCheckout}
-          disabled={isSubmitting || isCountdownOpen || hasStockIssue}
+          disabled={isSubmitting || isCountdownOpen || hasStockIssue || isStoreOffline}
           accessibilityRole="button"
           accessibilityLabel="Place Order"
         >
@@ -1015,6 +1039,8 @@ export function CartView({
               ? "Confirming..."
               : hasStockIssue
               ? "Stock Exceeded"
+              : isStoreOffline
+              ? "Store Offline"
               : "Place Order"}
           </Text>
           <ArrowRight size={18} color="#FFFFFF" />

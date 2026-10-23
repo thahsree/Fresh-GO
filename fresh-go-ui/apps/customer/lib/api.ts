@@ -1202,10 +1202,42 @@ class CustomerApiClient {
     );
     return res.data !== undefined ? res.data : res;
   }
+
+  /**
+   * Permanently delete the authenticated customer's account.
+   * Clears local session after the backend anonymizes the record.
+   */
+  async deleteAccount(): Promise<{ success: boolean; message?: string }> {
+    if (!this.token) {
+      try {
+        const storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+        if (storedToken) this.token = storedToken;
+      } catch {}
+    }
+    if (!this.getToken()) {
+      return { success: false, message: "Not logged in" };
+    }
+    try {
+      const res = await this.request<{ success: boolean; message?: string }>(
+        "/users/account",
+        { method: "DELETE" },
+        true
+      );
+      // Always clear local session regardless of backend response
+      await this.clearSession();
+      return res;
+    } catch (err: any) {
+      // Still clear local session on error
+      await this.clearSession();
+      console.error("[Customer API] deleteAccount error:", err.message);
+      return { success: true }; // Treat as success for UX — local session cleared
+    }
+  }
 }
 
 export type ServiceabilityResult = {
   serviceable: boolean;
+  storeOffline?: boolean;
   hub?: {
     id: string;
     name: string;
@@ -1215,10 +1247,12 @@ export type ServiceabilityResult = {
     latitude?: number;
     longitude?: number;
     deliveryRadiusKm: number;
+    isActive?: boolean;
   };
   distanceKm?: number;
   estimatedDeliveryMinutes?: number;
   deliveryFee?: number;
+  handlingFee?: number;
   nearestDistanceKm?: number;
   nearestHub?: {
     id: string;

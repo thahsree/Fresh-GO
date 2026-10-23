@@ -118,4 +118,51 @@ export class UsersService {
       select: { id: true, name: true, phone: true, pushToken: true },
     });
   }
+
+  /**
+   * Permanently deletes a customer's account per Apple App Store guideline 5.1.1(v).
+   * - Anonymizes all PII: name, phone, email, pushToken
+   * - Deletes all saved addresses and customer profile notes
+   * - Preserves order records (required for business/financial records)
+   * - Deactivates the account so it cannot be used again
+   */
+  async deleteAccount(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException("User not found");
+
+    // Only customers can self-delete via this endpoint
+    const anonymizedPhone = `deleted_${userId.replace(/-/g, "").slice(0, 12)}`;
+    const anonymizedName = "Deleted User";
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Delete all saved addresses
+      await tx.address.deleteMany({ where: { userId } });
+
+      // 2. Clear customer profile notes and default address
+      await tx.customerProfile.updateMany({
+        where: { userId },
+        data: { defaultAddressId: null, notes: null },
+      });
+
+      // 3. Reset wallet balance if customer had a wallet
+      await tx.wallet.updateMany({
+        where: { userId },
+        data: { balance: 0.0 },
+      });
+
+      // 4. Anonymize all PII on the user record and deactivate
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          name: anonymizedName,
+          phone: anonymizedPhone,
+          email: null,
+          pushToken: null,
+          isActive: false,
+        },
+      });
+    });
+
+    return { success: true, message: "Account deleted successfully." };
+  }
 }

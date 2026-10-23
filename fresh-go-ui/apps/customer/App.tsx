@@ -40,6 +40,7 @@ import { SplashScreen } from "./components/SplashScreen";
 import { SnackbarNotification } from "./components/SnackbarNotification";
 import { BackendConnectionError } from "./components/BackendConnectionError";
 import { ComingSoonView } from "./components/ComingSoonView";
+import { StoreOfflineView } from "./components/StoreOfflineView";
 import { CustomerLocationModal } from "./components/CustomerLocationModal";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { customerApi, ServiceabilityResult, BackendHub, BackendAddress } from "./lib/api";
@@ -634,6 +635,17 @@ export default function App() {
       return;
     }
 
+    // Check if store is offline
+    if (serviceability?.storeOffline) {
+      dispatchOrderNotification({
+        orderId: "STORE_OFFLINE",
+        status: "cancelled",
+        title: "Store is Offline",
+        message: "This hub is currently offline and not taking orders. Please check back shortly.",
+      });
+      return;
+    }
+
     // 1. Send live order to backend with hubId and cut preparations
     // Fall back to the first loaded hub if serviceability hasn't resolved yet
     // (e.g. new install before location permission was granted)
@@ -793,18 +805,26 @@ export default function App() {
                 <>
                   {activeNavigation === "Home" &&
                     (hasChosenLocation && serviceability && !serviceability.serviceable ? (
-                      <ComingSoonView
-                        serviceability={serviceability}
-                        customerCoordinates={customerCoords}
-                        customerAddress={customerAddress}
-                        onRefreshLocation={() => {
-                          checkLocationServiceability(
-                            customerCoords.lat,
-                            customerCoords.lng
-                          );
-                        }}
-                        onOpenLocationPicker={() => setIsLocationModalOpen(true)}
-                      />
+                      serviceability.storeOffline ? (
+                        <StoreOfflineView
+                          customerAddress={customerAddress}
+                          onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+                          onOpenHelp={() => setIsHelpOpen(true)}
+                        />
+                      ) : (
+                        <ComingSoonView
+                          serviceability={serviceability}
+                          customerCoordinates={customerCoords}
+                          customerAddress={customerAddress}
+                          onRefreshLocation={() => {
+                            checkLocationServiceability(
+                              customerCoords.lat,
+                              customerCoords.lng
+                            );
+                          }}
+                          onOpenLocationPicker={() => setIsLocationModalOpen(true)}
+                        />
+                      )
                     ) : (
                       <HomeView
                         searchValue={searchValue}
@@ -842,6 +862,7 @@ export default function App() {
                       deliveryCoords={customerCoords}
                       deliveryPincode={customerPincode}
                       deliveryFee={serviceability?.deliveryFee ?? 0}
+                      isStoreOffline={Boolean(serviceability?.storeOffline)}
                       onOpenLocationPicker={() => setIsLocationModalOpen(true)}
                       isLoggedIn={user.isLoggedIn}
                       onOpenAuth={() => setIsAuthModalOpen(true)}
