@@ -45,7 +45,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly smsService: SmsService,
-  ) {}
+  ) { }
 
   async sendOtp(dto: SendOtpDto) {
     const { phone } = dto;
@@ -100,8 +100,8 @@ export class AuthService {
       message: isMock
         ? "Development OTP simulated (Set SMS_PROVIDER in .env for real SMS)"
         : smsSuccess
-        ? "OTP sent successfully via SMS"
-        : "SMS delivery issue encountered; default OTP fallback activated (123456)",
+          ? "OTP sent successfully via SMS"
+          : "SMS delivery issue encountered; default OTP fallback activated (123456)",
       phone,
       expiresInSeconds: 300,
       isMock,
@@ -140,14 +140,14 @@ export class AuthService {
 
     // Find or create User
     let user = await this.prisma.user.findUnique({
-       where: { phone },
-       include: {
-         customerProfile: true,
-         partnerProfile: true,
-         wallet: true,
-         hub: true,
-       },
-     });
+      where: { phone },
+      include: {
+        customerProfile: true,
+        partnerProfile: true,
+        wallet: true,
+        hub: true,
+      },
+    });
 
     const isSuperAdmin = phone === "+918888888888" || role === (Role.SUPER_ADMIN as any);
     const isHubAdmin = !isSuperAdmin && (phone === "+919999999999" || role === Role.ADMIN);
@@ -165,17 +165,17 @@ export class AuthService {
       const assignedRole = isSuperAdmin
         ? Role.SUPER_ADMIN
         : isHubAdmin
-        ? Role.ADMIN
-        : (role as Role) || Role.CUSTOMER;
+          ? Role.ADMIN
+          : (role as Role) || Role.CUSTOMER;
 
       const hubLocationName = activeHub?.name || "Mavoor Road";
       const defaultName = isSuperAdmin
         ? "FreshGo Super Admin"
         : isHubAdmin
-        ? `${hubLocationName} Hub Admin`
-        : assignedRole === Role.DELIVERY_PARTNER
-        ? "New Partner"
-        : "New Customer";
+          ? `${hubLocationName} Hub Admin`
+          : assignedRole === Role.DELIVERY_PARTNER
+            ? "New Partner"
+            : "New Customer";
 
       user = await this.prisma.user.create({
         data: {
@@ -185,19 +185,19 @@ export class AuthService {
           hubId: isHubAdmin && activeHub ? activeHub.id : undefined,
           ...(assignedRole === Role.CUSTOMER
             ? {
-                customerProfile: { create: {} },
-                wallet: { create: { balance: 0.0 } },
-              }
+              customerProfile: { create: {} },
+              wallet: { create: { balance: 0.0 } },
+            }
             : {}),
           ...(assignedRole === Role.DELIVERY_PARTNER
             ? {
-                partnerProfile: {
-                  create: {
-                    vehicleType: "BIKE",
-                    isOnline: false,
-                  },
+              partnerProfile: {
+                create: {
+                  vehicleType: "BIKE",
+                  isOnline: false,
                 },
-              }
+              },
+            }
             : {}),
         },
         include: {
@@ -281,13 +281,13 @@ export class AuthService {
         hubId: user.hubId,
         hub: user.hub
           ? {
-              id: user.hub.id,
-              name: user.hub.name,
-              code: user.hub.code,
-              city: user.hub.city,
-              latitude: user.hub.latitude,
-              longitude: user.hub.longitude,
-            }
+            id: user.hub.id,
+            name: user.hub.name,
+            code: user.hub.code,
+            city: user.hub.city,
+            latitude: user.hub.latitude,
+            longitude: user.hub.longitude,
+          }
           : null,
         customerProfile: user.customerProfile,
         partnerProfile: user.partnerProfile,
@@ -341,9 +341,9 @@ export class AuthService {
           role: assignedRole,
           ...(assignedRole === Role.CUSTOMER
             ? {
-                customerProfile: { create: {} },
-                wallet: { create: { balance: 0.0 } },
-              }
+              customerProfile: { create: {} },
+              wallet: { create: { balance: 0.0 } },
+            }
             : {}),
         },
         include: {
@@ -367,13 +367,13 @@ export class AuthService {
         hubId: user.hubId,
         hub: user.hub
           ? {
-              id: user.hub.id,
-              name: user.hub.name,
-              code: user.hub.code,
-              city: user.hub.city,
-              latitude: user.hub.latitude,
-              longitude: user.hub.longitude,
-            }
+            id: user.hub.id,
+            name: user.hub.name,
+            code: user.hub.code,
+            city: user.hub.city,
+            latitude: user.hub.latitude,
+            longitude: user.hub.longitude,
+          }
           : null,
         customerProfile: user.customerProfile,
         partnerProfile: user.partnerProfile,
@@ -599,12 +599,12 @@ export class AuthService {
         hubId: linkedHub?.id || null,
         hub: linkedHub
           ? {
-              id: linkedHub.id,
-              name: linkedHub.name,
-              code: linkedHub.code,
-              city: linkedHub.city,
-              contactPhone: linkedHub.contactPhone,
-            }
+            id: linkedHub.id,
+            name: linkedHub.name,
+            code: linkedHub.code,
+            city: linkedHub.city,
+            contactPhone: linkedHub.contactPhone,
+          }
           : null,
       },
       ...tokens,
@@ -672,12 +672,12 @@ export class AuthService {
         hubId: profile.hubId,
         hub: profile.hub
           ? {
-              id: profile.hub.id,
-              name: profile.hub.name,
-              code: profile.hub.code,
-              address: profile.hub.address,
-              contactPhone: profile.hub.contactPhone,
-            }
+            id: profile.hub.id,
+            name: profile.hub.name,
+            code: profile.hub.code,
+            address: profile.hub.address,
+            contactPhone: profile.hub.contactPhone,
+          }
           : null,
         partnerProfile: {
           id: profile.id,
@@ -692,12 +692,12 @@ export class AuthService {
           hubId: profile.hubId,
           hub: profile.hub
             ? {
-                id: profile.hub.id,
-                name: profile.hub.name,
-                code: profile.hub.code,
-                address: profile.hub.address,
-                contactPhone: profile.hub.contactPhone,
-              }
+              id: profile.hub.id,
+              name: profile.hub.name,
+              code: profile.hub.code,
+              address: profile.hub.address,
+              contactPhone: profile.hub.contactPhone,
+            }
             : null,
         },
       },

@@ -32,17 +32,17 @@ export class SmsService {
         // Prepare primary payload: route "otp" delivers to DND and non-DND via pre-approved template
         const primaryPayload: any = preferredRoute === "q"
           ? {
-              route: "q",
-              message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
-              language: "english",
-              flash: 0,
-              numbers: rawNumber,
-            }
+            route: "q",
+            message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
+            language: "english",
+            flash: 0,
+            numbers: rawNumber,
+          }
           : {
-              route: "otp",
-              variables_values: otp,
-              numbers: rawNumber,
-            };
+            route: "otp",
+            variables_values: otp,
+            numbers: rawNumber,
+          };
 
         let res = await axios.post(
           "https://www.fast2sms.com/dev/bulkV2",
@@ -61,17 +61,17 @@ export class SmsService {
           this.logger.warn(`Fast2SMS primary route (${primaryPayload.route}) failed: ${JSON.stringify(res.data?.message)}. Trying alternate route...`);
           const fallbackPayload: any = primaryPayload.route === "otp"
             ? {
-                route: "q",
-                message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
-                language: "english",
-                flash: 0,
-                numbers: rawNumber,
-              }
+              route: "q",
+              message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
+              language: "english",
+              flash: 0,
+              numbers: rawNumber,
+            }
             : {
-                route: "otp",
-                variables_values: otp,
-                numbers: rawNumber,
-              };
+              route: "otp",
+              variables_values: otp,
+              numbers: rawNumber,
+            };
 
           res = await axios.post(
             "https://www.fast2sms.com/dev/bulkV2",

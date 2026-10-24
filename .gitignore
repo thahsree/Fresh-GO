@@ -43,3 +43,11 @@ Thumbs.db
 *.sln
 *.sw?
 dump.rdb
+
+# Apple & Android Credentials & Keys
+credentials/
+credentials.json
+*.p12
+*.p8
+*.mobileprovision
+*.pem
