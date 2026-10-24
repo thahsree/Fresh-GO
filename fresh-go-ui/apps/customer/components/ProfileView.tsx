@@ -22,6 +22,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -52,6 +53,7 @@ type ProfileViewProps = {
   currentCoords?: { lat: number; lng: number };
   currentPincode?: string;
   onSelectDeliveryAddress?: (addr: BackendAddress) => void;
+  onUpdateUser?: (updated: UserProfile) => void;
 };
 
 export function ProfileView({
@@ -64,7 +66,40 @@ export function ProfileView({
   currentCoords = { lat: 0, lng: 0 },
   currentPincode = "",
   onSelectDeliveryAddress,
+  onUpdateUser,
 }: ProfileViewProps) {
+  // Edit Profile State
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [editName, setEditName] = useState(user.name === "New Customer" ? "" : user.name);
+  const [editEmail, setEditEmail] = useState(user.email || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEditName(user.name === "New Customer" ? "" : user.name);
+    setEditEmail(user.email || "");
+  }, [user.name, user.email]);
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      setProfileError("Please enter your name");
+      return;
+    }
+    setProfileError(null);
+    setIsSavingProfile(true);
+    try {
+      const updated = await customerApi.updateProfile(editName.trim(), editEmail.trim() || undefined);
+      if (onUpdateUser) {
+        onUpdateUser(updated);
+      }
+      setIsEditProfileOpen(false);
+    } catch (err: any) {
+      setProfileError(err?.message || "Failed to update profile. Please try again.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   // Address State
   const [addresses, setAddresses] = useState<BackendAddress[]>([]);
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
@@ -119,7 +154,7 @@ export function ProfileView({
 
   // Open modal to Add Address
   const handleOpenAdd = () => {
-    if (!user.isLoggedIn) {
+    if (!user.isLoggedIn || !customerApi.getToken()) {
       onOpenAuth();
       return;
     }
@@ -193,6 +228,19 @@ export function ProfileView({
       setIsAddressModalOpen(false);
       await loadAddresses();
     } catch (err: any) {
+      const msg = err?.message || "";
+      if (
+        msg.includes("Unauthorized") ||
+        msg.includes("401") ||
+        msg.includes("User account") ||
+        msg.includes("log in") ||
+        msg.includes("Address_userId_fkey")
+      ) {
+        await customerApi.clearSession();
+        setIsAddressModalOpen(false);
+        onOpenAuth();
+        return;
+      }
       setFormError(err?.message || "Failed to save address. Please try again.");
     } finally {
       setIsSavingAddress(false);
@@ -298,11 +346,37 @@ export function ProfileView({
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.userName}>{user.name}</Text>
+              <Pressable
+                style={styles.editProfileBtn}
+                onPress={() => {
+                  setEditName(user.name === "New Customer" ? "" : user.name);
+                  setEditEmail(user.email || "");
+                  setProfileError(null);
+                  setIsEditProfileOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Edit profile name"
+              >
+                <Edit3 size={13} color={colors.primary} />
+              </Pressable>
               <View style={styles.memberBadge}>
                 <Sparkles size={11} color={colors.accent} />
                 <Text style={styles.memberBadgeText}>Club Member</Text>
               </View>
             </View>
+            {user.name === "New Customer" && (
+              <Pressable
+                onPress={() => {
+                  setEditName("");
+                  setEditEmail(user.email || "");
+                  setProfileError(null);
+                  setIsEditProfileOpen(true);
+                }}
+                style={styles.addNameHint}
+              >
+                <Text style={styles.addNameHintText}>+ Tap to set your name</Text>
+              </Pressable>
+            )}
             <Text style={styles.userPhone}>{user.phone}</Text>
             {!!user.email && <Text style={styles.userEmail}>{user.email}</Text>}
           </View>
@@ -808,6 +882,92 @@ export function ProfileView({
         </View>
       </Modal>
 
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={isEditProfileOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditProfileOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsEditProfileOpen(false)}
+          />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile Name</Text>
+              <Pressable
+                style={styles.modalCloseBtn}
+                onPress={() => setIsEditProfileOpen(false)}
+              >
+                <X size={18} color={colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.modalScrollContent, { gap: 14 }]}>
+              <View style={styles.fieldWrap}>
+                <Text style={styles.inputLabel}>YOUR FULL NAME *</Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={(val) => {
+                    setEditName(val);
+                    if (profileError) setProfileError(null);
+                  }}
+                  placeholder="e.g. Rahul Sharma"
+                  placeholderTextColor={colors.textSoft}
+                  style={styles.input}
+                  autoFocus
+                />
+              </View>
+
+              <View style={styles.fieldWrap}>
+                <Text style={styles.inputLabel}>EMAIL ADDRESS (OPTIONAL)</Text>
+                <TextInput
+                  value={editEmail}
+                  onChangeText={(val) => {
+                    setEditEmail(val);
+                    if (profileError) setProfileError(null);
+                  }}
+                  placeholder="e.g. rahul@example.com"
+                  placeholderTextColor={colors.textSoft}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={styles.input}
+                />
+              </View>
+
+              {!!profileError && (
+                <Text style={styles.errorText}>{profileError}</Text>
+              )}
+            </View>
+
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={[
+                  styles.saveBtn,
+                  (!editName.trim() || isSavingProfile) && { opacity: 0.6 },
+                ]}
+                onPress={handleSaveProfile}
+                disabled={!editName.trim() || isSavingProfile}
+              >
+                {isSavingProfile ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Check size={16} color="#FFFFFF" />
+                    <Text style={styles.saveBtnText}>Save Changes</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Dedicated Legal & Trust Modal (Task 2) */}
       <PrivacyPolicyModal
         visible={isPrivacyModalOpen}
@@ -860,6 +1020,26 @@ const styles = StyleSheet.create({
     color: colors.primaryDark,
     fontSize: 16,
     fontWeight: "800",
+  },
+  editProfileBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  addNameHint: {
+    marginTop: 2,
+    marginBottom: 4,
+    alignSelf: "flex-start",
+  },
+  addNameHintText: {
+    color: colors.primary,
+    fontSize: 11.5,
+    fontWeight: "700",
   },
   memberBadge: {
     flexDirection: "row",

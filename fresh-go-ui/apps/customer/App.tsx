@@ -897,6 +897,7 @@ export default function App() {
                     ) : (
                       <ProfileView
                         user={user}
+                        onUpdateUser={(updated) => setUser(updated)}
                         onOpenAuth={() => setIsAuthModalOpen(true)}
                         onLogout={() => {
                           customerApi.clearSession();

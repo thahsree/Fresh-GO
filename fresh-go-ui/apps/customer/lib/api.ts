@@ -557,8 +557,13 @@ class CustomerApiClient {
       throw new Error("Verification failed. Please try again.");
     }
 
+    const finalName =
+      res.user.name && res.user.name !== "New Customer"
+        ? res.user.name
+        : name?.trim() || res.user.name || "Customer";
+
     const profile: UserProfile = {
-      name: res.user.name || name?.trim() || "Customer",
+      name: finalName,
       phone: res.user.phone || phone,
       email: res.user.email || "",
       isLoggedIn: true,
@@ -612,6 +617,12 @@ class CustomerApiClient {
           const errText = await res.text().catch(() => "");
           if (errText) msg = errText;
         }
+
+        if (res.status === 401) {
+          console.warn("[Customer API] 401 Unauthorized encountered, clearing session");
+          await this.clearSession();
+        }
+
         throw new Error(msg);
       }
 
@@ -833,8 +844,10 @@ class CustomerApiClient {
     latitude: number;
     longitude: number;
     isDefault?: boolean;
-  }): Promise<BackendAddress | null> {
-    if (!this.getToken()) return null;
+  }): Promise<BackendAddress> {
+    if (!this.getToken()) {
+      throw new Error("Please log in to save a delivery address");
+    }
     try {
       const res = await this.post<BackendAddress>("/users/addresses", dto, true);
       return res;
@@ -1232,6 +1245,35 @@ class CustomerApiClient {
       console.error("[Customer API] deleteAccount error:", err.message);
       return { success: true }; // Treat as success for UX — local session cleared
     }
+  }
+
+  async updateProfile(name: string, email?: string): Promise<UserProfile> {
+    const res = await this.put<{
+      id: string;
+      phone: string;
+      name: string;
+      email?: string;
+      role: string;
+    }>(
+      "/users/profile",
+      {
+        name: name.trim(),
+        email: email?.trim() || undefined,
+      },
+      true
+    );
+
+    const profile: UserProfile = {
+      name: res.name || name.trim(),
+      phone: res.phone || this.user?.phone || "",
+      email: res.email || "",
+      isLoggedIn: true,
+    };
+
+    if (this.token) {
+      await this.setSession(this.token, profile);
+    }
+    return profile;
   }
 }
 

@@ -255,6 +255,15 @@ export class AuthService {
         }
       }
 
+      // If user provides a name during login or if name was previously generic/New Customer, update it
+      if (name && name.trim()) {
+        const cleanName = name.trim();
+        if (user.name !== cleanName) {
+          updateData.name = cleanName;
+          needUpdate = true;
+        }
+      }
+
       if (needUpdate) {
         user = await this.prisma.user.update({
           where: { id: user.id },
@@ -346,6 +355,17 @@ export class AuthService {
             }
             : {}),
         },
+        include: {
+          customerProfile: true,
+          partnerProfile: true,
+          wallet: true,
+          hub: true,
+        },
+      });
+    } else if (name && name.trim() && user.name !== name.trim()) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { name: name.trim() },
         include: {
           customerProfile: true,
           partnerProfile: true,

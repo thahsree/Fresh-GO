@@ -29,6 +29,13 @@ export class UsersService {
   }
 
   async addAddress(userId: string, dto: CreateAddressDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new NotFoundException(`User account with ID ${userId} was not found`);
+    }
+
     if (dto.isDefault) {
       await this.prisma.address.updateMany({
         where: { userId },
@@ -117,6 +124,27 @@ export class UsersService {
       data: { pushToken },
       select: { id: true, name: true, phone: true, pushToken: true },
     });
+  }
+
+  async updateProfile(userId: string, dto: { name?: string; email?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException("User not found");
+
+    const updateData: any = {};
+    if (dto.name && dto.name.trim()) updateData.name = dto.name.trim();
+    if (dto.email !== undefined) updateData.email = dto.email.trim() || null;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+    return {
+      id: updated.id,
+      phone: updated.phone,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+    };
   }
 
   /**

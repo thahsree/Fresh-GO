@@ -99,3 +99,13 @@ export class UpdatePartnerProfileDto {
   @IsString()
   licenseNumber?: string;
 }
+
+export class UpdateUserProfileDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+}
