@@ -389,9 +389,15 @@ export function HubsManagementView({
                 </tr>
               ) : (
                 filteredHubs.map((hub) => {
-                  const adminName =
-                    hub.admins?.[0]?.name || `${hub.name} Admin`;
-                  const adminPhone = hub.admins?.[0]?.phone || "Auto-assigned";
+                  const activeAdmin =
+                    hub.admins?.find(
+                      (a: any) =>
+                        a.isActive !== false &&
+                        !a.phone?.startsWith("deleted_") &&
+                        a.name !== "Deleted User"
+                    ) || hub.admins?.[0];
+                  const adminName = activeAdmin?.name || `${hub.name} Admin`;
+                  const adminPhone = activeAdmin?.phone || "Auto-assigned";
 
                   return (
                     <tr

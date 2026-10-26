@@ -503,7 +503,9 @@ export class AuthService {
         ],
       },
       include: {
-        admins: true,
+        admins: {
+          where: { isActive: true },
+        },
         _count: {
           select: { orders: true },
         },
@@ -517,13 +519,17 @@ export class AuthService {
 
     let hub = matchingHubs[0] || null;
 
-    // 2. Find admin user linked to this hub or by direct phone match
-    let adminUser: any = hub?.admins[0];
-    if (!adminUser) {
+    // 2. Find admin user: prioritize active, non-deleted admin linked to this hub or by direct phone match
+    let adminUser: any = hub?.admins?.find(
+      (a: any) => a.isActive && !a.phone?.startsWith("deleted_")
+    ) || hub?.admins?.[0];
+
+    if (!adminUser || !adminUser.isActive) {
       adminUser = await this.prisma.user.findFirst({
         where: {
           phone: normalizedPhone,
           role: { in: [Role.ADMIN, Role.HUB_MANAGER, Role.SUPER_ADMIN] },
+          isActive: true,
         },
         include: {
           hub: true,

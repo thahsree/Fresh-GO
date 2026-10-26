@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../common/prisma/prisma.service";
 import { CreateAddressDto, UpdateAddressDto, UpdatePartnerProfileDto } from "./dto/users.dto";
-import { VehicleType } from "@prisma/client";
+import { VehicleType, Role } from "@prisma/client";
 
 @Injectable()
 export class UsersService {
@@ -158,6 +158,13 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
 
+    // Protect administrative and staff accounts from being deleted via customer app
+    if (user.role !== Role.CUSTOMER) {
+      throw new BadRequestException(
+        `Staff, Partner, and Admin accounts (${user.role}) cannot be deleted from the customer mobile app. Please contact Super Admin.`
+      );
+    }
+
     // Only customers can self-delete via this endpoint
     const anonymizedPhone = `deleted_${userId.replace(/-/g, "").slice(0, 12)}`;
     const anonymizedName = "Deleted User";
@@ -187,6 +194,7 @@ export class UsersService {
           email: null,
           pushToken: null,
           isActive: false,
+          hubId: null,
         },
       });
     });

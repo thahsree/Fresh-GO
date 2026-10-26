@@ -41,6 +41,7 @@ export class HubsService {
       where: options?.includeInactive ? {} : { isActive: true },
       include: {
         admins: {
+          where: { isActive: true },
           select: {
             id: true,
             name: true,
@@ -71,6 +72,7 @@ export class HubsService {
       where: { id },
       include: {
         admins: {
+          where: { isActive: true },
           select: {
             id: true,
             name: true,
@@ -448,13 +450,14 @@ export class HubsService {
       hub.contactPhone ||
       "+919999999999";
 
-    // Update or create hub admin user with password
+    // Update or create hub admin user with password and ensure active status
     await this.prisma.user.upsert({
       where: { phone: targetPhone },
       update: {
         password: hashedPassword,
         hubId: hub.id,
         role: Role.ADMIN,
+        isActive: true,
       },
       create: {
         phone: targetPhone,
@@ -462,6 +465,22 @@ export class HubsService {
         role: Role.ADMIN,
         hubId: hub.id,
         password: hashedPassword,
+        isActive: true,
+      },
+    });
+
+    // Unlink any deactivated / deleted admin users from this hub so they don't pollute the hub's admin list
+    await this.prisma.user.updateMany({
+      where: {
+        hubId: hub.id,
+        OR: [
+          { isActive: false },
+          { name: "Deleted User" },
+          { phone: { startsWith: "deleted_" } },
+        ],
+      },
+      data: {
+        hubId: null,
       },
     });
 
