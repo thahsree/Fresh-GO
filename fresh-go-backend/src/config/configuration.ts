@@ -32,7 +32,11 @@ export default () => ({
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || "",
     twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || "",
     fast2smsApiKey: process.env.FAST2SMS_API_KEY || "",
-    fast2smsRoute: process.env.FAST2SMS_ROUTE || "q",
+    fast2smsRoute: process.env.FAST2SMS_ROUTE || "whatsapp",
+    fast2smsWhatsappMessageId: process.env.FAST2SMS_WHATSAPP_MESSAGE_ID || "40333",
+    fast2smsWhatsappPhoneNumberId: process.env.FAST2SMS_WHATSAPP_PHONE_NUMBER_ID || "1334391076434856",
+    fast2smsSenderId: process.env.FAST2SMS_SENDER_ID || "",
+    fast2smsDltTemplateId: process.env.FAST2SMS_DLT_TEMPLATE_ID || "",
   },
   storage: {
     endpoint: process.env.S3_ENDPOINT || "",

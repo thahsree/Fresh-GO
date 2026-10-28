@@ -100,8 +100,8 @@ export class AuthService {
       message: isMock
         ? "Development OTP simulated (Set SMS_PROVIDER in .env for real SMS)"
         : smsSuccess
-          ? "OTP sent successfully via SMS"
-          : "SMS delivery issue encountered; default OTP fallback activated (123456)",
+          ? "OTP sent successfully"
+          : "Delivery issue encountered; default OTP fallback activated (123456)",
       phone,
       expiresInSeconds: 300,
       isMock,

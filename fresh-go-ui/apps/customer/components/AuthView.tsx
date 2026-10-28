@@ -318,7 +318,7 @@ export function AuthView({ visible, onClose, onSuccess }: AuthViewProps) {
                   <Text style={styles.mainTitle}>Enter Verification Code</Text>
                   <Text style={styles.subtitle}>
                     We have sent a 6-digit verification code to{" "}
-                    <Text style={styles.phoneHighlight}>+91 {phone}</Text>
+                    <Text style={styles.phoneHighlight}>+91 {phone}</Text> on WhatsApp.
                   </Text>
                 </View>
 

@@ -27,10 +27,71 @@ export class SmsService {
           return false;
         }
         const rawNumber = phone.replace("+91", "").replace("+", "").trim();
-        const preferredRoute = this.configService.get<string>("sms.fast2smsRoute", "otp");
+        const route = this.configService.get<string>("sms.fast2smsRoute", "whatsapp");
 
-        // Prepare primary payload: route "otp" delivers to DND and non-DND via pre-approved template
-        const primaryPayload: any = preferredRoute === "q"
+        // 1. WHATSAPP ROUTE (Fast2SMS WhatsApp Template API - instant, no DLT required, costs ~₹0.25)
+        if (route === "whatsapp") {
+          const messageId = this.configService.get<string>("sms.fast2smsWhatsappMessageId", "40333");
+          const phoneNumberId = this.configService.get<string>("sms.fast2smsWhatsappPhoneNumberId", "1334391076434856");
+
+          const res = await axios.get("https://www.fast2sms.com/dev/whatsapp", {
+            params: {
+              message_id: messageId,
+              phone_number_id: phoneNumberId,
+              numbers: rawNumber,
+              variables_values: otp,
+            },
+            headers: {
+              authorization: apiKey,
+              accept: "application/json",
+            },
+            timeout: 8000,
+          });
+
+          if (res.data?.status === true || res.data?.return === true) {
+            this.logger.log(`📲 [Fast2SMS WhatsApp] Sent OTP successfully to ${rawNumber}: ${JSON.stringify(res.data?.message || res.data)}`);
+            return true;
+          } else {
+            this.logger.error(`❌ [Fast2SMS WhatsApp] Failed for ${rawNumber}: ${JSON.stringify(res.data?.message || res.data)}`);
+            return false;
+          }
+        }
+
+        // 2. DLT ROUTE (For when TRAI DLT registration is approved)
+        if (route === "dlt") {
+          const senderId = this.configService.get<string>("sms.fast2smsSenderId");
+          const dltTemplateId = this.configService.get<string>("sms.fast2smsDltTemplateId");
+
+          const res = await axios.post(
+            "https://www.fast2sms.com/dev/bulkV2",
+            {
+              route: "dlt",
+              sender_id: senderId,
+              message: dltTemplateId,
+              variables_values: otp,
+              numbers: rawNumber,
+            },
+            {
+              headers: {
+                authorization: apiKey,
+                "Content-Type": "application/json",
+                accept: "application/json",
+              },
+              timeout: 8000,
+            }
+          );
+
+          if (res.data?.return === true || res.data?.status === true) {
+            this.logger.log(`📲 [Fast2SMS DLT SMS] Sent OTP successfully to ${rawNumber}: ${JSON.stringify(res.data?.message)}`);
+            return true;
+          } else {
+            this.logger.error(`❌ [Fast2SMS DLT SMS] Failed for ${rawNumber}: ${JSON.stringify(res.data?.message)}`);
+            return false;
+          }
+        }
+
+        // 3. LEGACY / FALLBACK SMS ROUTES: "q" (Quick SMS) or "otp"
+        const primaryPayload: any = route === "q"
           ? {
             route: "q",
             message: `Your FreshGo verification code is ${otp}. Valid for 5 minutes.`,
